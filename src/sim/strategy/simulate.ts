@@ -125,7 +125,10 @@ export function simulateMany(
   sessions: number,
   opts: ManyOptions = {},
 ): Promise<ManyResult> {
-  const schedule = opts.schedule ?? ((fn: () => void) => void setTimeout(fn, 0));
+  const schedule = (fn: () => void): void => {
+    if (opts.schedule) opts.schedule(fn);
+    else setTimeout(fn, 0);
+  };
   const slice = opts.sliceMs ?? 16;
   const len = cfg.rolls + 1;
   return new Promise<ManyResult>((resolve, reject) => {

@@ -50,7 +50,10 @@ function trim(x: number, digits = 1): string {
 }
 function money(cents: number): string {
   const d = cents / 100;
-  const s = Math.abs(d).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: Number.isInteger(d) ? 0 : 2 });
+  const s = Math.abs(d).toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(d) ? 0 : 2,
+  });
   return `${d < 0 ? '-' : ''}$${s}`;
 }
 
@@ -66,7 +69,8 @@ function niceTicks(lo: number, hi: number, n = 5): number[] {
   }
   const step = niceStep(hi - lo, n);
   const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v / step) * step);
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step)
+    out.push(Math.round(v / step) * step);
   return out;
 }
 
@@ -76,7 +80,14 @@ function lastIndex(series: ChartSeries[]): number {
   return n - 1;
 }
 
-export function BankrollChart({ mode, series, start, title, summary, sessions }: BankrollChartProps) {
+export function BankrollChart({
+  mode,
+  series,
+  start,
+  title,
+  summary,
+  sessions,
+}: BankrollChartProps) {
   const last = lastIndex(series);
   const money$ = mode !== 'survival';
   const heading =
@@ -158,7 +169,11 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
     .join(' ');
 
   return (
-    <figure class="sim-chart" data-testid="bankroll-chart" style={{ margin: 0, position: 'relative' }}>
+    <figure
+      class="sim-chart"
+      data-testid="bankroll-chart"
+      style={{ margin: 0, position: 'relative' }}
+    >
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
@@ -221,7 +236,13 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
               stroke-opacity="0.6"
               stroke-width="1.5"
             />
-            <text x={W - M.r - 2} y={py(start) - 4} font-size="11" fill="currentColor" text-anchor="end">
+            <text
+              x={W - M.r - 2}
+              y={py(start) - 4}
+              font-size="11"
+              fill="currentColor"
+              text-anchor="end"
+            >
               Break even {money(start)}
             </text>
           </g>
@@ -230,7 +251,15 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
           const c = SERIES_COLORS[k % SERIES_COLORS.length]!;
           return (
             <g key={s.id} data-series={s.id} aria-hidden="true">
-              {s.band && <path d={bandPath(s.band)} fill={c} fill-opacity="0.18" stroke="none" data-role="band" />}
+              {s.band && (
+                <path
+                  d={bandPath(s.band)}
+                  fill={c}
+                  fill-opacity="0.18"
+                  stroke="none"
+                  data-role="band"
+                />
+              )}
               {s.expected && (
                 <path
                   d={path(s.expected)}
@@ -256,13 +285,26 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
       </svg>
       <ul
         class="sim-chart-legend"
-        style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: '0.85em' }}
+        style={{
+          listStyle: 'none',
+          margin: '4px 0 0',
+          padding: 0,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px 16px',
+          fontSize: '0.85em',
+        }}
       >
         {series.map((s, k) => {
           const c = SERIES_COLORS[k % SERIES_COLORS.length]!;
           return (
             <li key={s.id}>
-              <svg width="28" height="10" aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 4 }}>
+              <svg
+                width="28"
+                height="10"
+                aria-hidden="true"
+                style={{ verticalAlign: 'middle', marginRight: 4 }}
+              >
                 <line x1="0" x2="28" y1="5" y2="5" stroke={c} stroke-width="3" />
               </svg>
               {s.label}
@@ -272,8 +314,21 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
         })}
         {money$ && series.some((s) => s.expected) && (
           <li>
-            <svg width="28" height="10" aria-hidden="true" style={{ verticalAlign: 'middle', marginRight: 4 }}>
-              <line x1="0" x2="28" y1="5" y2="5" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4" />
+            <svg
+              width="28"
+              height="10"
+              aria-hidden="true"
+              style={{ verticalAlign: 'middle', marginRight: 4 }}
+            >
+              <line
+                x1="0"
+                x2="28"
+                y1="5"
+                y2="5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="6 4"
+              />
             </svg>
             Expected (start minus expected loss)
           </li>
@@ -296,7 +351,8 @@ export function BankrollChart({ mode, series, start, title, summary, sessions }:
         </thead>
         <tbody>
           {series.flatMap((s) => {
-            const at = (a: ArrayLike<number>, i: number) => fmtVal(a[Math.min(i, a.length - 1)] ?? 0);
+            const at = (a: ArrayLike<number>, i: number) =>
+              fmtVal(a[Math.min(i, a.length - 1)] ?? 0);
             const rows = [
               <tr key={s.id}>
                 <th scope="row">{s.label}</th>

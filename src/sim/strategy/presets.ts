@@ -1,11 +1,4 @@
-import type {
-  Action,
-  Bet,
-  BetTypeId,
-  Cents,
-  GameState,
-  TableRules,
-} from '../engine/types';
+import type { Action, Bet, BetTypeId, Cents, GameState, TableRules } from '../engine/types';
 import type { Strategy, StrategyId, StrategyLens, StrategySpec } from './types';
 
 const D = 100;
@@ -111,7 +104,10 @@ function molly(state: GameState, spec: StrategySpec): Plan {
   }
   if (state.phase === 'point' && state.point !== null) {
     if (pass && !find(state, 'pass-odds') && mult > 0) {
-      const amt = Math.min(oddsTarget(pass.amount, mult, rules.maxOdds[state.point]), whole(b.cash));
+      const amt = Math.min(
+        oddsTarget(pass.amount, mult, rules.maxOdds[state.point]),
+        whole(b.cash),
+      );
       if (amt >= D) b.place('pass-odds', amt, pass.id, false);
     }
   }
@@ -197,7 +193,10 @@ function martingale(state: GameState, spec: StrategySpec): Plan {
   } else if (pass && state.point !== null && !find(state, 'pass-odds')) {
     const mult = spec.oddsMultiple ?? 0;
     if (mult > 0) {
-      const amt = Math.min(oddsTarget(pass.amount, mult, rules.maxOdds[state.point]), whole(b.cash));
+      const amt = Math.min(
+        oddsTarget(pass.amount, mult, rules.maxOdds[state.point]),
+        whole(b.cash),
+      );
       if (amt >= D) b.place('pass-odds', amt, pass.id, false);
     }
   }
@@ -251,7 +250,9 @@ function repeatLayout(state: GameState, spec: StrategySpec): Plan {
       case 'dont-come-odds': {
         const pt = w.point ?? null;
         const parentType = t === 'come-odds' ? 'come' : 'dont-come';
-        const parent = state.bets.find((x) => x.type === parentType && x.point === pt && pt !== null);
+        const parent = state.bets.find(
+          (x) => x.type === parentType && x.point === pt && pt !== null,
+        );
         if (!parent || state.bets.some((x) => x.type === t && x.parentId === parent.id)) break;
         const cap = (t === 'come-odds' ? rules.maxOdds : rules.maxLayOdds)[parent.point!];
         const amt = Math.min(amount, whole(parent.amount * cap), whole(b.cash));

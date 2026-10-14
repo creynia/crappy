@@ -47,7 +47,14 @@ export function TotalsHistogram({ counts, title = 'Dice totals' }: TotalsHistogr
         <g font-size="11" fill="currentColor" aria-hidden="true">
           {yTicks.map((v) => (
             <g key={v}>
-              <line x1={M.l} x2={W - M.r} y1={py(v)} y2={py(v)} stroke="currentColor" stroke-opacity="0.15" />
+              <line
+                x1={M.l}
+                x2={W - M.r}
+                y1={py(v)}
+                y2={py(v)}
+                stroke="currentColor"
+                stroke-opacity="0.15"
+              />
               <text x={M.l - 6} y={py(v) + 4} text-anchor="end">
                 {v}
               </text>
@@ -79,7 +86,12 @@ export function TotalsHistogram({ counts, title = 'Dice totals' }: TotalsHistogr
                 <text x={x + bw / 2} y={py(c) - 3} text-anchor="middle">
                   {c}
                 </text>
-                <text x={x + bw / 2} y={H - M.b + 16} text-anchor="middle" font-weight={t === 7 ? 700 : 400}>
+                <text
+                  x={x + bw / 2}
+                  y={H - M.b + 16}
+                  text-anchor="middle"
+                  font-weight={t === 7 ? 700 : 400}
+                >
                   {t}
                 </text>
               </g>

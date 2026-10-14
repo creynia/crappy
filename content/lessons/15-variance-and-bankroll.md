@@ -55,11 +55,11 @@ autoRoll:
   sessions: [20]
 steps:
   - id: flat
-    text: "Strategy A: $10 Pass, **no odds** (odds 0×). Run **20 sessions** of 100 rolls. Each dot on the chart is one hour."
-    completeWhen: { autoRollCompleted: { minRolls: 100 } }
+    text: "Strategy A: $10 Pass, **no odds** (tap **Odds: Flat only**). Run **20 sessions** of 100 rolls. Each dot on the chart is one hour."
+    completeWhen: { autoRollCompleted: { minRolls: 100, oddsMultiple: 0 } }
   - id: odds
-    text: "Strategy B: $10 Pass + **max odds**. Run 20 sessions again."
-    completeWhen: { autoRollCompleted: { minRolls: 100 } }
+    text: "Strategy B: $10 Pass + **max odds** (tap **Odds: Max**). Run 20 sessions again."
+    completeWhen: { autoRollCompleted: { minRolls: 100, oddsMultiple: default } }
   - id: compare
     text: "Same average, much wider spread. Which spread are you comfortable with?"
     advance: button

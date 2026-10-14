@@ -1,4 +1,12 @@
-import type { Action, Cents, GameState, TableRules, RulePresetId } from '../engine/types';
+import type {
+  Action,
+  BetTypeId,
+  Cents,
+  GameState,
+  PointNumber,
+  RulePresetId,
+  TableRules,
+} from '../engine/types';
 
 export type StrategyLens = 'lowest-edge' | 'practical' | 'fun';
 export type StrategyId =
@@ -11,12 +19,25 @@ export type StrategyId =
   | 'across'
   | 'field-every-roll'
   | 'any-7-every-roll'
-  | 'hardways-all';
+  | 'hardways-all'
+  | 'no-bet'
+  | 'my-layout'
+  | 'martingale-pass';
 
+/** One bet of a player layout snapshot (used by `my-layout`). */
+export interface LayoutBet {
+  type: BetTypeId;
+  amount: Cents;
+  /** come/dont-come and their odds: the number the bet sits on (null/absent = in the box) */
+  point?: PointNumber | null;
+}
 export interface StrategySpec {
   id: StrategyId;
   unit: Cents;
-  oddsMultiple?: number; // default: table max
+  /** Odds as a multiple of the flat bet; 0 = flat bets only; default depends on the strategy (table max for max-odds ones). */
+  oddsMultiple?: number;
+  /** Required by `my-layout`: the bets to re-place each roll. */
+  layout?: LayoutBet[];
 }
 export interface Strategy {
   id: StrategyId;
@@ -45,6 +66,9 @@ export interface SessionResult {
   totalWagered: Cents;
   expectedLoss: number;
   actualLoss: Cents;
+  /** Count of each dice total, index 2..12 (0 and 1 unused). Used by the totals histogram. */
+  totals: Int32Array;
+  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss';
   maxDrawdown: Cents;
   peakEquity: Cents;
   bustedAtRoll: number | null;
@@ -59,6 +83,10 @@ export interface ManyResult {
   p90: Float64Array;
   expected: Float64Array;
   bustRate: number;
+  /** Share of sessions still solvent (not busted) after each roll; [0] = 1. */
+  survival: Float64Array;
+  /** Final equity of every session (cents), in seed order. */
+  finals: Int32Array;
   meanFinal: number;
   probAhead: number;
 }
@@ -66,6 +94,8 @@ export interface ManyOptions {
   onProgress?(p: number): void;
   signal?: AbortSignal;
   schedule?(fn: () => void): void;
+  /** Time budget per chunk before yielding (default 16ms). */
+  sliceMs?: number;
 }
 /** Proposed shape (simulator.md §2.4 names the fields but not the type); strategy agent may refine. */
 export interface StrategyMetrics {

@@ -138,6 +138,16 @@ describe('simulateSession', () => {
     expect(r.endedBy).toBe('bust');
     expect(r.equity.length).toBe(r.rollsPlayed + 1);
   });
+  it('place bettors who cannot afford the layout bust even on the come-out', () => {
+    const r = simulateSession({
+      strategy: spec('iron-cross'),
+      rolls: 500,
+      seed: 4,
+      bankroll: 1000,
+    });
+    expect(r.endedBy).toBe('bust');
+    expect(r.bustedAtRoll).toBe(0);
+  });
   it('honors stopWin / stopLoss', () => {
     const r = simulateSession({ ...cfg, rolls: 5000, stopLoss: 2000 });
     expect(r.rollsPlayed).toBeLessThan(5000);

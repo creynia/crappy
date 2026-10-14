@@ -70,6 +70,11 @@ describe('BankrollChart', () => {
     const s = (id: string) => ({ id, label: id, line: Float64Array.from([1, 1, 0.9, 0.7]) });
     render(<BankrollChart mode="survival" start={50_000} series={[s('a'), s('b')]} />, el);
     expect(el.querySelectorAll('[data-role="line"]').length).toBe(2);
+    const dashes = [...el.querySelectorAll('[data-role="line"]')].map((n) =>
+      n.getAttribute('stroke-dasharray'),
+    );
+    expect(new Set(dashes).size).toBe(2);
+    expect(el.querySelectorAll('[data-role="end-labels"] text').length).toBe(2);
     expect(el.querySelector('[data-testid="break-even"]')).toBeNull();
     expect(el.textContent).toContain('100%');
     expect(el.querySelector('desc')!.textContent).toContain('70%');

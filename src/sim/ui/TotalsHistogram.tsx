@@ -1,3 +1,5 @@
+import { useId } from 'preact/hooks';
+
 /** Counts of each dice total (index 2..12) against the expected 1-2-3-4-5-6-5-4-3-2-1 shape. */
 const WAYS = [0, 0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
 const W = 560;
@@ -18,6 +20,7 @@ export interface TotalsHistogramProps {
 }
 
 export function TotalsHistogram({ counts, title = 'Dice totals' }: TotalsHistogramProps) {
+  const uid = useId();
   let n = 0;
   for (let t = 2; t <= 12; t++) n += counts[t] ?? 0;
   const expected = (t: number) => (n * WAYS[t]!) / 36;
@@ -39,11 +42,11 @@ export function TotalsHistogram({ counts, title = 'Dice totals' }: TotalsHistogr
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-labelledby="totals-t totals-d"
+        aria-labelledby={`${uid}-t ${uid}-d`}
         style={{ width: '100%', height: 'auto', display: 'block' }}
       >
-        <title id="totals-t">{title}</title>
-        <desc id="totals-d">{desc}</desc>
+        <title id={`${uid}-t`}>{title}</title>
+        <desc id={`${uid}-d`}>{desc}</desc>
         <g font-size="11" fill="currentColor" aria-hidden="true">
           {yTicks.map((v) => (
             <g key={v}>

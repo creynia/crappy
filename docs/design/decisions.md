@@ -40,3 +40,37 @@ this file wins.
 | Lesson gating | All lessons open; "Continue" goes to next unfinished |
 | License | MIT |
 | Repo visibility | Public (already) |
+
+## Reconciling curriculum.md with simulator.md
+
+- **Bet ids**: the engine ids in `simulator.md` §1.2 are canonical
+  (`aces-2`, `ace-deuce-3`, `boxcars-12`, …). The registry is **extended with
+  `buy-5`, `buy-6`, `buy-8`, `buy-9`, `lay-5`, `lay-6`, `lay-8`, `lay-9`**
+  (buy pays true odds 3:2 / 6:5, lay pays 2:3 / 5:6, vig as for 4/10).
+  **No hop bets** in v1 (mentioned in lesson text only; add as a chip).
+  Content must use canonical ids; a content test rejects unknown ids.
+- **Vig rounding**: casino style (`floor-dollar-min-1`), per the product owner.
+  Curriculum text claiming "exactly 5%, no rounding" must be rewritten to match:
+  the simulator rounds like a real casino, and the lesson explains why you buy
+  in $20 units. Edge tables quote the 5%-of-$20-unit numbers (4.76% buy,
+  2.44% lay-4 at $40, etc.).
+- **Content format**: lessons are Markdown with `:::math Title` … `:::` and
+  `:::tip` … `:::` containers, and ` ```scene ` / ` ```quiz ` fenced **YAML**
+  blocks (the `yaml` npm package parses them at build time). This replaces the
+  fenced-JSON directives in `architecture.md` §4.
+- **Scene blocks** are written in the `SceneConfig` shape from `simulator.md`
+  §4.1 (money in **cents**, `rules` preset ids `standard-vegas`, `field-3x-12`,
+  `odds-10x`, `odds-100x`). The curriculum's informal scene YAML is converted to
+  that shape by the content-authoring agents. Each scene is checked with
+  `validateScene` in a content test.
+- **Strategy ids**: `simulator.md` §2.5 ids are canonical
+  (`pass-max-odds`, `dont-pass-max-lay`, `three-point-molly`, `place-6-8`,
+  `iron-cross`, `field-every-roll`, …).
+- **Curriculum-requested sim features**:
+  - Strategy comparison on the same dice: **in v1** (`autoRoll.compareMode`;
+    compared strategies share the seed).
+  - Survival / multi-session chart: **in v1** via `simulateMany`
+    (p10/p50/p90 bands + bust rate).
+  - "Call the bet" mode and "plan panel": **cut from v1**, tracked as chips;
+    lessons must read fine without them.
+- **Red-tier bets** need a second tap to confirm in the sandbox (curriculum §6).

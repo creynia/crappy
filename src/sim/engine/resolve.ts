@@ -70,7 +70,8 @@ export function resolveRoll(
         const cash = res.profit - res.vig;
         const staysUp = def.afterWin === 'stays-up';
         if (staysUp) {
-          kept.push(bet);
+          // upfront vig covers only the first win; later wins pay vig from the payout
+          kept.push(bet.vigPaid > 0 ? { ...bet, vigPaid: 0 } : bet);
           bankroll += cash;
         } else {
           bankroll += bet.amount + cash;

@@ -353,6 +353,22 @@ describe('createGame', () => {
     expect(() => createGame({ bets: [{ type: 'pass-odds', amount: $(10) }] })).toThrow();
     expect(() => createGame({ bets: [{ type: 'pass-line', amount: $(1) }] })).toThrow();
   });
+  it('validates a pre-travelled come point', () => {
+    expect(() =>
+      createGame({
+        phase: 'point',
+        point: 6,
+        bets: [{ type: 'come', amount: $(10), point: 7 as never }],
+      }),
+    ).toThrow();
+    expect(() =>
+      createGame({
+        phase: 'point',
+        point: 6,
+        bets: [{ type: 'place-6', amount: $(12), point: 6 }],
+      }),
+    ).toThrow();
+  });
   it('defaults', () => {
     const s = createGame({ seed: 5 });
     expect(s).toMatchObject({

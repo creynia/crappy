@@ -26,6 +26,7 @@ export interface OracleIn {
   point: number | null; // table point
   d1: number;
   d2: number;
+  upfrontPaid?: boolean; // upfront vig already paid and not yet consumed by a win
   working: boolean; // already decided by the caller (only matters for toggleable bets)
   rules: OracleRules;
 }
@@ -83,6 +84,7 @@ export function oracle(i: OracleIn): OracleOut {
     vig,
   });
   void WIN;
+  const upfrontCovered = r.vigTiming === 'upfront' && i.upfrontPaid === true;
 
   if (TOGGLEABLE.test(i.type) && !i.working) {
     if (i.type === 'come-odds' && i.betPoint !== null && (t === 7 || t === i.betPoint)) {
@@ -101,7 +103,7 @@ export function oracle(i: OracleIn): OracleOut {
   if (cat === 'buy') {
     if (t === n) {
       const [x, y] = TRUE[n]!;
-      return winAt(x, y, r.vigTiming === 'upfront' ? 0 : vigOn(a, r));
+      return winAt(x, y, upfrontCovered ? 0 : vigOn(a, r));
     }
     return t === 7 ? L : N;
   }
@@ -109,7 +111,7 @@ export function oracle(i: OracleIn): OracleOut {
     if (t === 7) {
       const [x, y] = AGAINST[n]!;
       const profit = paid(a, x, y, r.payoutUnit);
-      return { kind: 'win', profit, vig: r.vigTiming === 'upfront' ? 0 : vigOn(profit, r) };
+      return { kind: 'win', profit, vig: upfrontCovered ? 0 : vigOn(profit, r) };
     }
     return t === n ? L : N;
   }

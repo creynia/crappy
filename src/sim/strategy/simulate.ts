@@ -4,13 +4,27 @@ import { tableExpectedLossPerRoll, toNumber } from '../math';
 import { getImpl } from './presets';
 import type { ManyOptions, ManyResult, SessionConfig, SessionResult } from './types';
 
-const expectedLossFn = (s: GameState): number => toNumber(tableExpectedLossPerRoll(s));
+/** Expected loss only depends on phase, point and the bets, so repeated layouts hit a per-session cache. */
+function makeExpectedLossFn(): (s: GameState) => number {
+  const cache = new Map<string, number>();
+  return (s) => {
+    let key = s.phase === 'point' ? `p${s.point}` : 'c';
+    for (const b of s.bets) key += `|${b.type}:${b.amount}:${b.point ?? ''}:${b.working}`;
+    let v = cache.get(key);
+    if (v === undefined) {
+      v = toNumber(tableExpectedLossPerRoll(s));
+      cache.set(key, v);
+    }
+    return v;
+  };
+}
 
 /** Run one session. Pure and deterministic per `cfg.seed`. */
 export function simulateSession(cfg: SessionConfig): SessionResult {
   const impl = getImpl(cfg.strategy.id);
   const stopAtBust = cfg.stopAtBust ?? true;
   const start = cfg.bankroll;
+  const expectedLossFn = makeExpectedLossFn();
   let state = createGame({ rules: cfg.rules, bankroll: cfg.bankroll, seed: cfg.seed });
   const eq = new Int32Array(cfg.rolls + 1);
   const exp = new Float64Array(cfg.rolls + 1);

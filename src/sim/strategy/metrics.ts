@@ -43,7 +43,7 @@ function materialize(state: GameState, actions: Action[]): GameState {
   for (const b of bets) {
     if (b.parentId) {
       const p = bets.find((x) => x.id === b.parentId);
-      if (p) b.point = p.point;
+      if (p) b.point = p.point ?? state.point;
     }
   }
   return { ...state, bets, nextBetId };

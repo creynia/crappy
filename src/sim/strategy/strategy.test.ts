@@ -67,7 +67,15 @@ describe('layouts', () => {
     let s = createGame({ bankroll: 100_000, seed: 1 });
     const sp = spec(id, extra);
     for (const phase of ['come-out', 'point'] as const) {
-      if (phase === 'point') s = createGame({ bankroll: 100_000, seed: 1, phase, point: 6 });
+      if (phase === 'point') {
+        s = createGame({
+          bankroll: 100_000,
+          seed: 1,
+          phase,
+          point: 6,
+          bets: s.bets.map((b) => ({ type: b.type, amount: b.amount })),
+        });
+      }
       for (const a of getStrategy(id).decide(s, sp)) {
         const r = applyAction(s, a);
         if (!r.ok) throw new Error(r.error.message);
@@ -236,7 +244,11 @@ describe('strategyMetrics (simulator.md 2.4)', () => {
     expect(m('iron-cross', 500).expectedLossPerRoll).toBeCloseTo(7 / 18, 3);
     expect(m('any-7-every-roll', 500).expectedLossPerRoll).toBeCloseTo(0.8333, 3);
     expect(m('no-bet', 500).expectedLossPerRoll).toBe(0);
-    expect(m('pass-max-odds', 1000).edgeOnAction).toBeCloseTo(0.01414, 4);
+    expect(
+      strategyMetrics({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 }, rules).edgeOnAction,
+    ).toBeCloseTo(0.01414, 4);
+    // odds dilute the edge on total action
+    expect(m('pass-max-odds', 1000).edgeOnAction).toBeLessThan(0.005);
   });
 });
 

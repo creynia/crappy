@@ -96,7 +96,7 @@ function lineStrategy(
 function molly(state: GameState, spec: StrategySpec): Plan {
   const rules = state.rules;
   const b = new Builder(state);
-  const mult = spec.oddsMultiple ?? 2;
+  const mult = spec.oddsMultiple ?? Infinity;
   const unit = flatAmount(rules, spec.unit);
   const pass = find(state, 'pass-line');
   if (state.phase === 'come-out') {
@@ -136,7 +136,7 @@ function placeNumbers(state: GameState, items: Array<[BetTypeId, Cents]>, withFi
   const b = new Builder(state);
   if (state.phase !== 'point') return b.plan();
   const missing: Array<[BetTypeId, Cents]> = [];
-  if (withField > 0) missing.push(['field', withField]);
+  if (withField > 0 && !find(state, 'field')) missing.push(['field', withField]);
   for (const it of items) if (!find(state, it[0])) missing.push(it);
   // Field is one-roll: if only the field is missing, still re-place it.
   b.placeAll(missing);

@@ -52,4 +52,32 @@ describe('AutoRollPanel', () => {
     await click(el, '[data-testid="auto-roll-run"]');
     expect(el.querySelectorAll('[data-role="line"]').length).toBe(2);
   });
+
+  it('learner-facing cost row comes from the run: Iron Cross at $5 is about $27 per 100 rolls', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={3}
+        bankroll={200_000}
+        config={{
+          defaultStrategy: { id: 'iron-cross', unit: 500 },
+          strategies: ['iron-cross'],
+          rollOptions: [100],
+          sessions: [100],
+        }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600));
+    });
+    const row = [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
+      tr.textContent?.startsWith('Expected cost per 100 rolls'),
+    )!;
+    const cost = Number(row.querySelector('td')!.textContent.replace(/[^0-9.]/g, ''));
+    expect(cost).toBeGreaterThan(26);
+    expect(cost).toBeLessThan(28);
+    expect(row.querySelector('td')!.textContent).toMatch(/\.\d\d$/);
+  });
 });

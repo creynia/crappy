@@ -272,3 +272,13 @@ describe('benchmark', () => {
   });
   void eloss;
 });
+
+describe('edge on action is per decision', () => {
+  it('pass + max 3-4-5x odds is 0.374%, flat 5x 0.326%, DP + 6x lay 0.273%', () => {
+    const rules = resolveRules('standard-vegas');
+    const e = (spec: StrategySpec) => strategyMetrics(spec, rules).edgeOnAction * 100;
+    expect(e({ id: 'pass-max-odds', unit: 1000 })).toBeCloseTo(0.374, 2);
+    expect(e({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 })).toBeCloseTo(1.414, 2);
+    expect(e({ id: 'dont-pass-max-lay', unit: 1000 })).toBeCloseTo(0.273, 2);
+  });
+});

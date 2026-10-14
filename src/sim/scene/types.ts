@@ -51,6 +51,8 @@ export interface SceneConfig {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** per-strategy specs to compare side by side (implies compareMode) */
+    compare?: StrategySpec[];
   };
   steps?: SceneStep[];
 }
@@ -98,7 +100,7 @@ export type Condition =
   | { bankrollAtLeast: Cents }
   | { bankrollAtMost: Cents }
   | { previewed: BetTypeId }
-  | { autoRollCompleted: { minRolls?: number } }
+  | { autoRollCompleted: { minRolls?: number; oddsMultiple?: number | 'default' } }
   | { acknowledged: true };
 
 export interface SceneRuntime {
@@ -106,10 +108,12 @@ export interface SceneRuntime {
   stepStartRoll: number;
   counters: Record<string, number>;
   done: boolean;
+  /** current step's condition is met but the step waits for the Next button (advance: 'button') */
+  satisfied?: boolean;
 }
 
 export type SceneInput =
   | { kind: 'action'; action: Action; events: GameEvent[] }
   | { kind: 'previewed'; betType: BetTypeId }
   | { kind: 'acknowledged' }
-  | { kind: 'auto-roll-completed'; rolls: number };
+  | { kind: 'auto-roll-completed'; rolls: number; oddsMultiple?: number | 'default' };

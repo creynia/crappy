@@ -3,6 +3,20 @@ import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
+/** P(each point is established) given a decision of a line/come bet, in 36ths. */
+const POINT_WAYS: Record<PointNumber, number> = { 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3 };
+
+/**
+ * Expected odds wagered per decision, as a multiple of the flat bet, when odds are always taken at the table
+ * maximum: sum over points of P(point) x max multiple. 3-4-5x gives 100/36; 6x lay gives 4.
+ */
+export function oddsMultiplePerDecision(rules: TableRules, lay: boolean): number {
+  let t = 0;
+  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[])
+    t += (POINT_WAYS[n] / 36) * (lay ? rules.maxLayOdds[n] : rules.maxOdds[n]);
+  return t;
+}
+
 const COME_NUMBERS: PointNumber[] = [8, 5, 9, 10, 4];
 const LINE_TYPES: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
   'pass-line',
@@ -86,8 +100,18 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
   let action = 0;
   for (const b of state.bets) {
     if (b.type.endsWith('-odds')) {
-      const e = betEdge(b.type, b.amount, { phase: 'point', point: b.point, rules: r });
-      action += b.amount / toNumber(e.expectedRolls);
+      // Odds are measured per DECISION of their flat bet: the amount wagered on odds depends on which
+      // point is made, so use the expected odds over the point distribution (same fraction of the
+      // table maximum as this layout takes at its own point).
+      const parent = state.bets.find((x) => x.id === b.parentId);
+      if (!parent) continue;
+      const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
+      const maxMult = (lay ? r.maxLayOdds : r.maxOdds)[b.point ?? 6];
+      const frac =
+        maxMult > 0 && parent.amount > 0 ? Math.min(1, b.amount / (parent.amount * maxMult)) : 0;
+      const e = betEdge(parent.type, parent.amount, { phase: 'come-out', point: null, rules: r });
+      action +=
+        (parent.amount * frac * oddsMultiplePerDecision(r, lay)) / toNumber(e.expectedRolls);
       continue;
     }
     const ctx = LINE_TYPES.has(b.type)

@@ -592,17 +592,41 @@
   padding: 3px 6px;
   border-bottom: 1px solid var(--sim-border);
 }
-.sim-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 4px;
+.sim-footer {
   position: sticky;
   bottom: -18px;
   padding: 8px 0 18px;
   margin-bottom: -18px;
+  margin-top: 4px;
   background: var(--sim-surface);
   border-top: 1px solid var(--sim-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-footer .sim-banner {
+  margin: 0;
+}
+.sim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.sim-sheet .sim-btn-addodds {
+  background: var(--sim-surface-2);
+  font-weight: 700;
+}
+.sim-sheet.tier-neutral {
+  border-color: var(--sim-border);
+}
+.sim-badge-neutral {
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+}
+.sim-sheet .sim-btn-remove:disabled {
+  opacity: 0.45;
 }
 .sim-sheet .sim-btn-confirm {
   background: var(--sim-accent);

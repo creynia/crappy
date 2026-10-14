@@ -1,4 +1,4 @@
-import { getBetType } from '../engine/game';
+import { BET_TYPES } from '../engine/bets';
 import type {
   Bet,
   BetTypeId,
@@ -62,7 +62,7 @@ function rollCtx(dice: Dice, phase: Phase, point: PointNumber | null): RollConte
 /** Vig charged at placement when rules.vig.timing === 'upfront' (cents); else 0. */
 export function upfrontVig(type: BetTypeId, amount: Cents, rules: TableRules): Cents {
   if (rules.vig.timing !== 'upfront') return 0;
-  const def = getBetType(type);
+  const def = BET_TYPES[type];
   if (def.category !== 'buy' && def.category !== 'lay') return 0;
   // Vig base: the bet for buy, the potential win for lay. The win profit comes from the registry.
   let base = amount;
@@ -102,7 +102,7 @@ function enumerate(
   point: PointNumber | null,
   rules: TableRules,
 ): { groups: Group[]; none: Dice[] } {
-  const def = getBetType(bet.type);
+  const def = BET_TYPES[bet.type];
   const groups = new Map<string, Group>();
   const none: Dice[] = [];
   for (const dice of ALL_DICE) {
@@ -156,7 +156,11 @@ function distribution(
     if (res.kind === 'win') {
       immediate.push({
         w,
-        row: { label: `${prefix}Win on ${text}`, net: frac(res.profit - res.vig - vigPaid), push: false },
+        row: {
+          label: `${prefix}Win on ${text}`,
+          net: frac(res.profit - res.vig - vigPaid),
+          push: false,
+        },
       });
     } else if (res.kind === 'lose') {
       immediate.push({
@@ -188,7 +192,10 @@ function distribution(
   }
 
   if (continuing.length > 0) {
-    const rows: RawOutcome[] = immediate.map(({ w, row }) => ({ ...row, probability: frac(w, 36) }));
+    const rows: RawOutcome[] = immediate.map(({ w, row }) => ({
+      ...row,
+      probability: frac(w, 36),
+    }));
     let rolls = ZERO;
     for (const c of continuing) {
       const p = frac(c.w, 36);
@@ -231,13 +238,25 @@ export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
     d = distribution(synth(t, bet.amount, null, vigPaid), 'point', ctx.point, ctx.rules, '');
   } else if (COMES.has(t)) {
     // Come box (point null) or already on a number.
-    d = distribution(synth(t, bet.amount, bet.point, vigPaid), 'point', bet.point ?? ctx.point ?? 6, ctx.rules, '');
+    d = distribution(
+      synth(t, bet.amount, bet.point, vigPaid),
+      'point',
+      bet.point ?? ctx.point ?? 6,
+      ctx.rules,
+      '',
+    );
   } else if (ODDS.has(t)) {
     const p = bet.point ?? ctx.point;
     if (p === null) throw new Error(`${t} needs a point`);
     d = distribution(synth(t, bet.amount, p, vigPaid), 'point', p, ctx.rules, '');
   } else {
-    d = distribution(synth(t, bet.amount, bet.point, vigPaid), 'point', ctx.point ?? 6, ctx.rules, '');
+    d = distribution(
+      synth(t, bet.amount, bet.point, vigPaid),
+      'point',
+      ctx.point ?? 6,
+      ctx.rules,
+      '',
+    );
   }
   if (cache.size > 5000) cache.clear();
   cache.set(key, d);

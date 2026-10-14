@@ -1,0 +1,212 @@
+{
+  "pass-line": {
+    "summary": "Placeholder: pass-line.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "dont-pass": {
+    "summary": "Placeholder: dont-pass.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "come": {
+    "summary": "Placeholder: come.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "dont-come": {
+    "summary": "Placeholder: dont-come.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "pass-odds": {
+    "summary": "Placeholder: pass-odds.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "free"
+  },
+  "dont-pass-odds": {
+    "summary": "Placeholder: dont-pass-odds.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "free"
+  },
+  "come-odds": {
+    "summary": "Placeholder: come-odds.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "free"
+  },
+  "dont-come-odds": {
+    "summary": "Placeholder: dont-come-odds.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "free"
+  },
+  "place-4": {
+    "summary": "Placeholder: place-4.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "place-5": {
+    "summary": "Placeholder: place-5.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "place-6": {
+    "summary": "Placeholder: place-6.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "place-8": {
+    "summary": "Placeholder: place-8.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "good"
+  },
+  "place-9": {
+    "summary": "Placeholder: place-9.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "place-10": {
+    "summary": "Placeholder: place-10.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-4": {
+    "summary": "Placeholder: buy-4.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-5": {
+    "summary": "Placeholder: buy-5.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-6": {
+    "summary": "Placeholder: buy-6.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-8": {
+    "summary": "Placeholder: buy-8.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-9": {
+    "summary": "Placeholder: buy-9.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "buy-10": {
+    "summary": "Placeholder: buy-10.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-4": {
+    "summary": "Placeholder: lay-4.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-5": {
+    "summary": "Placeholder: lay-5.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-6": {
+    "summary": "Placeholder: lay-6.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-8": {
+    "summary": "Placeholder: lay-8.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-9": {
+    "summary": "Placeholder: lay-9.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "lay-10": {
+    "summary": "Placeholder: lay-10.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "fair"
+  },
+  "field": {
+    "summary": "Placeholder: field.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "poor"
+  },
+  "big-6": {
+    "summary": "Placeholder: big-6.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "poor"
+  },
+  "big-8": {
+    "summary": "Placeholder: big-8.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "poor"
+  },
+  "hard-4": {
+    "summary": "Placeholder: hard-4.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "hard-6": {
+    "summary": "Placeholder: hard-6.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "hard-8": {
+    "summary": "Placeholder: hard-8.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "hard-10": {
+    "summary": "Placeholder: hard-10.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "any-7": {
+    "summary": "Placeholder: any-7.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "any-craps": {
+    "summary": "Placeholder: any-craps.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "yo-11": {
+    "summary": "Placeholder: yo-11.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "aces-2": {
+    "summary": "Placeholder: aces-2.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "boxcars-12": {
+    "summary": "Placeholder: boxcars-12.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "ace-deuce-3": {
+    "summary": "Placeholder: ace-deuce-3.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "horn": {
+    "summary": "Placeholder: horn.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "c-e": {
+    "summary": "Placeholder: c-e.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  },
+  "world": {
+    "summary": "Placeholder: world.",
+    "howItWorks": "Placeholder text. The real description is written by the lesson authors.",
+    "verdict": "avoid"
+  }
+}

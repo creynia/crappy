@@ -1,0 +1,19 @@
+[
+  {
+    "term": "Come-out roll",
+    "slug": "come-out",
+    "definition": "The first roll of a new round, before a **point** is set.",
+    "see": ["point"]
+  },
+  {
+    "term": "Point",
+    "slug": "point",
+    "definition": "The number (4, 5, 6, 8, 9 or 10) the shooter must roll again before a 7.",
+    "see": ["come-out"]
+  },
+  {
+    "term": "House edge",
+    "slug": "house-edge",
+    "definition": "The average share of each bet the casino keeps in the long run."
+  }
+]

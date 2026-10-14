@@ -1,0 +1,722 @@
+/* crappy simulator UI. Felt colours are fixed; chrome tokens have light and dark values. */
+:root {
+  --felt-hi: #0f7d45;
+  --felt-lo: #0a5a30;
+  --felt-edge: #063b20;
+  --sim-bg: #f4f1e8;
+  --sim-surface: #ffffff;
+  --sim-surface-2: #ece8dc;
+  --sim-text: #1b1d1c;
+  --sim-muted: #5a5f5c;
+  --sim-border: #cfc9b8;
+  --sim-accent: #0b6b3a;
+  --sim-accent-ink: #ffffff;
+  --sim-focus: #1456d9;
+  --ev-free: #0b7fb5;
+  --ev-good: #1f8a45;
+  --ev-fair: #b58a00;
+  --ev-poor: #c7620d;
+  --ev-avoid: #c93232;
+  --ev-ink: #ffffff;
+  --ev-fair-ink: #1b1d1c;
+  --sim-win: #1c7a3c;
+  --sim-loss: #b72a2a;
+  --sim-chip-ring: #f5c542;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --sim-bg: #111513;
+    --sim-surface: #1b211e;
+    --sim-surface-2: #252d29;
+    --sim-text: #eef1ee;
+    --sim-muted: #a3aca7;
+    --sim-border: #3a443f;
+    --sim-accent: #2fa564;
+    --sim-accent-ink: #04140a;
+    --sim-focus: #7fa8ff;
+    --ev-free: #3aa7dc;
+    --ev-good: #3fb868;
+    --ev-fair: #e0b21c;
+    --ev-poor: #e8812f;
+    --ev-avoid: #ec5a5a;
+    --ev-ink: #0b0f0d;
+    --sim-win: #5fd08a;
+    --sim-loss: #ff8a8a;
+  }
+}
+:root[data-theme='dark'] {
+  --sim-bg: #111513;
+  --sim-surface: #1b211e;
+  --sim-surface-2: #252d29;
+  --sim-text: #eef1ee;
+  --sim-muted: #a3aca7;
+  --sim-border: #3a443f;
+  --sim-accent: #2fa564;
+  --sim-accent-ink: #04140a;
+  --sim-focus: #7fa8ff;
+  --ev-free: #3aa7dc;
+  --ev-good: #3fb868;
+  --ev-fair: #e0b21c;
+  --ev-poor: #e8812f;
+  --ev-avoid: #ec5a5a;
+  --ev-ink: #0b0f0d;
+  --sim-win: #5fd08a;
+  --sim-loss: #ff8a8a;
+}
+
+.sim-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- table ---------- */
+.sim-table-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--felt-edge);
+  box-shadow: inset 0 0 0 3px #3a2412;
+}
+.sim-table {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font-family: 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+}
+.sim-table text {
+  font-family: inherit;
+  font-weight: 800;
+  pointer-events: none;
+}
+.sim-num {
+  font-weight: 900;
+}
+.sim-label {
+  font-weight: 900;
+  letter-spacing: 3px;
+}
+.sim-tiny {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.sim-region {
+  cursor: pointer;
+  outline: none;
+}
+.sim-hit {
+  fill: transparent;
+}
+.sim-region:hover .sim-hit {
+  fill: rgba(255, 255, 255, 0.08);
+}
+.sim-region:active .sim-hit {
+  fill: rgba(255, 255, 255, 0.16);
+}
+.sim-focus-ring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 6;
+}
+.sim-region:focus-visible .sim-focus-ring {
+  stroke: #ffe066;
+}
+.sim-region.is-selected .sim-hit {
+  fill: rgba(255, 224, 102, 0.16);
+}
+.sim-region.is-disabled {
+  opacity: 0.4;
+}
+.sim-pulse {
+  fill: none;
+  stroke: #ffe066;
+  stroke-width: 4;
+}
+.sim-stack-hit {
+  cursor: pointer;
+}
+.sim-stack.is-off {
+  opacity: 0.8;
+}
+.sim-stack-badge text {
+  pointer-events: none;
+}
+.sim-chip-text {
+  font-family: Arial, system-ui, sans-serif;
+}
+.sim-puck {
+  pointer-events: none;
+  transition: transform 300ms ease;
+}
+.sim-dice-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* ---------- dice ---------- */
+.sim-dice {
+  display: inline-flex;
+  gap: 8px;
+}
+.sim-die svg {
+  display: block;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
+}
+.sim-dice-lg .sim-die {
+  width: 64px;
+  height: 64px;
+}
+.sim-dice-sm {
+  gap: 4px;
+  vertical-align: middle;
+}
+.sim-dice-sm .sim-die {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------- chips rack ---------- */
+.sim-rack {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.sim-rack-column {
+  flex-direction: column;
+}
+.sim-chipbtn {
+  width: 44px;
+  height: 48px;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.sim-chipbtn svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sim-chipbtn.is-selected {
+  transform: translateY(-5px);
+  box-shadow: 0 0 0 3px var(--sim-chip-ring);
+  border-radius: 50%;
+}
+.sim-chipbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sim-chipbtn:focus-visible,
+.sim-roll:focus-visible,
+.sim-sheet button:focus-visible,
+.sim-sheet input:focus-visible,
+.sim-toast-x:focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- roll button ---------- */
+.sim-roll {
+  min-height: 56px;
+  min-width: 112px;
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: pointer;
+  font: inherit;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.sim-roll:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sim-roll-label {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.sim-roll-cost {
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+
+/* ---------- status + history ---------- */
+.sim-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--sim-text);
+  font-size: 0.85rem;
+}
+.sim-status-money {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.sim-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sim-point {
+  white-space: nowrap;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sim-surface-2);
+}
+.sim-point.has-point {
+  background: var(--sim-text);
+  color: var(--sim-bg);
+}
+.sim-session-up b {
+  color: var(--sim-win);
+}
+.sim-session-down b {
+  color: var(--sim-loss);
+}
+.sim-history {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  scrollbar-width: thin;
+}
+.sim-history-empty {
+  color: var(--sim-muted);
+}
+.sim-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  font-size: 0.8rem;
+}
+.sim-pill i {
+  font-style: normal;
+  font-weight: 900;
+}
+.sim-pill-seven-out {
+  background: var(--ev-avoid);
+  color: var(--ev-ink);
+}
+.sim-pill-point-made {
+  background: var(--ev-good);
+  color: var(--ev-ink);
+}
+.sim-pill-natural {
+  background: transparent;
+  border-color: var(--sim-text);
+}
+
+/* ---------- toasts ---------- */
+.sim-toasts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.sim-toast {
+  pointer-events: auto;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  border-left: 6px solid var(--sim-muted);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-size: 0.9rem;
+}
+.sim-toast-win {
+  border-left-color: var(--sim-win);
+}
+.sim-toast-loss {
+  border-left-color: var(--sim-loss);
+}
+.sim-toast-x {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ---------- bet sheet ---------- */
+.sim-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  background: rgba(0, 0, 0, 0.45);
+}
+.sim-sheet-sheet {
+  align-items: flex-end;
+  justify-content: center;
+}
+.sim-sheet-panel {
+  align-items: stretch;
+  justify-content: flex-end;
+}
+.sim-sheet {
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  padding: 14px 16px 18px;
+  overflow-y: auto;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 6px solid var(--sim-border);
+  font-size: 0.95rem;
+}
+.sim-sheet-sheet .sim-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  border-radius: 18px 18px 0 0;
+}
+.sim-sheet-panel .sim-sheet {
+  width: min(380px, 48vw);
+  border-top: 0;
+  border-left: 6px solid var(--sim-border);
+}
+.sim-sheet.tier-free {
+  border-color: var(--ev-free);
+}
+.sim-sheet.tier-good {
+  border-color: var(--ev-good);
+}
+.sim-sheet.tier-fair {
+  border-color: var(--ev-fair);
+}
+.sim-sheet.tier-poor {
+  border-color: var(--ev-poor);
+}
+.sim-sheet.tier-avoid {
+  border-color: var(--ev-avoid);
+}
+.sim-sheet-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.sim-sheet button {
+  font: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  cursor: pointer;
+  padding: 4px 12px;
+}
+.sim-sheet button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sim-seg {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sim-seg button.is-selected {
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  border-color: var(--sim-accent);
+  font-weight: 700;
+}
+.sim-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sim-stepper output {
+  min-width: 90px;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+.sim-quick {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sim-working {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+.sim-working input {
+  width: 22px;
+  height: 22px;
+}
+.sim-invalid {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ev-avoid) 18%, transparent);
+  border: 1px solid var(--ev-avoid);
+}
+.sim-warnings {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--sim-muted);
+}
+.sim-ev {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-ev-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sim-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--ev-ink);
+}
+.sim-badge-free {
+  background: var(--ev-free);
+}
+.sim-badge-good {
+  background: var(--ev-good);
+}
+.sim-badge-fair {
+  background: var(--ev-fair);
+  color: var(--ev-fair-ink);
+}
+.sim-badge-poor {
+  background: var(--ev-poor);
+}
+.sim-badge-avoid {
+  background: var(--ev-avoid);
+}
+.sim-headline {
+  font-weight: 700;
+}
+.sim-banner {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ev-avoid);
+  color: var(--ev-ink);
+  font-weight: 700;
+}
+.sim-detail,
+.sim-note,
+.sim-formula {
+  margin: 0;
+  color: var(--sim-muted);
+}
+.sim-ev-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-ev-lines .sim-oneroll {
+  display: block;
+  color: var(--sim-muted);
+  font-style: italic;
+}
+.sim-alt {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--sim-surface-2);
+  border: 1px dashed var(--ev-good);
+}
+.sim-alt p {
+  margin: 0;
+}
+.sim-why-btn {
+  align-self: flex-start;
+}
+.sim-why table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.sim-why th,
+.sim-why td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--sim-border);
+}
+.sim-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.sim-sheet .sim-btn-confirm {
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  border-color: var(--sim-accent);
+  font-weight: 800;
+  min-width: 120px;
+}
+.sim-sheet .sim-btn-confirm.is-danger {
+  background: var(--ev-avoid);
+  border-color: var(--ev-avoid);
+  color: var(--ev-ink);
+}
+.sim-sheet .sim-btn-remove {
+  margin-right: auto;
+  color: var(--sim-loss);
+}
+
+/* ---------- animation: transforms and opacity only; off under reduced motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .sim-pulse {
+    animation: sim-pulse 1.2s ease-in-out infinite;
+  }
+  .sim-dice.is-rolling .sim-die-0 {
+    animation: sim-tumble-a var(--sim-tumble, 1000ms) ease-out both;
+  }
+  .sim-dice.is-rolling .sim-die-1 {
+    animation: sim-tumble-b var(--sim-tumble, 1000ms) ease-out both;
+  }
+  .sim-ghost-lose {
+    animation: sim-lose calc(400ms * var(--sim-anim, 1)) ease-in forwards;
+  }
+  .sim-ghost-win {
+    animation: sim-win calc(600ms * var(--sim-anim, 1)) ease-out both;
+  }
+  .sim-stack-hit.is-won {
+    animation: sim-flash 600ms ease-out;
+  }
+  .sim-toast {
+    animation: sim-toast-in 180ms ease-out;
+  }
+  .sim-sheet-sheet .sim-sheet {
+    animation: sim-slide-up 200ms ease-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-pulse {
+    stroke-width: 6;
+  }
+  .sim-ghost-lose {
+    opacity: 0;
+  }
+  .sim-puck {
+    transition: none;
+  }
+}
+@keyframes sim-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes sim-tumble-a {
+  0% {
+    transform: translate(-80px, -60px) rotate(0);
+    opacity: 0.2;
+  }
+  40% {
+    transform: translate(14px, 18px) rotate(380deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-6px, -8px) rotate(620deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(720deg);
+  }
+}
+@keyframes sim-tumble-b {
+  0% {
+    transform: translate(80px, -70px) rotate(0);
+    opacity: 0.2;
+  }
+  45% {
+    transform: translate(-12px, 16px) rotate(-300deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(8px, -6px) rotate(-560deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-720deg);
+  }
+}
+@keyframes sim-lose {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-160px);
+    opacity: 0;
+  }
+}
+@keyframes sim-win {
+  from {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sim-flash {
+  50% {
+    filter: brightness(1.6);
+  }
+}
+@keyframes sim-toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+@keyframes sim-slide-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0.6;
+  }
+}

@@ -1,7 +1,7 @@
 import { BET_TYPES } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import { maxOddsAmount, suggestAmount, validateAction } from '../engine/validate';
-import type { Action, Bet, BetTypeId, Cents, GameState, Validation } from '../engine/types';
+import type { Action, BetTypeId, Cents, GameState, Validation } from '../engine/types';
 import {
   betEV,
   edgeOfBet,
@@ -159,7 +159,7 @@ export function previewAction(
         const old = state.bets.find((b) => b.id === action.betId);
         if (!old) return unknown(base, validation);
         const nowOn = isWorking(old, state);
-        const willOn = isWorking({ ...old, working: action.working } as Bet, state);
+        const willOn = isWorking({ ...old, working: action.working }, state);
         const loss = lossPerRoll(old, ctx);
         const cost = nowOn === willOn ? ZERO : willOn ? loss : neg(loss);
         const ev = neg(cost);

@@ -16,4 +16,4 @@ export { validateAction, legalBetTypes, maxOddsAmount, suggestAmount } from './v
 export { resolveRoll } from './resolve';
 export { formatMoney, formatPct } from './money';
 export { createGame, nextDice, applyAction, isWorking, equity, replay, getBetType } from './game';
-export type { BetInit, CreateGameOptions } from './game';
+export type { BetInit, CreateGameOptions, ApplyOptions } from './game';

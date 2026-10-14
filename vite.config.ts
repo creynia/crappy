@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
             swPlugin(),
           ]),
     ],
+    publicDir: single ? false : 'public',
     build: { outDir: single ? 'dist-single' : 'dist', target: 'es2022' },
   };
 });

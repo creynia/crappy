@@ -25,6 +25,22 @@ win, lose or stay (dealer-style). Builds table fluency.
 A small planner: pick bankroll, unit, strategy and session length, and see
 expected loss, risk of ruin and a suggested stop-loss before you play.
 
+### Combined edge with two Come bets
+`combinedEdge` in `src/sim/ui/text.ts` falls back to the first Come bet when the
+sheet manages a Come bet via `set-amount`; use the bet being managed so the max
+odds multiple comes from the right point.
+
+### Contract-bet sheet wording
+For a Pass/Come bet already on a point, the sheet shows "Expected loss: $0.00".
+Show the bet's current (positive) value instead, or hide the loss line.
+
+### Auto-roll "Watch" mode
+Replay a short auto-roll run on the table itself, roll by roll.
+
+### Lesson 20 summary table on narrow phones
+At 390px the four-column comparison table wraps its headers; consider a
+stacked card layout.
+
 ## Done
 
 _(nothing yet)_

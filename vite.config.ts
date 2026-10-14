@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 // TODO(WP3): import { contentPlugin } from './build/vite-plugin-content';
-// TODO(WP4): import { swPlugin } from './build/vite-plugin-sw';
+import { swPlugin } from './build/vite-plugin-sw';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -20,11 +20,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       preact(),
       // TODO(WP3): contentPlugin(),   (provides the `virtual:content` module)
-      ...(single
-        ? [viteSingleFile()]
-        : [
-            // TODO(WP4): swPlugin(),   (service worker + manifest/apple-touch-icon HTML transform)
-          ]),
+      ...(single ? [viteSingleFile()] : [swPlugin()]),
     ],
     publicDir: single ? false : 'public',
     build: { outDir: single ? 'dist-single' : 'dist', target: 'es2022' },

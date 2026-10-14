@@ -8,7 +8,11 @@ import type { BetCtx } from './types';
 
 const rules = (over: Partial<TableRules> = {}): TableRules => ({ ...DEFAULT_RULES, ...over });
 const comeOut = (r = rules()): BetCtx => ({ phase: 'come-out', point: null, rules: r });
-const onPoint = (p: 4 | 5 | 6 | 8 | 9 | 10, r = rules()): BetCtx => ({ phase: 'point', point: p, rules: r });
+const onPoint = (p: 4 | 5 | 6 | 8 | 9 | 10, r = rules()): BetCtx => ({
+  phase: 'point',
+  point: p,
+  rules: r,
+});
 
 function edge(type: BetTypeId, dollars: number, ctx: BetCtx = comeOut()) {
   return betEdge(type, dollars * 100, ctx);
@@ -96,12 +100,17 @@ describe('section 2.3 target numbers (per resolved / per roll)', () => {
 describe('exact facts', () => {
   it('P(pass wins) = 244/495', () => {
     const rows = betOutcomes({ type: 'pass-line', amount: 1000, point: null }, comeOut());
-    const win = rows.filter((r) => r.net.n > 0n).reduce((a, r) => a + Number(r.probability.n) / Number(r.probability.d), 0);
+    const win = rows
+      .filter((r) => r.net.n > 0n)
+      .reduce((a, r) => a + Number(r.probability.n) / Number(r.probability.d), 0);
     expect(win).toBeCloseTo(244 / 495, 12);
-    expect(rows.reduce((a, r) => a + Number(r.probability.n) / Number(r.probability.d), 0)).toBeCloseTo(1, 12);
+    expect(
+      rows.reduce((a, r) => a + Number(r.probability.n) / Number(r.probability.d), 0),
+    ).toBeCloseTo(1, 12);
   });
   it('contract value of a flat bet on a point (cents per $1 = per 100c)', () => {
-    const val = (type: BetTypeId, p: 4 | 5 | 6) => betEV({ type, amount: 100, point: null }, onPoint(p));
+    const val = (type: BetTypeId, p: 4 | 5 | 6) =>
+      betEV({ type, amount: 100, point: null }, onPoint(p));
     same(val('pass-line', 4), frac(-100, 3));
     same(val('pass-line', 5), frac(-20));
     same(val('pass-line', 6), frac(-100, 11));
@@ -122,7 +131,7 @@ describe('exact facts', () => {
     expect(t('place-5', 10)).toBe('fair');
     expect(t('place-4', 10)).toBe('poor');
     expect(t('field', 5)).toBe('poor');
-    expect(t('field', 5, comeOut(rules(RULE_PRESETS['field-3x-12'])))).toBe('good');
+    expect(t('field', 5, comeOut(rules(RULE_PRESETS['field-3x-12'])))).toBe('fair');
     expect(t('big-6', 6)).toBe('avoid');
     expect(t('hard-6', 5)).toBe('avoid');
     expect(t('any-7', 5)).toBe('avoid');

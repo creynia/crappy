@@ -1,5 +1,5 @@
 import { BET_TYPES } from '../engine/bets';
-import { isWorking } from '../engine/game';
+import { isWorking } from '../engine/working';
 import type { BetTypeId, Cents, GameState } from '../engine/types';
 import { distributionFor, isLineLike, isOddsType, toOutcomes } from './outcomes';
 import { add, div, frac, mul, neg, sub, toNumber, ZERO, ONE, type Fraction } from './fraction';

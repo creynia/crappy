@@ -1,4 +1,4 @@
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, upfrontVig } from '../engine/bets';
 import type {
   Bet,
   BetTypeId,
@@ -57,21 +57,6 @@ function synth(type: BetTypeId, amount: Cents, point: PointNumber | null, vigPai
 
 function rollCtx(dice: Dice, phase: Phase, point: PointNumber | null): RollContext {
   return { dice, total: dice[0] + dice[1], hard: dice[0] === dice[1], phase, point };
-}
-
-/** Vig charged at placement when rules.vig.timing === 'upfront' (cents); else 0. */
-export function upfrontVig(type: BetTypeId, amount: Cents, rules: TableRules): Cents {
-  if (rules.vig.timing !== 'upfront') return 0;
-  const def = BET_TYPES[type];
-  if (def.category !== 'buy' && def.category !== 'lay') return 0;
-  // Vig base: the bet for buy, the potential win for lay. The win profit comes from the registry.
-  let base = amount;
-  if (def.category === 'lay') {
-    const res = def.resolve(synth(type, amount, null, 0), rollCtx([3, 4], 'point', 6), rules, true);
-    base = res.kind === 'win' ? res.profit : 0;
-  }
-  if (rules.vig.rounding === 'exact-cents') return Math.round(base * rules.vig.rate);
-  return Math.max(100, Math.floor((base * rules.vig.rate) / 100) * 100);
 }
 
 function totalsText(dice: Dice[]): string {

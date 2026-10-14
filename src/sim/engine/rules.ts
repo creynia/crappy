@@ -31,6 +31,27 @@ export const RULE_PRESETS: Record<RulePresetId, Partial<TableRules>> = {
   },
 };
 
-export function resolveRules(_r?: Partial<TableRules> | RulePresetId): TableRules {
-  throw new Error('TODO(engine)');
+const copyPoints = (r: Record<PointNumber, number>): Record<PointNumber, number> => ({ ...r });
+
+/** Merge a preset id or partial rules onto DEFAULT_RULES; returns a fresh object. */
+export function resolveRules(r?: Partial<TableRules> | RulePresetId): TableRules {
+  let partial: Partial<TableRules>;
+  let presetId: RulePresetId = 'standard-vegas';
+  if (r === undefined) {
+    partial = {};
+  } else if (typeof r === 'string') {
+    partial = RULE_PRESETS[r];
+    presetId = r;
+  } else {
+    partial = r;
+    presetId = r.presetId ?? 'standard-vegas';
+  }
+  const m: TableRules = { ...DEFAULT_RULES, ...partial, presetId };
+  return {
+    ...m,
+    maxOdds: copyPoints(m.maxOdds),
+    maxLayOdds: copyPoints(m.maxLayOdds),
+    fieldPays: { ...m.fieldPays },
+    vig: { ...m.vig },
+  };
 }

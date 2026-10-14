@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BET_TYPE_IDS, POINT_NUMBERS } from './index';
+import { BET_TYPE_IDS, POINT_NUMBERS } from '../index';
 
 describe('contract', () => {
   it('lists the point numbers and a unique bet registry', () => {

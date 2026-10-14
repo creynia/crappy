@@ -1,0 +1,412 @@
+[
+  {
+    "id": "pass-line",
+    "name": "Pass Line",
+    "shortName": "Pass",
+    "group": "line",
+    "summary": "The main bet in craps: you win if the shooter makes the point.",
+    "howItWorks": "Bet before the come-out roll. A 7 or 11 wins, a 2, 3 or 12 loses, and any other number becomes the point. Then the shooter must roll the point again before a 7. It pays even money and stays until it resolves.",
+    "tip": "Once a point is set, add odds behind it: the odds bet has no house edge.",
+    "lessonId": "pass-line"
+  },
+  {
+    "id": "dont-pass",
+    "name": "Don't Pass",
+    "shortName": "Don't",
+    "group": "line",
+    "summary": "The opposite of the Pass Line: you win if the shooter sevens out.",
+    "howItWorks": "Bet before the come-out roll. A 2 or 3 wins, a 7 or 11 loses, and a 12 is a push (the bar 12). Once a point is set, you win if a 7 rolls before the point. It pays even money.",
+    "tip": "Once a point is set this bet is the favourite, so keep it up.",
+    "lessonId": "dont-side"
+  },
+  {
+    "id": "come",
+    "name": "Come",
+    "shortName": "Come",
+    "group": "come",
+    "summary": "A Pass Line bet you can make on any roll after the point is set.",
+    "howItWorks": "The next roll acts as a come-out for this bet: 7 or 11 wins, 2, 3 or 12 loses, and any other number moves your bet there to become its own point. Then it wins if that number repeats before a 7.",
+    "tip": "Add odds to a Come bet once it has moved to a number.",
+    "lessonId": "come-bets"
+  },
+  {
+    "id": "dont-come",
+    "name": "Don't Come",
+    "shortName": "Don't Come",
+    "group": "come",
+    "summary": "A Don't Pass bet you can make on any roll after the point is set.",
+    "howItWorks": "The next roll acts as a come-out against you: 2 or 3 wins, 7 or 11 loses, 12 is a push. Any other number moves your bet there, and it wins if a 7 rolls before that number.",
+    "lessonId": "dont-side"
+  },
+  {
+    "id": "pass-odds",
+    "name": "Pass Odds",
+    "shortName": "Odds",
+    "group": "odds",
+    "summary": "An extra bet behind your Pass Line bet that pays true odds.",
+    "howItWorks": "After a point is set, back your Pass Line bet with odds. It wins if the point is rolled before a 7 and pays 2:1 on 4 and 10, 3:2 on 5 and 9, and 6:5 on 6 and 8. The house has no edge on it.",
+    "tip": "Take as much odds as you are comfortable with. Bet in even amounts on 5 and 9, and in $5 units on 6 and 8, to get the full payout.",
+    "lessonId": "odds-bet"
+  },
+  {
+    "id": "dont-pass-odds",
+    "name": "Don't Pass Odds",
+    "shortName": "Lay Odds",
+    "group": "odds",
+    "summary": "Extra money behind a Don't Pass bet that pays true odds.",
+    "howItWorks": "You lay more than you win: 1:2 against 4 and 10, 2:3 against 5 and 9, 5:6 against 6 and 8. It wins if a 7 rolls before the point, and it is always working. The house has no edge on it.",
+    "tip": "Lay in units of $2 on 4 and 10, $3 on 5 and 9, and $6 on 6 and 8.",
+    "lessonId": "dont-side"
+  },
+  {
+    "id": "come-odds",
+    "name": "Come Odds",
+    "shortName": "C Odds",
+    "group": "odds",
+    "summary": "Odds behind a Come bet that has moved to a number.",
+    "howItWorks": "Once a Come bet has travelled to a number, back it with odds at true payouts. By default the odds are off on a come-out roll, so a 7 on the come-out returns them instead of losing them.",
+    "lessonId": "come-bets"
+  },
+  {
+    "id": "dont-come-odds",
+    "name": "Don't Come Odds",
+    "shortName": "DC Lay",
+    "group": "odds",
+    "summary": "Lay odds behind a Don't Come bet that has moved to a number.",
+    "howItWorks": "Once a Don't Come bet has moved to a number, lay true odds behind it. It wins if a 7 rolls before that number and is always working, even on a come-out roll.",
+    "lessonId": "dont-side"
+  },
+  {
+    "id": "place-4",
+    "name": "Place 4",
+    "shortName": "P4",
+    "group": "place",
+    "summary": "A bet that the 4 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 9:5, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "Consider buying the 4 for $20 or more instead: the commission is cheaper than the place payout shortfall.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "place-5",
+    "name": "Place 5",
+    "shortName": "P5",
+    "group": "place",
+    "summary": "A bet that the 5 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 7:5, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "Bet in $5 units. A Come bet with odds is usually cheaper.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "place-6",
+    "name": "Place 6",
+    "shortName": "P6",
+    "group": "place",
+    "summary": "A bet that the 6 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 7:6, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "A good bet. Bet in $6 units so the 7:6 payout comes out in whole dollars.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "place-8",
+    "name": "Place 8",
+    "shortName": "P8",
+    "group": "place",
+    "summary": "A bet that the 8 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 7:6, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "A good bet. Bet in $6 units so the 7:6 payout comes out in whole dollars.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "place-9",
+    "name": "Place 9",
+    "shortName": "P9",
+    "group": "place",
+    "summary": "A bet that the 9 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 7:5, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "Bet in $5 units. A Come bet with odds is usually cheaper.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "place-10",
+    "name": "Place 10",
+    "shortName": "P10",
+    "group": "place",
+    "summary": "A bet that the 10 rolls before a 7.",
+    "howItWorks": "Pick the number and bet it rolls before a 7. It pays 9:5, a little less than true odds, so the house keeps a small edge. It is off on the come-out by default, stays up after a win, and you can take it down any time.",
+    "tip": "Consider buying the 10 for $20 or more instead: the commission is cheaper than the place payout shortfall.",
+    "lessonId": "place-bets"
+  },
+  {
+    "id": "buy-4",
+    "name": "Buy 4",
+    "shortName": "B4",
+    "group": "buy",
+    "summary": "Like Place 4, but at true odds with a commission.",
+    "howItWorks": "Bet the 4 rolls before a 7. It pays true odds of 2:1, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Buy for $20 or more so the $1 minimum vig is a small share of the bet. Buying the 4 and 10 beats placing them.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "buy-5",
+    "name": "Buy 5",
+    "shortName": "B5",
+    "group": "buy",
+    "summary": "Like Place 5, but at true odds with a commission.",
+    "howItWorks": "Bet the 5 rolls before a 7. It pays true odds of 3:2, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Buy for $20 or more. Buying is cheaper than placing the 5, but a Come bet with odds is cheaper still.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "buy-6",
+    "name": "Buy 6",
+    "shortName": "B6",
+    "group": "buy",
+    "summary": "Like Place 6, but at true odds with a commission.",
+    "howItWorks": "Bet the 6 rolls before a 7. It pays true odds of 6:5, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Placing the 6 is cheaper than buying it. Place it instead.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "buy-8",
+    "name": "Buy 8",
+    "shortName": "B8",
+    "group": "buy",
+    "summary": "Like Place 8, but at true odds with a commission.",
+    "howItWorks": "Bet the 8 rolls before a 7. It pays true odds of 6:5, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Placing the 8 is cheaper than buying it. Place it instead.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "buy-9",
+    "name": "Buy 9",
+    "shortName": "B9",
+    "group": "buy",
+    "summary": "Like Place 9, but at true odds with a commission.",
+    "howItWorks": "Bet the 9 rolls before a 7. It pays true odds of 3:2, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Buy for $20 or more. Buying is cheaper than placing the 9, but a Come bet with odds is cheaper still.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "buy-10",
+    "name": "Buy 10",
+    "shortName": "B10",
+    "group": "buy",
+    "summary": "Like Place 10, but at true odds with a commission.",
+    "howItWorks": "Bet the 10 rolls before a 7. It pays true odds of 2:1, and the casino takes a 5% commission (the vig) only when you win, rounded down to whole dollars with a $1 minimum. It is off on the come-out by default.",
+    "tip": "Buy for $20 or more so the $1 minimum vig is a small share of the bet. Buying the 4 and 10 beats placing them.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-4",
+    "name": "Lay 4",
+    "shortName": "L4",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 4.",
+    "howItWorks": "You bet against the 4, so you risk more than you win: it pays 1:2. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $40 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-5",
+    "name": "Lay 5",
+    "shortName": "L5",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 5.",
+    "howItWorks": "You bet against the 5, so you risk more than you win: it pays 2:3. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $30 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-6",
+    "name": "Lay 6",
+    "shortName": "L6",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 6.",
+    "howItWorks": "You bet against the 6, so you risk more than you win: it pays 5:6. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $24 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-8",
+    "name": "Lay 8",
+    "shortName": "L8",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 8.",
+    "howItWorks": "You bet against the 8, so you risk more than you win: it pays 5:6. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $24 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-9",
+    "name": "Lay 9",
+    "shortName": "L9",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 9.",
+    "howItWorks": "You bet against the 9, so you risk more than you win: it pays 2:3. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $30 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "lay-10",
+    "name": "Lay 10",
+    "shortName": "L10",
+    "group": "lay",
+    "summary": "A bet that a 7 rolls before the 10.",
+    "howItWorks": "You bet against the 10, so you risk more than you win: it pays 1:2. The casino takes 5% of your win as the vig, rounded down to whole dollars with a $1 minimum. It is always working, including on the come-out.",
+    "tip": "Lay $40 for the cleanest vig. Don't Come with lay odds is cheaper.",
+    "lessonId": "buy-and-lay"
+  },
+  {
+    "id": "field",
+    "name": "Field",
+    "shortName": "Field",
+    "group": "field",
+    "summary": "A one-roll bet on 2, 3, 4, 9, 10, 11 or 12.",
+    "howItWorks": "Wins if the next roll is 2, 3, 4, 9, 10, 11 or 12, and loses on 5, 6, 7 or 8. Most numbers pay even money; 2 and 12 pay double at this table. It looks like seven numbers against four, but the losing numbers are the most common ones.",
+    "tip": "Because it is decided every roll, its cost adds up fast.",
+    "lessonId": "field-and-big-6-8"
+  },
+  {
+    "id": "big-6",
+    "name": "Big 6",
+    "shortName": "Big 6",
+    "group": "big",
+    "summary": "Wins when 6 rolls before a 7, but pays only even money.",
+    "howItWorks": "This is the same bet as Place 6, with a worse payout of 1:1 instead of 7:6. Place the 6 instead.",
+    "tip": "There is never a reason to bet Big 6: Place 6 wins on the same rolls.",
+    "lessonId": "field-and-big-6-8"
+  },
+  {
+    "id": "big-8",
+    "name": "Big 8",
+    "shortName": "Big 8",
+    "group": "big",
+    "summary": "Wins when 8 rolls before a 7, but pays only even money.",
+    "howItWorks": "This is the same bet as Place 8, with a worse payout of 1:1 instead of 7:6. Place the 8 instead.",
+    "tip": "There is never a reason to bet Big 8: Place 8 wins on the same rolls.",
+    "lessonId": "field-and-big-6-8"
+  },
+  {
+    "id": "hard-4",
+    "name": "Hard 4",
+    "shortName": "H4",
+    "group": "hardway",
+    "summary": "Bet the 4 rolls as a pair before an easy 4 or a 7.",
+    "howItWorks": "Wins if the 4 rolls the hard way (2-2) before it rolls any other way or a 7. It pays 7:1. It is off on the come-out by default, and it is a sucker bet.",
+    "tip": "Tempting payouts, but the house edge is 9% or more.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "hard-6",
+    "name": "Hard 6",
+    "shortName": "H6",
+    "group": "hardway",
+    "summary": "Bet the 6 rolls as a pair before an easy 6 or a 7.",
+    "howItWorks": "Wins if the 6 rolls the hard way (3-3) before it rolls any other way or a 7. It pays 9:1. It is off on the come-out by default, and it is a sucker bet.",
+    "tip": "Tempting payouts, but the house edge is 9% or more.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "hard-8",
+    "name": "Hard 8",
+    "shortName": "H8",
+    "group": "hardway",
+    "summary": "Bet the 8 rolls as a pair before an easy 8 or a 7.",
+    "howItWorks": "Wins if the 8 rolls the hard way (4-4) before it rolls any other way or a 7. It pays 9:1. It is off on the come-out by default, and it is a sucker bet.",
+    "tip": "Tempting payouts, but the house edge is 9% or more.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "hard-10",
+    "name": "Hard 10",
+    "shortName": "H10",
+    "group": "hardway",
+    "summary": "Bet the 10 rolls as a pair before an easy 10 or a 7.",
+    "howItWorks": "Wins if the 10 rolls the hard way (5-5) before it rolls any other way or a 7. It pays 7:1. It is off on the come-out by default, and it is a sucker bet.",
+    "tip": "Tempting payouts, but the house edge is 9% or more.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "any-7",
+    "name": "Any 7",
+    "shortName": "Any 7",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is a 7.",
+    "howItWorks": "Wins if the next roll is a 7 and pays 4:1. Every other roll loses. It has the highest house edge on the table.",
+    "tip": "The worst bet on the table. Pay your money to the casino some other way.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "any-craps",
+    "name": "Any Craps",
+    "shortName": "Craps",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is 2, 3 or 12.",
+    "howItWorks": "Wins if the next roll is 2, 3 or 12 and pays 7:1. Every other roll loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "yo-11",
+    "name": "Yo (11)",
+    "shortName": "Yo",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is 11.",
+    "howItWorks": "Wins if the next roll is 11 and pays 15:1. Everything else loses. Called \"yo\" so it is not mistaken for a 7.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "aces-2",
+    "name": "Aces (2)",
+    "shortName": "Aces",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is 2, \"snake eyes\".",
+    "howItWorks": "Wins if the next roll is double ones and pays 30:1. Everything else loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "boxcars-12",
+    "name": "Boxcars (12)",
+    "shortName": "Boxcars",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is 12.",
+    "howItWorks": "Wins if the next roll is double sixes and pays 30:1. Everything else loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "ace-deuce-3",
+    "name": "Ace-Deuce (3)",
+    "shortName": "Ace-Deuce",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is 3.",
+    "howItWorks": "Wins if the next roll is a 3 and pays 15:1. Everything else loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "horn",
+    "name": "Horn",
+    "shortName": "Horn",
+    "group": "prop",
+    "summary": "Four one-roll bets at once: 2, 3, 11 and 12.",
+    "howItWorks": "Bet in multiples of 4: one unit rides on each of 2, 3, 11 and 12. Whichever hits pays at its own odds, and the other three units lose.",
+    "tip": "Four props in one: four times the cost.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "c-e",
+    "name": "Craps & Eleven",
+    "shortName": "C&E",
+    "group": "prop",
+    "summary": "A one-roll bet split between Any Craps and 11.",
+    "howItWorks": "Bet in multiples of 2: half on Any Craps, half on 11. A craps number pays 3:1 on the whole bet and 11 pays 7:1. Anything else loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "world",
+    "name": "World (Whirl)",
+    "shortName": "World",
+    "group": "prop",
+    "summary": "A one-roll bet on the Horn plus Any 7.",
+    "howItWorks": "Bet in multiples of 5: the Horn plus a unit on Any 7. A 7 is a push because the any-7 unit covers the others; 2, 3, 11 and 12 pay as in the Horn, less the Any 7 unit (12 nets +$26 on $5).",
+    "lessonId": "sucker-bets"
+  }
+]

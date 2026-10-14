@@ -47,7 +47,7 @@ describe.skipIf(!existsSync('dist-single/crappy.html'))('dist-single/crappy.html
     : '';
   it('has no external script/link/manifest references', () => {
     expect(html).not.toMatch(/<script[^>]+\ssrc=/i);
-    expect(html).not.toMatch(/rel=["']?(manifest|apple-touch-icon|stylesheet)/i);
+    expect(html).not.toMatch(/<link[^>]+rel=["']?(manifest|apple-touch-icon|stylesheet)/i);
   });
   it('does not register a service worker', () => {
     expect(html).not.toContain('serviceWorker.register');

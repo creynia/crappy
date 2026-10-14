@@ -26,7 +26,7 @@ If you leave a bet up all session, what you actually pay depends on how many dec
 
 Two surprises. **Place 6/8 is nearly as cheap per roll as the Pass Line.** And **every one-roll bet keeps its full edge per roll**, so a Field bet costs more than **13 times** as much per roll as a Pass bet of the same size.
 
-**The cost of an hour.** A busy table runs about 100 rolls an hour, and a quiet one more (a crowded one fewer). You can change the pace in Settings, and every per-hour figure in the simulator scales with it. Expected cost ≈ **bet × per-roll edge × rolls the bet is working**:
+**The cost of an hour.** A typical table runs about 100 rolls an hour: a quiet one more, a crowded one fewer. You can change the pace in Settings, and every per-hour figure in the simulator scales with it. Expected cost ≈ **bet × per-roll edge × rolls the bet is working**:
 
 | Your play (about 100 rolls/hour) | Expected cost per hour |
 |---|---|
@@ -60,6 +60,9 @@ autoRoll:
   enabled: true
   strategies: [pass-max-odds, field-every-roll]
   defaultStrategy: { id: pass-max-odds, unit: 500, oddsMultiple: 0 }
+  compare:
+    - { id: pass-max-odds, unit: 500, oddsMultiple: 0 }
+    - { id: field-every-roll, unit: 500 }
   rollOptions: [100]
   sessions: [1, 5]
   compareMode: true

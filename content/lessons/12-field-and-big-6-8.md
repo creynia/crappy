@@ -64,6 +64,7 @@ showEV: true
 steps:
   - id: place-both
     text: "Put $6 on **Big 6** and $6 on **Place 6**."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen:
       all:
         - { betOnTable: { type: big-6, minAmount: 600 } }

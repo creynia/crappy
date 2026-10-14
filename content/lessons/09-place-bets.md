@@ -53,6 +53,7 @@ steps:
     completeWhen: { previewed: place-6 }
   - id: place-both
     text: "Place **$6** on the 6 and **$6** on the 8."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen:
       all:
         - { betOnTable: { type: place-6, minAmount: 600 } }

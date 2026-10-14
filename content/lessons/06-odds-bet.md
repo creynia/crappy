@@ -56,7 +56,6 @@ phase: point
 point: 5
 bets:
   - { ref: p, type: pass-line, amount: 1000 }
-forcedDice: [[6, 2], [4, 1]]
 allowedBets: [pass-odds]
 highlightedBets: [pass-odds]
 showEV: true
@@ -66,12 +65,16 @@ ui:
 steps:
   - id: add-odds
     text: "The point is 5 and you have $10 on the Pass Line. Tap your Pass bet to add **Odds**. The max here is $40 (4×). Place $40."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen: { action: { type: place-bet, betType: pass-odds, amount: 4000 } }
   - id: read-ev
     text: "Tap your Odds bet. The EV panel shows 0.00% edge and a $0.00 expected loss. Tier: Free bet."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen: { previewed: pass-odds }
   - id: roll
     text: "Roll twice. You made the 5: the Pass pays $10 and the Odds pays $60."
+    allowedActions: [roll]
+    forcedDice: [[6, 2], [4, 1]]
     completeWhen: { event: point-made }
 ```
 

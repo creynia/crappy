@@ -6,9 +6,16 @@ Learn craps from zero to perfect strategy. crappy pairs short, friendly lessons 
 
 ## Use it
 
-- **Open it:** <https://creynia.github.io/crappy/>
+- **Open it:** <https://creynia.github.io/crappy/> (direct file download: <https://creynia.github.io/crappy/crappy.html>)
 - **Install it as an app (Android/Chrome):** open the link above, tap the Chrome menu (three dots), then **Add to Home screen** (or **Install app**). It then launches full screen and works offline.
 - **Download one offline file:** go to this repo's **Releases**, open **Latest build** and download `crappy.html`. Open it in Chrome from your Downloads list. It has no external requests at all. Progress in this copy is separate from the website copy, so use Settings, then Export/Import to move it.
+
+### One-time setup (maintainer, from a phone)
+
+The repo is already public. Use github.com in Chrome (tap the menu and choose **Desktop site** if a tab is hidden):
+
+1. **Settings, Pages, Build and deployment, Source: GitHub Actions.**
+2. Run **Deploy to GitHub Pages** again from the **Actions** tab (**Run workflow**), or merge to `main`.
 
 ## Features
 
@@ -24,7 +31,7 @@ No. crappy is for education. In craps the house always has an edge, and no betti
 
 ## Development
 
-Requires Node 22 or newer.
+Requires Node >= 22.12.
 
 ```sh
 npm ci

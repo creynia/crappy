@@ -76,7 +76,7 @@
   },
   {
     "term": "Contract bet",
-    "definition": "A bet you cannot take down once it is working, such as the Pass Line after a point is set.",
+    "definition": "A bet you cannot take down once a point is set, such as the Pass Line after a point is set.",
     "seeAlso": "pass-line"
   },
   {
@@ -131,7 +131,7 @@
   },
   {
     "term": "Buy bet",
-    "definition": "A bet at true odds with a 5% commission. Best on 4 and 10, and best made in $20 amounts.",
+    "definition": "A bet at true odds with a 5% commission. Best on 4 and 10, and best bought for $20 or more.",
     "seeAlso": "buy-and-lay"
   },
   {

@@ -48,11 +48,11 @@ export function swPlugin(): Plugin {
           .filter((f) => f !== 'sw.js' && f !== 'crappy.html' && !f.endsWith('.map'))
           .sort();
         const precache = ['./', ...files.map((f) => './' + f)];
-        const hash = createHash('sha256');
+        const src = readFileSync(resolve(root, 'src/pwa/sw.ts'), 'utf8');
+        const hash = createHash('sha256').update(src);
         for (const f of files) hash.update(f).update(readFileSync(join(outDir, f)));
         const version = hash.digest('hex').slice(0, 12);
 
-        const src = readFileSync(resolve(root, 'src/pwa/sw.ts'), 'utf8');
         const js = ts.transpileModule(src, {
           compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
         }).outputText;

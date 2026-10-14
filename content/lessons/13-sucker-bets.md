@@ -75,6 +75,7 @@ steps:
         - { previewed: hard-8 }
   - id: place
     text: "Place $1 on Any 7 and $1 on Hard 8 anyway (the second tap says \"Place anyway\")."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen:
       all:
         - { betOnTable: { type: any-7, minAmount: 100 } }

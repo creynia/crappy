@@ -38,15 +38,18 @@ autoRoll:
   enabled: true
   strategies: [martingale-pass, pass-max-odds]
   defaultStrategy: { id: martingale-pass, unit: 1000 }
-  rollOptions: [1000]
+  compare:
+    - { id: martingale-pass, unit: 1000 }
+    - { id: pass-max-odds, unit: 1000, oddsMultiple: 0 }
+  rollOptions: [100]
   sessions: [20]
   compareMode: true
 steps:
   - id: martingale
-    text: "Open auto-roll and run **Martingale pass** ($10, double after each loss) for **20 sessions** of 1,000 rolls. Most sessions end up a little; a few crash hard."
-    completeWhen: { autoRollCompleted: { minRolls: 1000 } }
+    text: "Open auto-roll and run **Martingale pass** ($10, double after each loss) for **20 sessions** of 100 rolls. Most sessions end up a little; a few crash hard."
+    completeWhen: { autoRollCompleted: {} }
   - id: flat
-    text: "Now compare with **flat $10 Pass** (no odds) on the same dice. Both averages are negative."
+    text: "Now look at **flat $10 Pass** (no odds), run on the same dice. The Martingale wins small more often, but its average is just as negative."
     advance: button
     completeWhen: { acknowledged: true }
 ```

@@ -406,7 +406,7 @@
     "shortName": "World",
     "group": "prop",
     "summary": "A one-roll bet on the Horn plus Any 7.",
-    "howItWorks": "Bet in multiples of 5: the Horn plus a unit on Any 7. A 7 is a push because the any-7 unit covers the others; 2, 3, 11 and 12 pay as in the Horn.",
+    "howItWorks": "Bet in multiples of 5: the Horn plus a unit on Any 7. A 7 is a push because the any-7 unit covers the others; 2, 3, 11 and 12 pay as in the Horn, less the Any 7 unit (12 nets +$26 on $5).",
     "lessonId": "sucker-bets"
   }
 ]

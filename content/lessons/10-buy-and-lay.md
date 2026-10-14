@@ -8,7 +8,7 @@ minutes: 7
 
 **Buy bets** are like place bets, except the casino pays **true odds** (2:1 on 4/10, 3:2 on 5/9, 6:5 on 6/8) and charges a **5% commission**, called the **vig**. In this app, as at many Las Vegas casinos, the vig is **5% of your bet, rounded down to whole dollars (minimum $1), and taken only when you win**.
 
-That rounding is why you should **buy for $20 or more**. At $20 to $39 the vig is $1, so a $20 buy costs a clean 5%. Buy for less and the $1 minimum takes a bigger bite: a $10 buy on the 4 costs 3.33% instead of 1.67%. Buy a bit more than $20 and the vig stays at $1: a $25 buy on the 4 costs just 1.33%.
+That rounding is why you should **buy for $20 or more**. At $20 to $39 the vig is $1, so the $1 vig is exactly 5% of a $20 buy. Buy for less and the $1 minimum takes a bigger bite: a $10 buy on the 4 costs 3.33% instead of 1.67%. Buy a bit more than $20 and the vig stays at $1: a $25 buy on the 4 costs just 1.33%.
 
 | Buy (for $20) | House edge (vig on win) | Compare Place |
 |---|---|---|

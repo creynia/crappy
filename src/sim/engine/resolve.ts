@@ -39,7 +39,8 @@ export function resolveRoll(
 
   const events: GameEvent[] = [];
   const kept: Bet[] = [];
-  const byType: Partial<Record<BetTypeId, BetTypeStats>> = { ...state.stats.byType };
+  let byType: Partial<Record<BetTypeId, BetTypeStats>> = state.stats.byType;
+  let byTypeCopied = false;
   let bankroll = state.bankroll;
   let net: Cents = 0;
   let totalWagered = state.stats.totalWagered;
@@ -48,6 +49,10 @@ export function resolveRoll(
   let totalVig = state.stats.totalVig;
 
   const stat = (type: BetTypeId): BetTypeStats => {
+    if (!byTypeCopied) {
+      byType = { ...byType };
+      byTypeCopied = true;
+    }
     const cur = byType[type];
     const next = cur ? { ...cur } : emptyTypeStats();
     byType[type] = next;

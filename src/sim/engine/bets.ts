@@ -301,11 +301,10 @@ function oddsSpec(
       const p = bet.point ?? r.point;
       if (p === null) return NONE;
       const decided = r.total === 7 || r.total === p;
-      if (!working) return decided ? { kind: 'return', reason: 'odds-off' } : NONE;
+      if (comeOdds && !working) return decided ? { kind: 'return', reason: 'odds-off' } : NONE;
       const ratio = (good ? TRUE_ODDS : LAY_ODDS)[p];
       const wins = good ? r.total === p : r.total === 7;
       const loses = good ? r.total === 7 : r.total === p;
-      void comeOdds;
       if (wins) return win(payout(bet.amount, ratio[0], ratio[1], rules.payoutUnit));
       return loses ? LOSE : NONE;
     },
@@ -314,7 +313,7 @@ function oddsSpec(
 specs.push(oddsSpec('pass-odds', 'Pass Odds', 'ODDS', true, false));
 specs.push(oddsSpec('dont-pass-odds', "Don't Pass Odds", 'DP ODDS', false, false));
 specs.push(oddsSpec('come-odds', 'Come Odds', 'C ODDS', true, true));
-specs.push(oddsSpec('dont-come-odds', "Don't Come Odds", 'DC ODDS', false, true));
+specs.push(oddsSpec('dont-come-odds', "Don't Come Odds", 'DC ODDS', false, false));
 
 const NUMS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
 for (const n of NUMS) {

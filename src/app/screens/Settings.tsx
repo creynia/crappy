@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useStore } from '../context';
+import { effectiveSpeed } from '../theme';
 import type { SpeedSetting, ThemeSetting } from '../storage';
 
 export function Settings() {
@@ -8,6 +9,8 @@ export function Settings() {
   const [code, setCode] = useState('');
   const [msg, setMsg] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmImport, setConfirmImport] = useState(false);
+  const forcedInstant = effectiveSpeed(s) === 'instant' && s.animationSpeed !== 'instant';
   return (
     <div class="page">
       <h1>Settings</h1>
@@ -26,14 +29,17 @@ export function Settings() {
         <label>
           Animation speed
           <select
-            value={s.animationSpeed}
+            value={forcedInstant ? 'instant' : s.animationSpeed}
+            disabled={forcedInstant}
             onChange={(e) =>
               store.updateSettings({ animationSpeed: e.currentTarget.value as SpeedSetting })
             }
           >
             <option value="normal">Normal</option>
             <option value="fast">Fast</option>
-            <option value="instant">Instant</option>
+            <option value="instant">
+              {forcedInstant ? 'Instant (reduced motion)' : 'Instant'}
+            </option>
           </select>
         </label>
         <label class="check">
@@ -100,9 +106,8 @@ export function Settings() {
           <button
             type="button"
             class="btn btn-ghost"
-            onClick={() =>
-              setMsg(store.importCode(code) ? 'Progress imported.' : 'That code is not valid.')
-            }
+            disabled={code.trim() === '' || confirmImport}
+            onClick={() => setConfirmImport(true)}
           >
             Import
           </button>
@@ -114,6 +119,24 @@ export function Settings() {
           value={code}
           onInput={(e) => setCode(e.currentTarget.value)}
         />
+        {confirmImport && (
+          <div class="row">
+            <span>Replace your current progress?</span>
+            <button
+              type="button"
+              class="btn btn-danger"
+              onClick={() => {
+                setMsg(store.importCode(code) ? 'Progress imported.' : 'That code is not valid.');
+                setConfirmImport(false);
+              }}
+            >
+              Yes, replace
+            </button>
+            <button type="button" class="btn btn-ghost" onClick={() => setConfirmImport(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
         {msg && <p role="status">{msg}</p>}
         {confirmReset ? (
           <div class="row">

@@ -69,6 +69,10 @@ describe('App routes render', () => {
     });
     const check = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Check answer')!;
     await act(() => check.click());
-    expect(store.lesson(lesson.id)?.quizzes[quiz.id]).toEqual({ correct: true, attempts: 1 });
+    expect(store.lesson(lesson.id)?.quizzes[quiz.id]).toEqual({
+      correct: true,
+      attempts: 1,
+      firstTry: true,
+    });
   });
 });

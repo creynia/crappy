@@ -18,3 +18,14 @@ export function applyTheme(s: Settings, root: HTMLElement = document.documentEle
   else root.setAttribute('data-theme', s.theme);
   root.setAttribute('data-motion', effectiveSpeed(s) === 'instant' ? 'reduce' : 'full');
 }
+
+/** Calls `cb` when the OS reduced-motion preference changes. Returns an unsubscribe function. */
+export function onReducedMotionChange(cb: () => void): () => void {
+  try {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    mq.addEventListener('change', cb);
+    return () => mq.removeEventListener('change', cb);
+  } catch {
+    return () => {};
+  }
+}

@@ -40,3 +40,17 @@ describe('compileLesson', () => {
     expect(() => compileLesson(head + '[[nope]]', 't.md', opts)).toThrow(/nope/);
   });
 });
+
+describe('heading levels', () => {
+  it('shifts the shallowest heading to h2', () => {
+    const l = compileLesson(head + '### A\n\ntext\n\n#### B\n\n:::tip\n### C\n:::\n', 't.md');
+    const html = JSON.stringify(l.blocks);
+    expect(html).toContain('<h2>A</h2>');
+    expect(html).toContain('<h3>B</h3>');
+    expect(html).toContain('<h2>C</h2>');
+  });
+  it('leaves h2 lessons alone and ignores # inside code fences', () => {
+    const l = compileLesson(head + '## A\n\n```text\n# not a heading\n```\n', 't.md');
+    expect(JSON.stringify(l.blocks)).toContain('<h2>A</h2>');
+  });
+});

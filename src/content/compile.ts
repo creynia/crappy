@@ -1,4 +1,4 @@
-import { marked } from 'marked';
+import { Marked, marked } from 'marked';
 import { parse as parseYaml } from 'yaml';
 import { validateScene } from '../sim/scene';
 import type { Block, Lesson, Quiz } from './types';
@@ -8,6 +8,44 @@ export interface CompileOptions {
   glossarySlugs?: ReadonlySet<string>;
   /** glossary term (lowercase) → slug, for `[[term]]` */
   glossaryTerms?: ReadonlyMap<string, string>;
+  /** subtract from every heading depth (min result 2), so lesson headings sit under the page h1 */
+  headingShift?: number;
+}
+
+const shifted = new Map<number, Marked>();
+function markedFor(shift: number): Marked | typeof marked {
+  if (!shift) return marked;
+  let m = shifted.get(shift);
+  if (!m) {
+    m = new Marked({
+      renderer: {
+        heading({ tokens, depth }) {
+          const d = Math.min(6, Math.max(2, depth - shift));
+          return `<h${d}>${this.parser.parseInline(tokens)}</h${d}>\n`;
+        },
+      },
+    });
+    shifted.set(shift, m);
+  }
+  return m;
+}
+
+/** Shallowest markdown heading depth outside code fences (7 if none). */
+export function minHeadingDepth(body: string): number {
+  let min = 7;
+  let fence = '';
+  for (const line of body.split(/\r?\n/)) {
+    const f = /^(`{3,}|~{3,})/.exec(line);
+    if (f) {
+      if (!fence) fence = f[1]![0]!;
+      else if (f[1]![0] === fence) fence = '';
+      continue;
+    }
+    if (fence) continue;
+    const h = /^(#{1,6})\s/.exec(line);
+    if (h) min = Math.min(min, h[1]!.length);
+  }
+  return min;
 }
 
 export type CompiledLesson = Omit<Lesson, 'chapterId'>;
@@ -34,7 +72,7 @@ export function renderMarkdown(md: string, opts: CompileOptions = {}): string {
     }
     return `<a class="gloss" href="#/glossary?term=${encodeURIComponent(slug)}">${label ?? term.trim()}</a>`;
   });
-  return (marked.parse(withLinks, { async: false })).trim();
+  return (markedFor(opts.headingShift ?? 0).parse(withLinks, { async: false })).trim();
 }
 
 function str(v: unknown, what: string): string {
@@ -140,6 +178,8 @@ export function compileLesson(source: string, file: string, opts: CompileOptions
   try {
     const { data, body } = splitFrontMatter(source);
     const id = str(data.id, 'front matter id');
+    const min = minHeadingDepth(body);
+    opts = { ...opts, headingShift: min <= 6 ? Math.max(0, min - 2) : 0 };
     const blocks: Block[] = [];
     let quizCount = 0;
     for (const seg of segment(body)) {

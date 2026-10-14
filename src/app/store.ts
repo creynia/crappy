@@ -92,6 +92,7 @@ export class Store {
           [quizId]: {
             correct: (prev?.correct ?? false) || correct,
             attempts: (prev?.attempts ?? 0) + 1,
+            firstTry: prev ? (prev.firstTry ?? (prev.attempts === 1 && prev.correct)) : correct,
           },
         },
       };
@@ -163,14 +164,18 @@ export function overallProgress(
 
 export const FINAL_EXAM_ID = 'final-exam';
 
-/** Score (0..1) of the final exam from stored quiz results, or null if the lesson has no quizzes. */
+/** Score (0..1) of the final exam, counting first attempts only (retries do not raise it), or null if the lesson has no quizzes. */
 export function finalExamScore(content: ContentBundle, store: Store): number | null {
   const lesson = content.lessons.find((l) => l.id === FINAL_EXAM_ID);
   if (!lesson) return null;
   const qs = lesson.blocks.flatMap((b) => (b.kind === 'quiz' ? [b.quiz.id] : []));
   if (qs.length === 0) return null;
   const p = store.lesson(FINAL_EXAM_ID);
-  return qs.filter((id) => p?.quizzes[id]?.correct).length / qs.length;
+  const firstTry = (id: string) => {
+    const q = p?.quizzes[id];
+    return q ? (q.firstTry ?? (q.attempts === 1 && q.correct)) : false;
+  };
+  return qs.filter(firstTry).length / qs.length;
 }
 
 /** "Perfect Strategy" badge: final-exam score >= 80%. */

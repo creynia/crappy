@@ -172,7 +172,13 @@ class Ctx {
         break;
       case 'autoRollCompleted':
         if (!isObj(val)) return this.err(`${path}.autoRollCompleted`, 'must be an object');
-        this.keys(`${path}.autoRollCompleted`, val, ['minRolls']);
+        this.keys(`${path}.autoRollCompleted`, val, ['minRolls', 'oddsMultiple']);
+        if (
+          val.oddsMultiple !== undefined &&
+          val.oddsMultiple !== 'default' &&
+          !(typeof val.oddsMultiple === 'number' && val.oddsMultiple >= 0)
+        )
+          this.err(`${path}.autoRollCompleted.oddsMultiple`, 'must be a number >= 0 or "default"');
         if (val.minRolls !== undefined && !(isInt(val.minRolls) && val.minRolls >= 1))
           this.err(`${path}.autoRollCompleted.minRolls`, 'must be a positive integer');
         if (!autoRoll) this.err(path, 'autoRollCompleted needs autoRoll.enabled on the scene');

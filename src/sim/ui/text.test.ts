@@ -154,6 +154,24 @@ describe('tiers and ev facts', () => {
     expect(f.combined!.edge).toBeGreaterThan(0);
     expect(f.combined!.edge).toBeLessThan(0.0141);
   });
+  it('combined edge is per decision: pass + max odds 0.374%, DP + max lay 0.273%', () => {
+    const pass = createGame({
+      phase: 'point',
+      point: 6,
+      bets: [{ type: 'pass-line', amount: 1000 }],
+    });
+    const po = { type: 'place-bet', betType: 'pass-odds', amount: 5000 } as const;
+    const f1 = buildEvFacts(previewAction(pass, po), pass)!;
+    expect(f1.combined!.edge * 100).toBeCloseTo(0.374, 2);
+    const dp = createGame({
+      phase: 'point',
+      point: 6,
+      bets: [{ type: 'dont-pass', amount: 1000 }],
+    });
+    const dpo = { type: 'place-bet', betType: 'dont-pass-odds', amount: 6000 } as const;
+    const f2 = buildEvFacts(previewAction(dp, dpo), dp)!;
+    expect(f2.combined!.edge * 100).toBeCloseTo(0.273, 2);
+  });
   it('returns null for a roll', () => {
     expect(facts({ type: 'roll' })).toBeNull();
   });

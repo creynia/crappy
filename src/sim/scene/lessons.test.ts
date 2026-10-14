@@ -106,7 +106,13 @@ function satisfy(run: Run, c: Condition, why: string): void {
   if ('previewed' in c) return run.feed({ kind: 'previewed', betType: c.previewed });
   if ('acknowledged' in c) return run.feed({ kind: 'acknowledged' });
   if ('autoRollCompleted' in c)
-    return run.feed({ kind: 'auto-roll-completed', rolls: c.autoRollCompleted.minRolls ?? 1 });
+    return run.feed({
+      kind: 'auto-roll-completed',
+      rolls: c.autoRollCompleted.minRolls ?? 1,
+      ...(c.autoRollCompleted.oddsMultiple !== undefined
+        ? { oddsMultiple: c.autoRollCompleted.oddsMultiple }
+        : {}),
+    });
   if ('betOnTable' in c) {
     if (run.game.bets.some((b) => b.type === c.betOnTable.type)) return;
     return placeFor(

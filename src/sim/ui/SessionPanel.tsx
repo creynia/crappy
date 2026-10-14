@@ -64,7 +64,7 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
                 <th scope="col">Wagered</th>
                 <th scope="col">Expected</th>
                 <th scope="col">Actual</th>
-                <th scope="col">Edge</th>
+                <th scope="col">Edge (5+ bets)</th>
               </tr>
             </thead>
             <tbody>
@@ -74,7 +74,9 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
                   <td>{fmtMoney(s.wagered)}</td>
                   <td>{fmtMoney(-s.expectedLoss, { sign: true })}</td>
                   <td>{fmtMoney(s.net, { sign: true })}</td>
-                  <td>{s.wagered > 0 ? fmtPct(s.expectedLoss / s.wagered) : 'n/a'}</td>
+                  <td>
+                    {s.wagered > 0 && s.count >= 5 ? fmtPct(s.expectedLoss / s.wagered) : '–'}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -1,7 +1,15 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { BET_TYPES } from '../engine/bets';
-import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
+import type {
+  Action,
+  Bet,
+  BetTypeId,
+  Cents,
+  GameEvent,
+  GameState,
+} from '../engine/types';
 import { betEdge } from '../math';
+import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
 // ---------- money ----------
@@ -127,6 +135,8 @@ const ODDS_FLAT: Partial<Record<BetTypeId, BetTypeId>> = {
   'dont-come-odds': 'dont-come',
 };
 
+const a2 = (a: Action): string | undefined => (a.type === 'place-bet' ? a.parentId : undefined);
+
 /** Combined flat + odds edge per dollar, when the flat bet has (or is getting) odds. */
 function combinedEdge(
   type: BetTypeId,
@@ -168,8 +178,20 @@ function combinedEdge(
     label = FLAT_ODDS[parentType]!.label;
   } else return null;
   if (oddsAmount <= 0 || flatAmount <= 0) return null;
+  // Per DECISION of the flat bet: the odds wagered depend on which point is made, so use the same fraction
+  // of the table maximum at every point (max odds on 3-4-5x gives Pass + odds 0.374%, DP + 6x lay 0.273%).
   const flat = fracToNumber(betEdge(flatType, flatAmount, ctx).perResolved);
-  return { label, edge: (flat * flatAmount) / (flatAmount + oddsAmount) };
+  const lay = flatType === 'dont-pass' || flatType === 'dont-come';
+  const parentBet =
+    flatType === 'pass-line' || flatType === 'dont-pass'
+      ? null
+      : (state.bets.find((b) => b.type === flatType && (a2(action) ? b.id === a2(action) : true)) ??
+        null);
+  const point = parentBet?.point ?? state.point ?? 6;
+  const maxMult = (lay ? state.rules.maxLayOdds : state.rules.maxOdds)[point];
+  const frac = Math.min(1, oddsAmount / (flatAmount * maxMult));
+  const oddsPerDecision = flatAmount * frac * oddsMultiplePerDecision(state.rules, lay);
+  return { label, edge: (flat * flatAmount) / (flatAmount + oddsPerDecision) };
 }
 
 /**

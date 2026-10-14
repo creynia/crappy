@@ -45,6 +45,8 @@ export interface BetSheetProps {
   /** Preview of removing this bet; an 'avoid' tier (gives up EV) needs the same second tap as Confirm. */
   removePreview?: SheetPreview;
   onRemove?: () => void;
+  /** Flat line/come bet that cannot come down: neutral badge, disabled Remove with a reason, optional Add odds. */
+  contract?: { reason: string; onAddOdds?: () => void };
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -71,7 +73,8 @@ export function BetSheet(p: BetSheetProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [whyOpen, setWhyOpen] = useState(!!p.forceWhyOpen);
   const [armed, setArmed] = useState(false);
-  const tier = normalizeTier(preview.tier);
+  const contract = mode === 'manage' ? p.contract : undefined;
+  const tier = contract ? ('free' as const) : normalizeTier(preview.tier);
   const valid = preview.validation.ok;
   const needsSecondTap = tier === 'avoid' && confirmSucker && valid;
   const removeNeedsSecondTap =
@@ -141,7 +144,7 @@ export function BetSheet(p: BetSheetProps) {
     >
       <div
         ref={rootRef}
-        class={`sim-sheet tier-${tier}`}
+        class={`sim-sheet tier-${contract ? 'neutral' : tier}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -227,10 +230,15 @@ export function BetSheet(p: BetSheetProps) {
         {showEV ? (
           <section class="sim-ev" aria-label="Expected value">
             <div class="sim-ev-head">
-              <span class={`sim-badge sim-badge-${tier}`} data-tier={tier}>
-                {TIER_LABEL[tier]}
+              <span
+                class={`sim-badge sim-badge-${contract ? 'neutral' : tier}`}
+                data-tier={contract ? 'contract' : tier}
+              >
+                {contract ? 'Contract bet' : TIER_LABEL[tier]}
               </span>
-              <span class="sim-headline">{preview.headline}</span>
+              <span class="sim-headline">
+                {contract ? 'It stays up until it wins or loses.' : preview.headline}
+              </span>
             </div>
             {tier === 'avoid' ? (
               <p class="sim-banner" role="note">
@@ -290,52 +298,61 @@ export function BetSheet(p: BetSheetProps) {
           </section>
         ) : null}
 
-        {mode === 'manage' && p.removePreview ? (
+        {mode === 'manage' && p.removePreview && !contract ? (
           <p class="sim-detail sim-remove-note">{p.removePreview.headline}</p>
         ) : null}
-        {removeNeedsSecondTap && removeArmed ? (
-          <p class="sim-banner" role="alert">
-            Removing this gives up expected value. Tap Remove again to confirm.
-          </p>
-        ) : null}
-        {needsSecondTap && armed ? (
-          <p class="sim-banner" role="alert">
-            This is a sucker bet. Tap Place anyway again to confirm.
-          </p>
-        ) : null}
+        {contract ? <p class="sim-detail sim-remove-note">{contract.reason}</p> : null}
+        <div class="sim-footer">
+          {removeNeedsSecondTap && removeArmed ? (
+            <p class="sim-banner" role="alert">
+              Removing this gives up expected value. Tap Remove again to confirm.
+            </p>
+          ) : null}
+          {needsSecondTap && armed ? (
+            <p class="sim-banner" role="alert">
+              This is a sucker bet. Tap Place anyway again to confirm.
+            </p>
+          ) : null}
 
-        <div class="sim-actions">
-          {mode === 'manage' && p.onRemove ? (
+          <div class="sim-actions">
+            {contract?.onAddOdds ? (
+              <button type="button" class="sim-btn-addodds" onClick={contract.onAddOdds}>
+                Add odds
+              </button>
+            ) : null}
+            {mode === 'manage' && p.onRemove ? (
+              <button
+                type="button"
+                class={`sim-btn-remove${removeNeedsSecondTap ? ' is-danger' : ''}`}
+                disabled={!!contract}
+                onClick={() => {
+                  if (removeNeedsSecondTap && !removeArmed) {
+                    setRemoveArmed(true);
+                    return;
+                  }
+                  p.onRemove?.();
+                }}
+              >
+                {removeNeedsSecondTap
+                  ? removeArmed
+                    ? 'Tap again to remove'
+                    : 'Remove anyway'
+                  : 'Remove'}
+              </button>
+            ) : null}
+            <button type="button" class="sim-btn-cancel" onClick={p.onCancel}>
+              Cancel
+            </button>
             <button
               type="button"
-              class={`sim-btn-remove${removeNeedsSecondTap ? ' is-danger' : ''}`}
-              onClick={() => {
-                if (removeNeedsSecondTap && !removeArmed) {
-                  setRemoveArmed(true);
-                  return;
-                }
-                p.onRemove?.();
-              }}
+              data-autofocus
+              class={`sim-btn-confirm${needsSecondTap ? ' is-danger' : ''}`}
+              disabled={!valid}
+              onClick={confirm}
             >
-              {removeNeedsSecondTap
-                ? removeArmed
-                  ? 'Tap again to remove'
-                  : 'Remove anyway'
-                : 'Remove'}
+              {confirmLabel}
             </button>
-          ) : null}
-          <button type="button" class="sim-btn-cancel" onClick={p.onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            data-autofocus
-            class={`sim-btn-confirm${needsSecondTap ? ' is-danger' : ''}`}
-            disabled={!valid}
-            onClick={confirm}
-          >
-            {confirmLabel}
-          </button>
+          </div>
         </div>
       </div>
     </div>

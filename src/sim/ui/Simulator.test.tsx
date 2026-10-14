@@ -87,3 +87,41 @@ describe('Simulator guided scene', () => {
     expect(events.some((e) => e.type === 'scene-completed')).toBe(true);
   });
 });
+
+describe('auto-roll compare scene', () => {
+  const scene: SceneConfig = {
+    id: 'cmp',
+    version: 1,
+    bankroll: 100000,
+    allowedBets: [],
+    autoRoll: {
+      enabled: true,
+      compareMode: true,
+      compare: [
+        { id: 'iron-cross', unit: 500 },
+        { id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 },
+        { id: 'field-every-roll', unit: 500 },
+      ],
+      rollOptions: [10],
+      sessions: [1],
+    },
+    steps: [
+      { id: 'run', text: 'Run them.', completeWhen: { autoRollCompleted: { minRolls: 10 } } },
+    ],
+  };
+
+  it('runs every compared strategy on one seed and completes only with all of them', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 10/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="auto-roll-summary"]')).not.toBeNull(),
+    );
+    const heads = container.querySelectorAll('[data-testid="auto-roll-summary"] thead th');
+    expect(heads).toHaveLength(4); // label + 3 strategies
+    await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true));
+  });
+});

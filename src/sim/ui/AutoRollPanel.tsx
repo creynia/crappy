@@ -31,12 +31,19 @@ export interface AutoRollPanelProps {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** exact specs to run side by side on the same seed (each with its own unit and odds) */
+    compare?: StrategySpec[];
   };
   /** the player's current layout, for the `my-layout` strategy */
   layout?: LayoutBet[];
   initialSeed?: number;
   rollsPerHour?: number; // default 100
-  onCompleted?(result: SessionResult | ManyResult): void;
+  /** `result` is the first strategy's; `all` has every compared strategy's result, `specs` what was run */
+  onCompleted?(
+    result: SessionResult | ManyResult,
+    all?: (SessionResult | ManyResult)[],
+    specs?: StrategySpec[],
+  ): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
 }
@@ -93,11 +100,14 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   }, [config?.strategies]);
   const rollOptions = config?.rollOptions ?? [10, 100, 1000];
   const sessionOptions = config?.sessions ?? [1, 100];
-  const compare = config?.compareMode === true;
+  const fixedSpecs = config?.compare && config.compare.length > 0 ? config.compare : null;
+  const compare = config?.compareMode === true || fixedSpecs !== null;
 
-  const [strategyIds, setStrategyIds] = useState<StrategyId[]>([
-    config?.defaultStrategy?.id ?? all[0]?.id ?? 'pass-max-odds',
-  ]);
+  const [strategyIds, setStrategyIds] = useState<StrategyId[]>(
+    fixedSpecs
+      ? fixedSpecs.map((x) => x.id)
+      : [config?.defaultStrategy?.id ?? all[0]?.id ?? 'pass-max-odds'],
+  );
   const [unit, setUnit] = useState<Cents>(config?.defaultStrategy?.unit ?? 1000);
   const [oddsMultiple, setOddsMultiple] = useState<number | undefined>(
     config?.defaultStrategy?.oddsMultiple,
@@ -142,7 +152,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     // computed once per run, with the rules this run uses
     const metricsFor = (specs: StrategySpec[]): Metrics[] =>
       specs.map((s) => strategyMetrics(s, rules));
-    const specs = strategyIds.map(specFor);
+    const specs = fixedSpecs
+      ? fixedSpecs.map((x) => (x.id === 'my-layout' ? { ...x, layout: layout ?? [] } : x))
+      : strategyIds.map(specFor);
     const base = {
       rolls,
       seed,
@@ -154,7 +166,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
         setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
-        props.onCompleted?.(results[0]!);
+        props.onCompleted?.(results[0]!, results, specs);
       } else {
         const ac = new AbortController();
         abort.current = ac;
@@ -165,7 +177,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             ? await simulateManyCompare(base, specs, sessions, o)
             : [await simulateMany(cfg, sessions, o)];
         setOutcome({ kind: 'many', results, specs, cfg, metrics: metricsFor(specs) });
-        props.onCompleted?.(results[0]!);
+        props.onCompleted?.(results[0]!, results, specs);
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
@@ -192,30 +204,49 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       aria-pressed={active}
       disabled={running}
       onClick={onClick}
-      style={{ minHeight: 44, minWidth: 44, padding: '0 12px', fontWeight: active ? 700 : 400 }}
+      class="sim-ar-btn"
     >
       {label}
     </button>
   );
-  const group = { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' } as const;
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
-      <div style={{ display: 'grid', gap: 12 }}>
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend>{compare ? 'Strategies to compare (pick up to 3)' : 'Strategy'}</legend>
-          {compare ? (
+      <div class="sim-ar-form">
+        <fieldset class="sim-ar-fieldset">
+          <legend>
+            {fixedSpecs
+              ? 'Strategies compared on the same dice'
+              : compare
+                ? 'Strategies to compare (pick up to 3)'
+                : 'Strategy'}
+          </legend>
+          {fixedSpecs ? (
+            <ul class="sim-ar-fixed">
+              {fixedSpecs.map((x, i) => (
+                <li key={i} style={{ color: COLORS[i] }}>
+                  <strong>{nameOf(x.id)}</strong>
+                  <span class="sim-ar-fixed-note">
+                    {' '}
+                    {money(x.unit)} unit,{' '}
+                    {x.oddsMultiple === undefined
+                      ? 'default odds'
+                      : x.oddsMultiple === 0
+                        ? 'flat bets only'
+                        : `${x.oddsMultiple}x odds`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : compare ? (
             lensGroups.map(
               (g) =>
                 g.items.length > 0 && (
-                  <div key={g.lens} style={{ marginTop: 4 }}>
+                  <div key={g.lens} class="sim-ar-lens">
                     <strong>{LENS_LABEL[g.lens]}</strong>
-                    <div style={group}>
+                    <div class="sim-ar-group">
                       {g.items.map((s) => (
-                        <label
-                          key={s.id}
-                          style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 6 }}
-                        >
+                        <label key={s.id} class="sim-ar-check">
                           <input
                             type="checkbox"
                             checked={strategyIds.includes(s.id)}
@@ -234,7 +265,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               aria-label="Strategy"
               value={strategyIds[0]}
               disabled={running}
-              style={{ minHeight: 44, maxWidth: '100%' }}
               onChange={(e) => toggleStrategy(e.currentTarget.value as StrategyId)}
             >
               {lensGroups.map(
@@ -252,28 +282,30 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </select>
           )}
           {!compare && (
-            <p style={{ margin: '4px 0 0', fontSize: '0.9em' }}>
-              {all.find((s) => s.id === strategyIds[0])?.description}
-            </p>
+            <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
           )}
           {needsLayout && (
-            <p role="status" style={{ margin: '4px 0 0' }}>
+            <p role="status" class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
             </p>
           )}
         </fieldset>
 
-        <div style={group} role="group" aria-label="Unit">
-          <span>Unit</span>
-          {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
-        </div>
-        <div style={group} role="group" aria-label="Odds">
-          <span>Odds</span>
-          {button(oddsMultiple === undefined, 'Default', () => setOddsMultiple(undefined))}
-          {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
-          {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
-        </div>
-        <div style={group} role="group" aria-label="Rolls">
+        {!fixedSpecs && (
+          <>
+            <div class="sim-ar-group" role="group" aria-label="Unit">
+              <span>Unit</span>
+              {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
+            </div>
+            <div class="sim-ar-group" role="group" aria-label="Odds">
+              <span>Odds</span>
+              {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
+              {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
+              {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
+            </div>
+          </>
+        )}
+        <div class="sim-ar-group" role="group" aria-label="Rolls">
           <span>Rolls</span>
           {rollOptions.map((r) =>
             button(
@@ -287,9 +319,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             ),
           )}
           <label>
-            <span class="sr-only" style={{ position: 'absolute', left: -9999 }}>
-              Custom number of rolls (up to {MAX_ROLLS})
-            </span>
+            <span class="sim-sr">Custom number of rolls (up to {MAX_ROLLS})</span>
             <input
               type="number"
               inputMode="numeric"
@@ -298,7 +328,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               placeholder="Custom"
               value={custom}
               disabled={running}
-              style={{ minHeight: 44, width: 90 }}
+              class="sim-ar-num"
               onInput={(e) => {
                 const v = e.currentTarget.value;
                 setCustom(v);
@@ -308,17 +338,16 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             />
           </label>
         </div>
-        <div style={group} role="group" aria-label="Sessions">
+        <div class="sim-ar-group" role="group" aria-label="Sessions">
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
         </div>
         {typeof props.rules !== 'object' && (
-          <label style={group}>
+          <label class="sim-ar-group">
             Rules
             <select
               value={preset}
               disabled={running}
-              style={{ minHeight: 44 }}
               onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
             >
               {PRESET_IDS.map((id) => (
@@ -329,38 +358,38 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </select>
           </label>
         )}
-        <div style={group}>
+        <div class="sim-ar-group">
           <label>
             Seed{' '}
             <input
               type="number"
               value={seed}
               disabled={running}
-              style={{ minHeight: 44, width: 120 }}
+              class="sim-ar-num sim-ar-seed"
               onInput={(e) => setSeed(Math.floor(Number(e.currentTarget.value)) || 0)}
             />
           </label>
           <button
             type="button"
             disabled={running}
-            style={{ minHeight: 44 }}
+            class="sim-ar-btn"
             onClick={() => setSeed(randomSeed())}
           >
             Re-roll seed
           </button>
         </div>
-        <div style={group}>
+        <div class="sim-ar-group">
           <button
             type="button"
             data-testid="auto-roll-run"
             disabled={running}
             onClick={() => void run()}
-            style={{ minHeight: 56, padding: '0 20px', fontWeight: 700 }}
+            class="sim-ar-run"
           >
             {running ? 'Running...' : `Auto-roll ${rolls}${sessions > 1 ? ` x ${sessions}` : ''}`}
           </button>
           {running && (
-            <button type="button" style={{ minHeight: 44 }} onClick={() => abort.current?.abort()}>
+            <button type="button" class="sim-ar-btn" onClick={() => abort.current?.abort()}>
               Cancel
             </button>
           )}
@@ -369,11 +398,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             props.onWatch &&
             outcome.results.length === 1 &&
             outcome.cfg.rolls <= 100 && (
-              <button
-                type="button"
-                style={{ minHeight: 44 }}
-                onClick={() => props.onWatch!(outcome.cfg)}
-              >
+              <button type="button" onClick={() => props.onWatch!(outcome.cfg)}>
                 Watch on the table
               </button>
             )}
@@ -383,7 +408,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       </div>
 
       {outcome && (
-        <div data-testid="auto-roll-output" style={{ marginTop: 16 }} aria-live="polite">
+        <div data-testid="auto-roll-output" class="sim-ar-output" aria-live="polite">
           {renderOutput(outcome)}
         </div>
       )}
@@ -425,7 +450,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     return (
       <>
         {o.kind === 'many' && (
-          <div style={group} role="group" aria-label="Chart">
+          <div class="sim-ar-group" role="group" aria-label="Chart">
             {button(chartTab === 'results', 'Session results', () => setChartTab('results'))}
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
@@ -436,17 +461,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
-        <table
-          style={{ width: '100%', marginTop: 12, borderCollapse: 'collapse' }}
-          data-testid="auto-roll-summary"
-        >
+        <table class="sim-ar-summary" data-testid="auto-roll-summary">
           <thead>
             <tr>
-              <th scope="col" style={{ textAlign: 'left' }}>
-                Summary
-              </th>
+              <th scope="col">Summary</th>
               {o.specs.map((s, i) => (
-                <th key={s.id} scope="col" style={{ textAlign: 'right', color: COLORS[i] }}>
+                <th key={i} scope="col" style={{ color: COLORS[i] }}>
                   {nameOf(s.id)}
                 </th>
               ))}
@@ -455,13 +475,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <tbody>
             {summaryRows(o, metrics).map(([label, cells]) => (
               <tr key={label}>
-                <th scope="row" style={{ textAlign: 'left', fontWeight: 400 }}>
-                  {label}
-                </th>
+                <th scope="row">{label}</th>
                 {cells.map((c, i) => (
-                  <td key={i} style={{ textAlign: 'right' }}>
-                    {c}
-                  </td>
+                  <td key={i}>{c}</td>
                 ))}
               </tr>
             ))}

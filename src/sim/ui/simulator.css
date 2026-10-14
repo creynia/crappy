@@ -226,10 +226,10 @@
   font-size: 0.8rem;
 }
 
-/* landscape: table + 180px right rail */
+/* landscape: table + right rail. Roll stays near the top of the rail; chips never wrap. */
 .sim-land .sim-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   align-items: start;
   gap: 10px;
 }
@@ -241,12 +241,40 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 .sim-rail .sim-controls {
-  grid-template-columns: 1fr;
+  display: contents;
+}
+.sim-rail .sim-step {
+  order: 0;
+  padding: 6px 10px;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+.sim-rail .sim-status {
+  order: 1;
+}
+.sim-rail .sim-roll {
+  order: 2;
+  width: 100%;
+}
+.sim-rail .sim-lock {
+  order: 3;
 }
 .sim-rail .sim-rack {
-  flex-wrap: wrap;
+  order: 4;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+.sim-rail .sim-chipbtn {
+  width: 40px;
+  flex: 0 0 auto;
+}
+.sim-rail .sim-ctl-row {
+  order: 5;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .sim-land .sim-table-wrap {
@@ -261,4 +289,134 @@
   .sim-rail .sim-tab {
     min-height: 40px;
   }
+}
+
+/* ---------- auto-roll panel ---------- */
+.sim-ar-form {
+  display: grid;
+  gap: 12px;
+}
+.sim-ar-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.sim-ar-fieldset legend {
+  font-weight: 700;
+  padding: 0;
+  margin-bottom: 4px;
+}
+.sim-ar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.sim-ar-lens {
+  margin-top: 4px;
+}
+.sim-ar-check {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim-ar-desc {
+  margin: 4px 0 0;
+  font-size: 0.9em;
+  color: var(--sim-muted);
+}
+.sim-ar-fixed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.sim-ar-fixed-note {
+  color: var(--sim-muted);
+  font-size: 0.9em;
+}
+.sim-autoroll button,
+.sim-autoroll select,
+.sim-autoroll input {
+  font: inherit;
+  color: var(--sim-text);
+}
+.sim-ar-btn,
+.sim-autoroll select,
+.sim-ar-num {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
+  cursor: pointer;
+}
+.sim-autoroll select {
+  max-width: 100%;
+}
+.sim-ar-num {
+  cursor: text;
+  width: 90px;
+  background: var(--sim-surface-2);
+}
+.sim-ar-seed {
+  width: 120px;
+}
+.sim-ar-btn[aria-pressed='true'] {
+  background: var(--sim-accent);
+  border-color: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  font-weight: 700;
+}
+.sim-ar-btn:disabled,
+.sim-ar-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sim-ar-run {
+  min-height: 56px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink) !important;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.sim-autoroll :is(button, select, input):focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+.sim-ar-output {
+  margin-top: 16px;
+}
+.sim-ar-summary {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.sim-ar-summary th,
+.sim-ar-summary td {
+  padding: 4px 6px;
+  border-top: 1px solid var(--sim-border);
+}
+.sim-ar-summary thead th {
+  border-top: 0;
+  text-align: right;
+}
+.sim-ar-summary tbody th {
+  text-align: left;
+  font-weight: 400;
+}
+.sim-ar-summary thead th:first-child {
+  text-align: left;
+}
+.sim-ar-summary td {
+  text-align: right;
 }

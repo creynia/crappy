@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { BET_TYPES, isToggleable } from '../engine/bets';
 import { applyAction, equity, isWorking } from '../engine/game';
 import { resolveRules } from '../engine/rules';
+import { validateAction } from '../engine/validate';
 import type {
   Action,
   ApplyResult,
@@ -29,7 +30,7 @@ import {
   rollLock,
 } from '../scene';
 import type { SceneConfig, SceneInput, SceneRuntime } from '../scene/types';
-import type { ManyResult, SessionResult } from '../strategy/types';
+import type { ManyResult, SessionResult, StrategySpec } from '../strategy/types';
 import { AutoRollPanel } from './AutoRollPanel';
 import { BetSheet, type QuickAction, type TypeOption } from './BetSheet';
 import { CenterPanel } from './CenterPanel';
@@ -49,6 +50,7 @@ import {
   defaultAmount,
   defaultBetForRegion,
   minAmountFor,
+  oddsRoom,
   parentFor,
   placeAction,
 } from './simHelpers';
@@ -305,7 +307,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
     const id = `t${++toastN.current}`;
-    setToasts((t) => [...t.slice(-2), { id, text, tone }]);
+    setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
 
   // ---------- core dispatch ----------
@@ -313,6 +315,8 @@ export function Simulator(props: SimulatorInternalProps) {
     const sc = sceneRef.current;
     if (!sc.steps?.length) return { game: g, rt: coreRef.current.rt };
     const r = observe(sc, coreRef.current.rt, g, input);
+    // a step `setup` that changes bankroll or bets must not show up as session profit or loss
+    if (r.game !== g) startEquity.current += equity(r.game) - equity(g);
     if (r.completedStep) {
       const idx = sc.steps.findIndex((s) => s.id === r.completedStep);
       emit({ type: 'step-completed', stepId: r.completedStep, index: idx });
@@ -515,7 +519,10 @@ export function Simulator(props: SimulatorInternalProps) {
         validation: {
           ok: false,
           code: 'not-allowed-by-scene',
-          message: 'Just looking: betting is switched off in this step.',
+          message:
+            needed === 'place-bet'
+              ? 'Just looking: betting is switched off in this step.'
+              : 'Changing bets is switched off in this step.',
         },
       };
     } else if (preview.validation.ok && !bet) {
@@ -571,7 +578,40 @@ export function Simulator(props: SimulatorInternalProps) {
           });
       }
     }
-    return { bet, action, preview, showEV, facts, options, quick, type, removePreview };
+    const removeVal = bet ? validateAction(game, { type: 'remove-bet', betId: bet.id }) : null;
+    const contract =
+      bet && removeVal && !removeVal.ok && removeVal.code === 'contract-bet'
+        ? { reason: "You can't take this bet down once the point is set." }
+        : null;
+    const oddsFor: Partial<Record<BetTypeId, BetTypeId>> = {
+      'pass-line': 'pass-odds',
+      'dont-pass': 'dont-pass-odds',
+      come: 'come-odds',
+      'dont-come': 'dont-come-odds',
+    };
+    const oddsType = bet ? oddsFor[bet.type] : undefined;
+    const addOdds =
+      contract && bet && oddsType && betTypeAllowed(scene, rt, oddsType) && oddsRoom(game, bet) > 0
+        ? {
+            regionId: sheet.regionId,
+            type: oddsType,
+            amount: Math.max(100, Math.min(oddsRoom(game, bet), game.bankroll)),
+            parentId: bet.id,
+          }
+        : null;
+    return {
+      bet,
+      action,
+      preview,
+      showEV,
+      facts,
+      options,
+      quick,
+      type,
+      removePreview,
+      contract,
+      addOdds,
+    };
   }, [sheet, game, scene, rt, settings.rollsPerHour, chip]);
 
   const closeSheet = () => setSheet(null);
@@ -655,8 +695,7 @@ export function Simulator(props: SimulatorInternalProps) {
     if (!ar) return undefined;
     const cfg: NonNullable<Parameters<typeof AutoRollPanel>[0]['config']> = {};
     if (ar.compare?.length) {
-      cfg.strategies = [...new Set(ar.compare.map((c) => c.id))];
-      cfg.defaultStrategy = ar.compare[0]!;
+      cfg.compare = ar.compare;
       cfg.compareMode = true;
     } else {
       if (ar.strategies) cfg.strategies = ar.strategies;
@@ -674,10 +713,25 @@ export function Simulator(props: SimulatorInternalProps) {
         .map((b) => ({ type: b.type, amount: b.amount, point: b.point })),
     [liveGame.bets],
   );
-  const onAutoCompleted = (result: SessionResult | ManyResult) => {
+  const onAutoCompleted = (
+    result: SessionResult | ManyResult,
+    all?: (SessionResult | ManyResult)[],
+    specs?: StrategySpec[],
+  ) => {
     emit({ type: 'auto-roll-completed', result });
-    const rolls = 'rollsPlayed' in result ? result.rollsPlayed : Math.max(0, result.p50.length - 1);
-    setCore(feed({ kind: 'auto-roll-completed', rolls }, coreRef.current.game));
+    const played = (r: SessionResult | ManyResult) =>
+      'rollsPlayed' in r ? r.rollsPlayed : Math.max(0, r.p50.length - 1);
+    // a compare scene needs every compared strategy in the run; report the shortest run
+    const needed = scene.autoRoll?.compare?.length ?? 1;
+    const results = all && all.length ? all : [result];
+    const rolls = results.length >= needed ? Math.min(...results.map(played)) : 0;
+    const om = specs?.[0]?.oddsMultiple;
+    setCore(
+      feed(
+        { kind: 'auto-roll-completed', rolls, oddsMultiple: om === undefined ? 'default' : om },
+        coreRef.current.game,
+      ),
+    );
   };
 
   // ---------- render ----------
@@ -721,7 +775,7 @@ export function Simulator(props: SimulatorInternalProps) {
           {...(costText ? { costText } : {})}
         />
       ) : null}
-      {lock && ui.showRoll !== false && !guided ? <p class="sim-lock">{lock}</p> : null}
+      {lock && ui.showRoll !== false ? <p class="sim-lock">{lock}</p> : null}
       <div class="sim-ctl-row">
         <button
           type="button"
@@ -763,25 +817,8 @@ export function Simulator(props: SimulatorInternalProps) {
     </div>
   );
 
-  return (
-    <div
-      class={`sim-root${landscape ? ' sim-land' : ''}${ui.compact ? ' sim-compact' : ''}${ui.showBankroll === false ? ' sim-hide-money' : ''}${ui.showHistory === false ? ' sim-hide-history' : ''}`}
-      data-testid="simulator"
-      data-mode={mode}
-      onClickCapture={(e) => {
-        if (player.current && !player.current.done) {
-          e.preventDefault();
-          e.stopPropagation();
-          skipAnimation();
-        }
-      }}
-      onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && player.current && !player.current.done) {
-          e.preventDefault();
-          skipAnimation();
-        }
-      }}
-    >
+  const stepEl = (
+    <>
       {guided && step ? (
         <StepPanel
           step={step}
@@ -805,6 +842,29 @@ export function Simulator(props: SimulatorInternalProps) {
           </button>
         </section>
       ) : null}
+    </>
+  );
+
+  return (
+    <div
+      class={`sim-root${landscape ? ' sim-land' : ''}${ui.compact ? ' sim-compact' : ''}${ui.showBankroll === false ? ' sim-hide-money' : ''}${ui.showHistory === false ? ' sim-hide-history' : ''}`}
+      data-testid="simulator"
+      data-mode={mode}
+      onClickCapture={(e) => {
+        if (player.current && !player.current.done) {
+          e.preventDefault();
+          e.stopPropagation();
+          skipAnimation();
+        }
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Escape' || e.key === ' ') && player.current && !player.current.done) {
+          e.preventDefault();
+          skipAnimation();
+        }
+      }}
+    >
+      {landscape ? null : stepEl}
 
       <div class="sim-main">
         <div class="sim-felt">
@@ -832,6 +892,7 @@ export function Simulator(props: SimulatorInternalProps) {
         </div>
         {landscape ? (
           <div class="sim-rail">
+            {stepEl}
             <StatusBar
               compact
               bankroll={game.bankroll}
@@ -924,6 +985,27 @@ export function Simulator(props: SimulatorInternalProps) {
           placement={landscape ? 'panel' : 'sheet'}
           preview={sheetModel.preview}
           {...(sheetModel.removePreview ? { removePreview: sheetModel.removePreview } : {})}
+          {...(sheetModel.contract
+            ? {
+                contract: {
+                  ...sheetModel.contract,
+                  ...(sheetModel.addOdds
+                    ? {
+                        onAddOdds: () => {
+                          const a = sheetModel.addOdds!;
+                          const next: SheetState = {
+                            regionId: a.regionId,
+                            type: a.type,
+                            amount: a.amount,
+                          };
+                          setSheet(next);
+                          firePreviewed(next);
+                        },
+                      }
+                    : {}),
+                },
+              }
+            : {})}
           facts={sheetModel.showEV ? sheetModel.facts : null}
           showEV={sheetModel.showEV}
           forceWhyOpen={scene.whyOpen === true}

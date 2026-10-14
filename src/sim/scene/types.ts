@@ -100,7 +100,7 @@ export type Condition =
   | { bankrollAtLeast: Cents }
   | { bankrollAtMost: Cents }
   | { previewed: BetTypeId }
-  | { autoRollCompleted: { minRolls?: number } }
+  | { autoRollCompleted: { minRolls?: number; oddsMultiple?: number | 'default' } }
   | { acknowledged: true };
 
 export interface SceneRuntime {
@@ -116,4 +116,4 @@ export type SceneInput =
   | { kind: 'action'; action: Action; events: GameEvent[] }
   | { kind: 'previewed'; betType: BetTypeId }
   | { kind: 'acknowledged' }
-  | { kind: 'auto-roll-completed'; rolls: number };
+  | { kind: 'auto-roll-completed'; rolls: number; oddsMultiple?: number | 'default' };

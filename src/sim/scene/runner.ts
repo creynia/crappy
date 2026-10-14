@@ -195,8 +195,11 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
   if ('bankrollAtLeast' in c) return game.bankroll >= c.bankrollAtLeast;
   if ('bankrollAtMost' in c) return game.bankroll <= c.bankrollAtMost;
   if ('previewed' in c) return (rt.counters[`p:${c.previewed}`] ?? 0) > 0;
-  if ('autoRollCompleted' in c)
-    return (rt.counters.autoRolls ?? -1) >= (c.autoRollCompleted.minRolls ?? 0);
+  if ('autoRollCompleted' in c) {
+    const om = c.autoRollCompleted.oddsMultiple;
+    const key = om === undefined ? 'autoRolls' : `autoRolls:${om}`;
+    return (rt.counters[key] ?? -1) >= (c.autoRollCompleted.minRolls ?? 0);
+  }
   if ('acknowledged' in c) return (rt.counters.ack ?? 0) > 0;
   return false;
 }
@@ -368,6 +371,10 @@ export function observe(
     bump(counters, `p:${input.betType}`);
   } else if (input.kind === 'auto-roll-completed') {
     counters.autoRolls = Math.max(counters.autoRolls ?? 0, input.rolls);
+    if (input.oddsMultiple !== undefined) {
+      const k = `autoRolls:${input.oddsMultiple}`;
+      counters[k] = Math.max(counters[k] ?? 0, input.rolls);
+    }
   } else {
     for (const m of matchersOf(step.completeWhen))
       if (matches(m, input.action, game, true)) bump(counters, actKey(m));

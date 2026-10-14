@@ -63,3 +63,27 @@ test('lesson 1: auto-roll scene completes its step', async ({ page }) => {
   await scene.getByRole('button', { name: /^Auto-roll 600/ }).click();
   await expect(scene.locator('.sim-step-text')).toContainText('Compare the 7 bar');
 });
+
+test('lesson 20: compare runs all three strategies', async ({ page }) => {
+  await page.goto('/#/learn/strategy-fun-per-dollar');
+  const scene = await openScene(page, 0);
+  await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
+  const summary = scene.getByTestId('auto-roll-summary');
+  await expect(summary.locator('thead th')).toHaveCount(4);
+  await expect(scene.locator('.sim-chart-legend li')).toHaveCount(4); // 3 series + the expected line
+  await expect(scene.locator('.sim-step-text')).toContainText(/Done|Nice work/);
+});
+
+test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ page }) => {
+  await page.goto('/#/learn/odds-bet');
+  const scene = await openScene(page, 0);
+  await scene.locator('[data-stack]').first().click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toContainText('Contract bet');
+  await expect(sheet).not.toContainText('Free bet');
+  await expect(sheet.getByRole('button', { name: 'Remove' })).toBeDisabled();
+  await sheet.getByRole('button', { name: 'Add odds' }).click();
+  await expect(sheet.getByLabel('Bet amount')).toHaveText('$40');
+  await sheet.getByRole('button', { name: 'Confirm' }).click();
+  await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
+});

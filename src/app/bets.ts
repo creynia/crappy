@@ -31,9 +31,14 @@ export function betLabel(id: BetTypeId, copy?: BetCopy): string {
   return safe(() => getBetType(id).label) ?? copy?.name ?? prettyBetName(id);
 }
 
-/** Table-sized payout: drops vig/field clauses ("7 to 6, 5% vig" -> "7 to 6"). */
-export function shortPayout(full: string | null): string | null {
-  return full ? (full.split(/[,(]/)[0] ?? full).trim() : null;
+/** Table-sized payout: "7 to 6, 5% vig" -> "7 to 6 + 5% vig"; multi-part payouts say "varies". */
+export function shortPayout(id: string, full: string | null): string | null {
+  if (!full) return null;
+  if (id === 'field' || id === 'horn' || id === 'c-e' || id === 'world')
+    return 'varies (see details)';
+  const first = (full.split(/[,(]/)[0] ?? full).trim();
+  const vig = /(\d+)% vig/.exec(full);
+  return vig ? `${first} + ${vig[1]}% vig` : first;
 }
 
 export function betPayout(id: BetTypeId): string | null {

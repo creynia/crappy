@@ -41,6 +41,19 @@ describe('Settings', () => {
     expect(store.status('a')).toBe('done');
   });
 
+  it('invalid codes are rejected without a confirm step', async () => {
+    const store = new Store(new MemoryStorage());
+    const el = await mount(store);
+    const ta = el.querySelector('textarea')!;
+    await act(() => {
+      ta.value = 'junk';
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(() => btn(el, 'Import').click());
+    expect(el.textContent).toContain('That code is not valid.');
+    expect(el.textContent).not.toContain('Replace your current progress?');
+  });
+
   it('speed select is locked to instant under reduce motion', async () => {
     const store = new Store(new MemoryStorage());
     store.updateSettings({ reduceMotion: true });

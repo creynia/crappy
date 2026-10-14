@@ -62,7 +62,13 @@ export class Store {
   }
 
   lesson(id: string): LessonProgress | undefined {
-    return this.data.lessons[id];
+    return Object.hasOwn(this.data.lessons, id) ? this.data.lessons[id] : undefined;
+  }
+
+  /** Clear a lesson's quiz results (keeps completedAt and scene progress), e.g. to retake an exam. */
+  resetLesson(id: string) {
+    if (!Object.hasOwn(this.data.lessons, id)) return;
+    this.patchLesson(id, (l) => ({ ...l, quizzes: {} }));
   }
 
   status(id: string): LessonStatus {

@@ -62,7 +62,7 @@ export function BetsList() {
                 <td>
                   <Link to={`/bets/${r.id}`}>{r.label}</Link>
                 </td>
-                <td title={r.payout ?? undefined}>{shortPayout(r.payout) ?? '--'}</td>
+                <td title={r.payout ?? undefined}>{shortPayout(r.id, r.payout) ?? '--'}</td>
                 <td class="num">{formatEdge(r.edge)}</td>
                 <td>
                   <TierBadge tier={r.tier} />

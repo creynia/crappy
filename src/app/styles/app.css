@@ -419,6 +419,9 @@ main {
 .lesson-foot {
   margin-top: 2rem;
 }
+.exam-score {
+  margin-top: 1.5rem;
+}
 .prevnext a {
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useStore } from '../context';
+import { decodeImport } from '../storage';
 import { effectiveSpeed } from '../theme';
 import type { SpeedSetting, ThemeSetting } from '../storage';
 
@@ -107,13 +108,19 @@ export function Settings() {
             type="button"
             class="btn btn-ghost"
             disabled={code.trim() === '' || confirmImport}
-            onClick={() => setConfirmImport(true)}
+            onClick={() => {
+              if (decodeImport(code)) {
+                setMsg('');
+                setConfirmImport(true);
+              } else setMsg('That code is not valid.');
+            }}
           >
             Import
           </button>
         </div>
         <textarea
           rows={3}
+          readOnly={confirmImport}
           aria-label="Progress code"
           placeholder="Progress code"
           value={code}

@@ -1,4 +1,4 @@
-import { Marked, marked } from 'marked';
+import { Marked, marked, type Token, type Tokens } from 'marked';
 import { parse as parseYaml } from 'yaml';
 import { validateScene } from '../sim/scene';
 import type { Block, Lesson, Quiz } from './types';
@@ -30,21 +30,19 @@ function markedFor(shift: number): Marked | typeof marked {
   return m;
 }
 
-/** Shallowest markdown heading depth outside code fences (7 if none). */
+/** Shallowest markdown heading depth (ATX and setext; code blocks ignored), 7 if none. */
 export function minHeadingDepth(body: string): number {
   let min = 7;
-  let fence = '';
-  for (const line of body.split(/\r?\n/)) {
-    const f = /^(`{3,}|~{3,})/.exec(line);
-    if (f) {
-      if (!fence) fence = f[1]![0]!;
-      else if (f[1]![0] === fence) fence = '';
-      continue;
+  const walk = (tokens: readonly Token[]) => {
+    for (const t of tokens) {
+      if (t.type === 'heading') min = Math.min(min, (t as Tokens.Heading).depth);
+      else {
+        if ('tokens' in t && Array.isArray(t.tokens)) walk(t.tokens);
+        if (t.type === 'list') for (const it of (t as Tokens.List).items) walk(it.tokens);
+      }
     }
-    if (fence) continue;
-    const h = /^(#{1,6})\s/.exec(line);
-    if (h) min = Math.min(min, h[1]!.length);
-  }
+  };
+  walk(marked.lexer(body));
   return min;
 }
 

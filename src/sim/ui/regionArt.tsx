@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+import { memo } from 'preact/compat';
 import type { PointNumber } from '../engine/types';
 import { DieFaceSvg } from './Dice';
 import { NUMBER_WORD } from './layouts/shared';
@@ -54,7 +55,7 @@ function outline(r: RegionDef, stroke: string, fill: string, rx = 14): JSX.Eleme
 }
 
 /** Visual content of a betting region: borders, numerals, printed labels. No interaction here. */
-export function RegionArt({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
+function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
   const { x, y, w, h } = region.rect;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -169,7 +170,7 @@ export function RegionArt({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
       );
     case 'dont-come': {
       const tall = h > w * 0.8;
-      const s = Math.min(34, h * 0.16);
+      const s = tall ? Math.min(34, h * 0.16) : Math.min(30, h * 0.27);
       return (
         <g>
           {outline(region, WHITE, 'rgba(0,0,0,0.05)')}
@@ -210,18 +211,20 @@ export function RegionArt({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
           ) : (
             <>
               <text
-                x={x + w * 0.3}
+                x={x + 20}
                 y={cy + h * 0.1}
                 class="sim-label"
-                font-size={h * 0.3}
-                text-anchor="middle"
+                font-size={h * 0.28}
+                text-anchor="start"
+                textLength={w * 0.5}
+                lengthAdjust="spacingAndGlyphs"
                 fill={WHITE}
               >
                 DON'T COME
               </text>
-              <Dice2 x={x + w * 0.6} y={cy - s / 2 - 8} a={6} b={6} s={s} />
+              <Dice2 x={x + w * 0.64} y={cy - s / 2 - 8} a={6} b={6} s={s} />
               <text
-                x={x + w * 0.74}
+                x={x + w * 0.64 + s}
                 y={y + h - 12}
                 class="sim-tiny"
                 font-size={h * 0.13}
@@ -410,3 +413,12 @@ export function RegionArt({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
     </g>
   );
 }
+
+export const RegionArt = memo(
+  RegionArtImpl,
+  (a, b) =>
+    a.region === b.region &&
+    a.ctx.point === b.ctx.point &&
+    a.ctx.fieldPays[2] === b.ctx.fieldPays[2] &&
+    a.ctx.fieldPays[12] === b.ctx.fieldPays[12],
+);

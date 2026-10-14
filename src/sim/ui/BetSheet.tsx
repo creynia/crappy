@@ -42,6 +42,8 @@ export interface BetSheetProps {
   onAmountChange: (a: Cents) => void;
   onUseAlternative?: (a: Action) => void;
   onToggleWorking?: (on: boolean) => void;
+  /** Preview of removing this bet; an 'avoid' tier (gives up EV) needs the same second tap as Confirm. */
+  removePreview?: SheetPreview;
   onRemove?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -71,10 +73,16 @@ export function BetSheet(p: BetSheetProps) {
   const [armed, setArmed] = useState(false);
   const tier = normalizeTier(preview.tier);
   const valid = preview.validation.ok;
-  const needsSecondTap = showEV && tier === 'avoid' && confirmSucker && valid;
+  const needsSecondTap = tier === 'avoid' && confirmSucker && valid;
+  const removeNeedsSecondTap =
+    !!p.removePreview && normalizeTier(p.removePreview.tier) === 'avoid' && confirmSucker;
+  const [removeArmed, setRemoveArmed] = useState(false);
   const sig = `${p.selectedType}|${amount}|${preview.action.type}`;
 
-  useEffect(() => setArmed(false), [sig]);
+  useEffect(() => {
+    setArmed(false);
+    setRemoveArmed(false);
+  }, [sig]);
   useEffect(() => {
     if (p.forceWhyOpen) setWhyOpen(true);
   }, [p.forceWhyOpen]);
@@ -282,6 +290,14 @@ export function BetSheet(p: BetSheetProps) {
           </section>
         ) : null}
 
+        {mode === 'manage' && p.removePreview ? (
+          <p class="sim-detail sim-remove-note">{p.removePreview.headline}</p>
+        ) : null}
+        {removeNeedsSecondTap && removeArmed ? (
+          <p class="sim-banner" role="alert">
+            Removing this gives up expected value. Tap Remove again to confirm.
+          </p>
+        ) : null}
         {needsSecondTap && armed ? (
           <p class="sim-banner" role="alert">
             This is a sucker bet. Tap Place anyway again to confirm.
@@ -290,8 +306,22 @@ export function BetSheet(p: BetSheetProps) {
 
         <div class="sim-actions">
           {mode === 'manage' && p.onRemove ? (
-            <button type="button" class="sim-btn-remove" onClick={p.onRemove}>
-              Remove
+            <button
+              type="button"
+              class={`sim-btn-remove${removeNeedsSecondTap ? ' is-danger' : ''}`}
+              onClick={() => {
+                if (removeNeedsSecondTap && !removeArmed) {
+                  setRemoveArmed(true);
+                  return;
+                }
+                p.onRemove?.();
+              }}
+            >
+              {removeNeedsSecondTap
+                ? removeArmed
+                  ? 'Tap again to remove'
+                  : 'Remove anyway'
+                : 'Remove'}
             </button>
           ) : null}
           <button type="button" class="sim-btn-cancel" onClick={p.onCancel}>
@@ -358,9 +388,22 @@ export function EvLines({ facts: f }: { facts: EvFacts }) {
           ) : null}
         </li>
       ) : null}
-      <li data-line="chance">
-        Wins <b>{f.chance}</b> · pays <b>{f.pays}</b>.
-      </li>
+      {f.chance || f.pays ? (
+        <li data-line="chance">
+          {f.chance ? (
+            <>
+              Wins <b>{f.chance}</b>
+            </>
+          ) : null}
+          {f.chance && f.pays ? ' · ' : null}
+          {f.pays ? (
+            <>
+              pays <b>{f.pays}</b>
+            </>
+          ) : null}
+          .
+        </li>
+      ) : null}
       {f.combined ? (
         <li data-line="combined">
           {f.combined.label} together: <b>{fmtPct(f.combined.edge)}</b> per dollar.

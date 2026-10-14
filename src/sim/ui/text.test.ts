@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Bet, GameEvent, RollRecord } from '../engine/types';
 import { portraitLayout } from './layouts';
+import { createGame } from '../engine';
+import { previewAction } from '../math';
+import type { Action, GameState } from '../engine/types';
 import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
@@ -114,21 +117,44 @@ describe('tiers and ev facts', () => {
     expect(normalizeTier('poor')).toBe('poor');
     expect(normalizeTier('zero')).toBe('free');
   });
-  it('computes expected loss and per-hour numbers', () => {
-    const f = buildEvFacts(
-      {
-        edge: {
-          perResolved: { n: 152n, d: 10000n },
-          perResolvedExPush: { n: 1n, d: 1n },
-          expectedRolls: { n: 1n, d: 1n },
-          perRoll: { n: 1n, d: 216n },
-        },
-        perHourCents: { n: 120000n, d: 216n },
-        rollsPerHour: 100,
-      },
-      { amount: 1200, oneRoll: false, chance: '5 in 11 (45%)', pays: '7 to 6' },
-    );
-    expect(f.expectedLossCents).toBeCloseTo(18.24, 1);
-    expect(f.perHourCents).toBeCloseTo((1200 * 100) / 216, 0);
+  const state = createGame({
+    point: 6,
+    bankroll: 100000,
+    bets: [
+      { ref: 'p', type: 'pass-line', amount: 1000 },
+      { type: 'pass-odds', amount: 3000, parentRef: 'p' },
+    ],
+  });
+  const facts = (action: Action, s: GameState = state) => buildEvFacts(previewAction(s, action), s);
+
+  it('derives edge, loss, per hour, chance and payout for place 6', () => {
+    const f = facts({ type: 'place-bet', betType: 'place-6', amount: 1200 })!;
+    expect(f.oneRoll).toBe(false);
+    expect(f.edge).toBeCloseTo(0.0152, 3);
+    expect(f.expectedLossCents).toBeCloseTo(18.2, 0);
+    expect(f.pays).toBe('7 to 6');
+    expect(f.chance).toBe('5 in 11 (45%)');
+    expect(f.perHourCents).toBeGreaterThan(0);
+    expect(f.combined).toBeNull();
+  });
+  it('hard 4 is not a one-roll bet and pays 7 to 1', () => {
+    const f = facts({ type: 'place-bet', betType: 'hard-4', amount: 500 })!;
+    expect(f.oneRoll).toBe(false);
+    expect(f.pays).toBe('7 to 1');
+  });
+  it('field is a one-roll bet with a per-roll chance', () => {
+    const f = facts({ type: 'place-bet', betType: 'field', amount: 500 })!;
+    expect(f.oneRoll).toBe(true);
+    expect(f.chance).toMatch(/rolls/);
+  });
+  it('odds are a free bet and show the combined edge with the flat bet', () => {
+    const f = facts({ type: 'place-bet', betType: 'pass-odds', amount: 3000 })!;
+    expect(f.edge).toBe(0);
+    expect(f.combined?.label).toBe('Pass + Odds');
+    expect(f.combined!.edge).toBeGreaterThan(0);
+    expect(f.combined!.edge).toBeLessThan(0.0141);
+  });
+  it('returns null for a roll', () => {
+    expect(facts({ type: 'roll' })).toBeNull();
   });
 });

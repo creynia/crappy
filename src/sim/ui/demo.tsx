@@ -1,21 +1,29 @@
 // Dev-only gallery with mocked props. Open /src/sim/ui/demo.html in `npm run dev`.
 // Query: ?view=portrait|landscape|center  &sheet=free|good|fair|poor|avoid|invalid  &why=1  &dark=1
 import { render } from 'preact';
-import { useState } from 'preact/hooks';
-import { BetSheet, type SheetPreview } from './BetSheet';
+import { useRef, useState } from 'preact/hooks';
+import { BetSheet } from './BetSheet';
 import { CenterPanel } from './CenterPanel';
 import { ChipRack } from './ChipRack';
 import { RollButton } from './RollButton';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts } from './Toasts';
-import { buildAnimationQueue, playTimeline, type Player } from './animation';
+import { buildAnimationQueue, durationFor, playTimeline, type Player } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { buildEvFacts, describeRoll } from './text';
-import type { Bet, Dice, GameEvent, RollRecord } from '../engine/types';
-import type { UiTier } from './text';
-type EdgeTier = UiTier;
+import { createGame, legalBetTypes } from '../engine';
+import { previewAction } from '../math';
+import type {
+  Action,
+  Bet,
+  BetTypeId,
+  Dice,
+  GameEvent,
+  GameState,
+  RollRecord,
+} from '../engine/types';
 
 const q = new URLSearchParams(location.search);
 const view = q.get('view') ?? (innerWidth > innerHeight ? 'landscape' : 'portrait');
@@ -77,82 +85,76 @@ const HISTORY: RollRecord[] = [
   rec(9, 4, 3, 'point', 6),
 ];
 
-const frac = (n: number, d = 1) => ({ n: BigInt(n), d: BigInt(d) });
-function mockPreview(tier: EdgeTier | 'invalid'): SheetPreview {
-  const edgeN = { free: 0, good: 141, fair: 400, poor: 667, avoid: 1111, invalid: 141 }[tier];
-  const headline = {
-    free: 'Expected value: $0.00 (no house edge, the best bet in the casino)',
-    good: 'Expected value: -$0.14 (house edge 1.41%)',
-    fair: 'Expected value: -$0.20 (house edge 4.00%)',
-    poor: 'Expected value: -$0.33 (house edge 6.67%)',
-    avoid: 'Expected value: -$0.11 (house edge 11.11%)',
-    invalid: 'Expected value: -$0.14 (house edge 1.41%)',
-  }[tier];
-  return {
-    action: { type: 'place-bet', betType: tier === 'avoid' ? 'hard-4' : 'pass-line', amount: 1000 },
-    validation:
-      tier === 'invalid'
-        ? {
-            ok: false,
-            code: 'wrong-phase',
-            message: "Come bets can't be placed on the come-out roll.",
-          }
-        : {
-            ok: true,
-            warnings:
-              tier === 'fair'
-                ? [
-                    {
-                      code: 'short-pay',
-                      message: '$5 on the 6 pays $5.83 here; most casinos pay $5. Bet in $6 units.',
-                    },
-                  ]
-                : [],
-          },
-    evCents: frac(-14),
-    edge: {
-      perResolved: frac(edgeN, 10000),
-      perResolvedExPush: frac(edgeN, 10000),
-      expectedRolls: frac(8),
-      perRoll: frac(edgeN, 80000),
-    },
-    tier: tier === 'invalid' ? 'good' : tier,
-    perRollCents: frac(-4),
-    perHourCents: frac(tier === 'avoid' ? 1389 : 176),
-    rollsPerHour: 100,
-    headline,
-    detail: "About -$0.04 per roll while it's working",
-    alternative:
-      tier === 'avoid' || tier === 'poor'
-        ? {
-            action: { type: 'place-bet', betType: 'buy-4', amount: 2000 },
-            label: 'Buy the 4',
-            edge: {
-              perResolved: frac(167, 10000),
-              perResolvedExPush: frac(167, 10000),
-              expectedRolls: frac(8),
-              perRoll: frac(2, 10000),
-            },
-            savingsCents: frac(100),
-            message: 'Buy the 4 instead: same bet, 1.67% instead of 6.67%.',
-          }
-        : null,
-    explanation: {
-      rows: [
-        {
-          label: '7 before the point',
-          ways: 6,
-          outOf: 11,
-          probability: frac(6, 11),
-          net: frac(-1000),
-        },
-        { label: 'Point first', ways: 5, outOf: 11, probability: frac(5, 11), net: frac(1000) },
-      ],
-      evFormula: '5/11 × $10.00 − 6/11 × $10.00 = -$0.91',
-      note: tier === 'free' ? 'Odds pay true odds, so the house has no edge.' : undefined,
-    },
-  };
+// ---- real engine state + real previews (no literals) ----
+const baseGame = () =>
+  createGame({
+    point: 6,
+    bankroll: 43000,
+    seed: 7,
+    bets: [
+      { ref: 'p', type: 'pass-line', amount: 1000 },
+      { type: 'pass-odds', amount: 3000, parentRef: 'p' },
+    ],
+  });
+const GAME = baseGame();
+const COME_OUT = createGame({ bankroll: 43000, seed: 7 });
+
+interface Scenario {
+  title: string;
+  state: GameState;
+  action: Action;
+  types: BetTypeId[];
+  labels: Partial<Record<BetTypeId, string>>;
 }
+const SCENARIOS: Record<string, Scenario> = {
+  free: {
+    title: 'Pass line odds',
+    state: createGame({
+      point: 6,
+      bankroll: 43000,
+      seed: 7,
+      bets: [{ type: 'pass-line', amount: 1000 }],
+    }),
+    action: { type: 'place-bet', betType: 'pass-odds', amount: 3000 },
+    types: ['pass-line', 'pass-odds'],
+    labels: { 'pass-line': 'Pass line', 'pass-odds': 'Odds' },
+  },
+  good: {
+    title: 'Place 6',
+    state: GAME,
+    action: { type: 'place-bet', betType: 'place-6', amount: 1200 },
+    types: ['place-6', 'buy-6', 'lay-6'],
+    labels: { 'place-6': 'Place', 'buy-6': 'Buy', 'lay-6': 'Lay' },
+  },
+  fair: {
+    title: 'Place 5',
+    state: GAME,
+    action: { type: 'place-bet', betType: 'place-5', amount: 1000 },
+    types: ['place-5', 'buy-5', 'lay-5'],
+    labels: { 'place-5': 'Place', 'buy-5': 'Buy', 'lay-5': 'Lay' },
+  },
+  poor: {
+    title: 'Field',
+    state: GAME,
+    action: { type: 'place-bet', betType: 'field', amount: 500 },
+    types: ['field'],
+    labels: { field: 'Field' },
+  },
+  avoid: {
+    title: 'Hard 4',
+    state: GAME,
+    action: { type: 'place-bet', betType: 'hard-4', amount: 500 },
+    types: ['hard-4'],
+    labels: { 'hard-4': 'Hard 4' },
+  },
+  invalid: {
+    title: 'Come',
+    state: COME_OUT,
+    action: { type: 'place-bet', betType: 'come', amount: 1000 },
+    types: ['come'],
+    labels: { come: 'Come' },
+  },
+};
 
 const DICE: Dice[] = [
   [3, 3],
@@ -197,7 +199,9 @@ function App() {
         ]
       : [],
   );
-  let player: Player | null = null;
+  const player = useRef<Player | null>(null);
+  const sc = sheet ? SCENARIOS[sheet] : undefined;
+  const [pending, setPending] = useState<{ type: BetTypeId; amount: number } | null>(null);
 
   const doRoll = () => {
     const d = DICE[roll % DICE.length]!;
@@ -207,8 +211,8 @@ function App() {
       [{ type: 'dice-rolled', roll: rec(10, d[0], d[1], 'point', 6) }],
       'normal',
     );
-    player?.cancel();
-    player = playTimeline(tl, { onDone: () => setRolling(null) });
+    player.current?.cancel();
+    player.current = playTimeline(tl, { onDone: () => setRolling(null) });
   };
 
   const land = view === 'landscape';
@@ -219,20 +223,38 @@ function App() {
     offBetIds: new Set(['b5']),
     disabledRegions: new Set<RegionId>(q.get('dim') ? ['field'] : []),
     highlightedBets: q.get('hl') ? (['pass-line'] as const) : [],
-    onRegionTap: (id: RegionId) =>
-      setSheet(
-        id === 'field' ? 'poor' : id.startsWith('hard') || id.endsWith('7') ? 'avoid' : 'good',
-      ),
-    rollingDice: rolling ? { dice: rolling, durationMs: 1000 } : null,
+    onRegionTap: (id: RegionId) => {
+      const key =
+        id === 'field'
+          ? 'poor'
+          : id.startsWith('hard') || id === 'any-7'
+            ? 'avoid'
+            : id === 'pass'
+              ? 'free'
+              : id === 'box-5' || id === 'box-9'
+                ? 'fair'
+                : id === 'come'
+                  ? 'invalid'
+                  : 'good';
+      setSheet(key);
+      const s = SCENARIOS[key]!;
+      const a = s.action as Extract<Action, { type: 'place-bet' }>;
+      setPending({ type: a.betType, amount: a.amount });
+    },
+    rollingDice: rolling ? { dice: rolling, durationMs: durationFor('dice', 'normal') } : null,
   };
-  const tier = sheet ?? 'good';
-  const facts = buildEvFacts(mockPreview(tier as EdgeTier), {
-    amount: 1000,
-    oneRoll: tier === 'avoid' || tier === 'poor',
-    chance: '5 in 11 (45%)',
-    pays: '7 to 6',
-    combined: tier === 'good' ? { label: 'Pass + Odds', edge: 0.0037 } : null,
-  });
+  const cur = sc
+    ? (pending ?? {
+        type: (sc.action as Extract<Action, { type: 'place-bet' }>).betType,
+        amount: (sc.action as Extract<Action, { type: 'place-bet' }>).amount,
+      })
+    : null;
+  const action: Action | null = cur
+    ? { type: 'place-bet', betType: cur.type, amount: cur.amount }
+    : null;
+  const preview = sc && action ? previewAction(sc.state, action) : null;
+  const facts = preview && sc ? buildEvFacts(preview, sc.state) : null;
+  const legal = sc ? new Set(legalBetTypes(sc.state)) : new Set<BetTypeId>();
 
   return (
     <div class={`demo${land ? ' demo-land' : ''}`}>
@@ -279,26 +301,30 @@ function App() {
           <RollButton onRoll={doRoll} costText="Expected cost: $0.42" />
         </div>
       )}
-      {sheet ? (
+      {sc && cur && preview ? (
         <BetSheet
-          title={sheet === 'avoid' ? 'Hard 4' : 'Pass line'}
+          title={sc.title}
           placement={land ? 'panel' : 'sheet'}
-          preview={mockPreview(sheet as EdgeTier | 'invalid')}
+          preview={preview}
           facts={facts}
           forceWhyOpen={!!q.get('why')}
-          typeOptions={[
-            { id: 'pass-line', label: 'Pass line', enabled: true },
-            { id: 'pass-odds', label: 'Odds', enabled: true },
-          ]}
-          selectedType="pass-line"
-          amount={1000}
+          typeOptions={sc.types.map((id) => ({
+            id,
+            label: sc.labels[id] ?? id,
+            enabled: legal.has(id) || id === cur.type,
+          }))}
+          selectedType={cur.type}
+          amount={cur.amount}
           step={chip}
           quickActions={[
             { id: 'min', label: 'Min', amount: 500 },
-            { id: 'double', label: '×2', amount: 2000 },
+            { id: 'double', label: '×2', amount: cur.amount * 2 },
           ]}
-          onTypeChange={() => {}}
-          onAmountChange={() => {}}
+          onTypeChange={(t) => setPending({ ...cur, type: t })}
+          onAmountChange={(n) => setPending({ ...cur, amount: n })}
+          onUseAlternative={(act) => {
+            if (act.type === 'place-bet') setPending({ type: act.betType, amount: act.amount });
+          }}
           onConfirm={() => setSheet(null)}
           onCancel={() => setSheet(null)}
         />

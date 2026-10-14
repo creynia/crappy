@@ -46,7 +46,7 @@ const regions: RegionDef[] = [
     label: "Don't Come",
     sublabel: 'Bar 12. Pays 1 to 1',
     betTypes: ['dont-come'],
-    chipSpots: { main: { x: dcRect.x + 372, y: dcRect.y + 52 } },
+    chipSpots: { main: { x: dcRect.x + 385, y: dcRect.y + 50 } },
   },
   {
     id: 'big-6',

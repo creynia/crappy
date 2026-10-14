@@ -39,15 +39,15 @@ describe('buildAnimationQueue', () => {
   it('instant speed is an empty timeline', () => {
     expect(buildAnimationQueue(events, 'instant')).toEqual({ steps: [], totalMs: 0 });
   });
-  it('normal: dice 1000, puck 300, lose 400, win 600 in order', () => {
+  it('normal: about 1.1s in total, in order', () => {
     const t = buildAnimationQueue(events, 'normal');
     expect(t.steps.map((s) => [s.kind, s.at, s.duration])).toEqual([
-      ['dice', 0, 1000],
-      ['puck', 1000, 300],
-      ['lose', 1300, 400],
-      ['win', 1700, 600],
+      ['dice', 0, 650],
+      ['puck', 650, 100],
+      ['lose', 750, 150],
+      ['win', 900, 200],
     ]);
-    expect(t.totalMs).toBe(2300);
+    expect(t.totalMs).toBe(1100);
   });
   it('fast is shorter', () => {
     expect(buildAnimationQueue(events, 'fast').totalMs).toBeLessThan(1000);
@@ -55,10 +55,11 @@ describe('buildAnimationQueue', () => {
 });
 
 describe('speed defaults', () => {
-  it('reduced motion defaults to instant, explicit setting wins', () => {
+  it('reduced motion forces instant, otherwise the setting applies', () => {
     expect(effectiveSpeed(undefined, true)).toBe('instant');
     expect(effectiveSpeed(undefined, false)).toBe('normal');
-    expect(effectiveSpeed('fast', true)).toBe('fast');
+    expect(effectiveSpeed('fast', true)).toBe('instant');
+    expect(effectiveSpeed('fast', false)).toBe('fast');
   });
   it('reads matchMedia', () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce') }));

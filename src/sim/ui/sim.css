@@ -142,6 +142,10 @@
 }
 .sim-stack-hit {
   cursor: pointer;
+  outline: none;
+}
+.sim-stack-hit:focus-visible .sim-stack {
+  filter: drop-shadow(0 0 6px #ffe066) drop-shadow(0 0 2px #ffe066);
 }
 .sim-stack.is-off {
   opacity: 0.8;
@@ -196,6 +200,7 @@
   flex-direction: column;
 }
 .sim-chipbtn {
+  flex: 0 0 44px;
   width: 44px;
   height: 48px;
   padding: 2px;
@@ -364,8 +369,9 @@
   border-left-color: var(--sim-loss);
 }
 .sim-toast-x {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px -12px -8px 0;
   border: 0;
   background: none;
   color: inherit;
@@ -591,6 +597,12 @@
   gap: 8px;
   justify-content: flex-end;
   margin-top: 4px;
+  position: sticky;
+  bottom: -18px;
+  padding: 8px 0 18px;
+  margin-bottom: -18px;
+  background: var(--sim-surface);
+  border-top: 1px solid var(--sim-border);
 }
 .sim-sheet .sim-btn-confirm {
   background: var(--sim-accent);
@@ -621,10 +633,10 @@
     animation: sim-tumble-b var(--sim-tumble, 1000ms) ease-out both;
   }
   .sim-ghost-lose {
-    animation: sim-lose calc(400ms * var(--sim-anim, 1)) ease-in forwards;
+    animation: sim-lose 150ms ease-in forwards;
   }
   .sim-ghost-win {
-    animation: sim-win calc(600ms * var(--sim-anim, 1)) ease-out both;
+    animation: sim-win 200ms ease-out both;
   }
   .sim-stack-hit.is-won {
     animation: sim-flash 600ms ease-out;

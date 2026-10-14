@@ -16,8 +16,8 @@ export interface Timeline {
 }
 
 const DUR: Record<Exclude<Speed, 'instant'>, Record<StepKind, number>> = {
-  normal: { dice: 1000, puck: 300, lose: 400, win: 600, push: 300 },
-  fast: { dice: 300, puck: 150, lose: 150, win: 200, push: 150 },
+  normal: { dice: 650, puck: 100, lose: 150, win: 200, push: 100 },
+  fast: { dice: 250, puck: 60, lose: 80, win: 100, push: 60 },
 };
 const TOAST_MS: Record<Speed, number> = { normal: 2500, fast: 1500, instant: 2500 };
 
@@ -31,12 +31,12 @@ export function prefersReducedMotion(): boolean {
   }
 }
 
-/** The user's chosen speed wins; otherwise reduced motion defaults to instant. */
+/** OS reduced motion forces instant; otherwise the user's setting (default normal). */
 export function effectiveSpeed(
   setting: Speed | undefined,
   reducedMotion: boolean = prefersReducedMotion(),
 ): Speed {
-  return setting ?? (reducedMotion ? 'instant' : 'normal');
+  return reducedMotion ? 'instant' : (setting ?? 'normal');
 }
 
 export function toastDurationMs(speed: Speed): number {

@@ -10,6 +10,11 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4173/', trace: 'retain-on-failure' },
   projects: [
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    {
+      name: 'phone-landscape',
+      use: { ...devices['Pixel 7 landscape'] },
+      testMatch: /(sandbox|lessons|layout)\.spec\.ts/,
+    },
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {

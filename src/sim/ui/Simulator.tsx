@@ -46,8 +46,6 @@ import type { RegionDef, RegionId } from './layouts/types';
 import { loadSandbox, saveSandbox, clearSandbox } from './persist';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
 import {
-  chanceText,
-  combinedEdge,
   defaultAmount,
   defaultBetForRegion,
   minAmountFor,
@@ -528,13 +526,14 @@ export function Simulator(props: SimulatorInternalProps) {
     const type = bet ? bet.type : sheet.type;
     const parent = parentFor(type, sheet.regionId, game);
     const def = BET_TYPES[type];
-    const facts = buildEvFacts(preview, {
-      amount: sheet.amount,
-      oneRoll: def.oneRoll,
-      chance: chanceText(preview),
-      pays: def.describePayout(game.rules, bet?.point ?? game.point),
-      combined: combinedEdge(type, sheet.amount, parent, game),
-    });
+    const facts = buildEvFacts(preview, game);
+    const removePreview = bet
+      ? previewAction(
+          game,
+          { type: 'remove-bet', betId: bet.id },
+          { rollsPerHour: settings.rollsPerHour },
+        )
+      : undefined;
     const options: TypeOption[] = bet
       ? [{ id: type, label: betLabel(type), enabled: true }]
       : region.betTypes.map((t) => {
@@ -572,7 +571,7 @@ export function Simulator(props: SimulatorInternalProps) {
           });
       }
     }
-    return { bet, action, preview, showEV, facts, options, quick, type };
+    return { bet, action, preview, showEV, facts, options, quick, type, removePreview };
   }, [sheet, game, scene, rt, settings.rollsPerHour, chip]);
 
   const closeSheet = () => setSheet(null);
@@ -714,6 +713,15 @@ export function Simulator(props: SimulatorInternalProps) {
           orientation="row"
         />
       ) : null}
+      {ui.showRoll !== false ? (
+        <RollButton
+          onRoll={roll}
+          disabled={busy || !!sheet || !!lock}
+          rolling={busy}
+          {...(costText ? { costText } : {})}
+        />
+      ) : null}
+      {lock && ui.showRoll !== false && !guided ? <p class="sim-lock">{lock}</p> : null}
       <div class="sim-ctl-row">
         <button
           type="button"
@@ -752,15 +760,6 @@ export function Simulator(props: SimulatorInternalProps) {
           </button>
         ) : null}
       </div>
-      {ui.showRoll !== false ? (
-        <RollButton
-          onRoll={roll}
-          disabled={busy || !!sheet || !!lock}
-          rolling={busy}
-          {...(costText ? { costText } : {})}
-        />
-      ) : null}
-      {lock && ui.showRoll !== false && !guided ? <p class="sim-lock">{lock}</p> : null}
     </div>
   );
 
@@ -924,6 +923,7 @@ export function Simulator(props: SimulatorInternalProps) {
           mode={sheetModel.bet ? 'manage' : 'new'}
           placement={landscape ? 'panel' : 'sheet'}
           preview={sheetModel.preview}
+          {...(sheetModel.removePreview ? { removePreview: sheetModel.removePreview } : {})}
           facts={sheetModel.showEV ? sheetModel.facts : null}
           showEV={sheetModel.showEV}
           forceWhyOpen={scene.whyOpen === true}

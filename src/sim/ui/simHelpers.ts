@@ -1,11 +1,7 @@
 import { BET_TYPES } from '../engine/bets';
 import { maxOddsAmount, suggestAmount } from '../engine/validate';
 import type { Action, Bet, BetTypeId, Cents, GameState, PointNumber } from '../engine/types';
-import { betEdge } from '../math/ev';
-import { toNumber } from '../math/fraction';
-import type { ActionPreview } from '../math/types';
 import type { RegionDef, RegionId } from './layouts/types';
-import { fracToNumber } from './text';
 
 /** The number a box region stands for, or null. */
 export function boxNumber(id: RegionId): PointNumber | null {
@@ -88,41 +84,3 @@ export function placeAction(
       : {}),
   };
 }
-
-/** "5 in 11 (45%)" from the explanation's winning rows. */
-export function chanceText(preview: ActionPreview): string {
-  const rows = preview.explanation.rows;
-  if (!rows.length) return 'see the Why table';
-  const outOf = rows[0]!.outOf;
-  let ways = 0;
-  for (const r of rows) if (r.net.n > 0n) ways += r.ways;
-  if (ways === 0) return `0 in ${outOf}`;
-  const pct = Math.round((ways / outOf) * 100);
-  return `${ways} in ${outOf} (${pct}%)`;
-}
-
-/** Flat bet + odds together: edge per dollar of the combined action (curriculum 6.1). */
-export function combinedEdge(
-  type: BetTypeId,
-  amount: Cents,
-  parent: Bet | undefined,
-  g: GameState,
-): { label: string; edge: number } | null {
-  if (!parent || BET_TYPES[type].category !== 'odds') return null;
-  const ctx = { phase: g.phase, point: g.point, rules: g.rules };
-  const flat = toNumber(
-    betEdge(parent.type, parent.amount, { ...ctx, phase: 'point' }).perResolved,
-  );
-  const total = parent.amount + amount;
-  const label =
-    parent.type === 'pass-line'
-      ? 'Pass + odds'
-      : parent.type === 'dont-pass'
-        ? "Don't pass + lay odds"
-        : parent.type === 'come'
-          ? 'Come + odds'
-          : "Don't come + lay odds";
-  return { label, edge: (flat * parent.amount) / total };
-}
-
-export { fracToNumber };

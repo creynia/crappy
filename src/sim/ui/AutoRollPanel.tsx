@@ -22,6 +22,25 @@ import type { ChartMode, ChartSeries } from './BankrollChart';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
+// Strategies whose default odds are the table maximum.
+const MAX_ODDS_BY_DEFAULT = new Set<string>([
+  'pass-max-odds',
+  'dont-pass-max-lay',
+  'three-point-molly',
+]);
+
+// Strategies with no line bet, so an odds setting means nothing for them.
+const NO_ODDS_STRATEGIES = new Set<string>([
+  'place-6-8',
+  'iron-cross',
+  'across',
+  'field-every-roll',
+  'any-7-every-roll',
+  'hardways-all',
+  'no-bet',
+  'my-layout',
+]);
+
 export interface AutoRollPanelProps {
   rules?: Partial<TableRules> | RulePresetId;
   bankroll?: Cents; // default $500
@@ -235,11 +254,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
                   <span class="sim-ar-fixed-note">
                     {' '}
                     {money(x.unit)} unit,{' '}
-                    {x.oddsMultiple === undefined
-                      ? 'default odds'
-                      : x.oddsMultiple === 0
-                        ? 'flat bets only'
-                        : `${x.oddsMultiple}x odds`}
+                    {NO_ODDS_STRATEGIES.has(x.id)
+                      ? 'standard layout'
+                      : x.oddsMultiple === undefined
+                        ? MAX_ODDS_BY_DEFAULT.has(x.id)
+                          ? 'max odds'
+                          : 'default odds'
+                        : x.oddsMultiple === 0
+                          ? 'flat bets only'
+                          : `${x.oddsMultiple}x odds`}
                   </span>
                 </li>
               ))}
@@ -348,7 +371,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
         </div>
-        {typeof props.rules !== 'object' && (
+        {typeof props.rules !== 'object' && !fixedSpecs && (
           <label class="sim-ar-group">
             Rules
             <select

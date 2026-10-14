@@ -1,7 +1,7 @@
 import { BET_TYPES } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import { maxOddsAmount, suggestAmount, validateAction } from '../engine/validate';
-import type { Action, Bet, BetTypeId, Cents, GameState, Validation } from '../engine/types';
+import type { Action, BetTypeId, Cents, GameState, Validation } from '../engine/types';
 import {
   betEV,
   edgeOfBet,

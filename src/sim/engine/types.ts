@@ -77,6 +77,17 @@ export interface RollRecord {
 
 export interface RngState { s: readonly [number, number, number, number]; }
 
+/** Per-bet-type session totals (EXTENSION to the frozen contract, requested by the session panel). */
+export interface BetTypeStats {
+  count: number;              // bets resolved (win/lose/push)
+  wagered: Cents;             // amounts at the moment each bet resolved
+  won: Cents;                 // profit received (after vig)
+  lost: Cents;                // amounts lost
+  vig: Cents;
+  net: Cents;                 // won - lost (actual result)
+  expectedLoss: number;       // cents (float), from applyAction opts.expectedLossByTypeFn
+}
+
 export interface SessionStats {
   totalWagered: Cents;        // sum of amounts at the moment each bet resolved (win/lose/push), action measure
   totalWon: Cents;            // profit received (after vig)
@@ -84,6 +95,8 @@ export interface SessionStats {
   totalVig: Cents;
   /** Sum over rolls of tableExpectedLossPerRoll(stateBeforeRoll), in cents (float) */
   expectedLoss: number;
+  /** EXTENSION: per bet type breakdown (only types that have appeared). */
+  byType: Partial<Record<BetTypeId, BetTypeStats>>;
 }
 
 export interface GameState {

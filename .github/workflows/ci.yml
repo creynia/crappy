@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 concurrency:
@@ -24,8 +25,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run format:check
-      - run: npm test
       - run: npm run build:all
+      - run: npm test
       - uses: actions/upload-artifact@v4
         with:
           name: crappy-html

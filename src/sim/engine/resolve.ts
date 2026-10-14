@@ -39,7 +39,8 @@ export function resolveRoll(
 
   const events: GameEvent[] = [];
   const kept: Bet[] = [];
-  const byType: Partial<Record<BetTypeId, BetTypeStats>> = { ...state.stats.byType };
+  let byType: Partial<Record<BetTypeId, BetTypeStats>> = state.stats.byType;
+  let byTypeCopied = false;
   let bankroll = state.bankroll;
   let net: Cents = 0;
   let totalWagered = state.stats.totalWagered;
@@ -48,6 +49,10 @@ export function resolveRoll(
   let totalVig = state.stats.totalVig;
 
   const stat = (type: BetTypeId): BetTypeStats => {
+    if (!byTypeCopied) {
+      byType = { ...byType };
+      byTypeCopied = true;
+    }
     const cur = byType[type];
     const next = cur ? { ...cur } : emptyTypeStats();
     byType[type] = next;
@@ -65,7 +70,8 @@ export function resolveRoll(
         const cash = res.profit - res.vig;
         const staysUp = def.afterWin === 'stays-up';
         if (staysUp) {
-          kept.push(bet);
+          // upfront vig covers only the first win; later wins pay vig from the payout
+          kept.push(bet.vigPaid > 0 ? { ...bet, vigPaid: 0 } : bet);
           bankroll += cash;
         } else {
           bankroll += bet.amount + cash;

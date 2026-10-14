@@ -249,11 +249,15 @@ export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
 }
 
 export function toOutcomes(d: Distribution): Outcome[] {
-  return d.rows.map((r) => ({
-    label: r.label,
-    ways: Number(r.probability.n),
-    outOf: Number(r.probability.d),
-    probability: r.probability,
-    net: r.net,
-  }));
+  return d.rows.map((r) => {
+    // Show dice combinations out of 36 whenever the probability is a whole number of them.
+    const inThirtySixths = r.probability.d !== 0n && 36n % r.probability.d === 0n;
+    return {
+      label: r.label,
+      ways: Number(inThirtySixths ? (r.probability.n * 36n) / r.probability.d : r.probability.n),
+      outOf: inThirtySixths ? 36 : Number(r.probability.d),
+      probability: r.probability,
+      net: r.net,
+    };
+  });
 }

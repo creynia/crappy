@@ -1,7 +1,7 @@
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, payRatio } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import { maxOddsAmount, suggestAmount, validateAction } from '../engine/validate';
-import type { Action, BetTypeId, Cents, GameState, Validation } from '../engine/types';
+import type { Action, BetTypeId, GameState, Validation } from '../engine/types';
 import {
   betEV,
   edgeOfBet,
@@ -49,10 +49,9 @@ function newBet(state: GameState, a: PlaceAction): BetLike {
   };
 }
 
-function edgeText(edge: EdgeInfo, ev: Fraction): string {
+function edgeText(edge: EdgeInfo): string {
   if (edge.perResolved.n === 0n) return 'no house edge, the best bet in the casino';
   if (edge.perResolved.n < 0n) return `player edge ${pct(neg(edge.perResolved))}`;
-  void ev;
   return `house edge ${pct(edge.perResolved)}`;
 }
 
@@ -103,7 +102,7 @@ export function previewAction(
           tier: edgeTier(edge.perResolved),
           perRollCents: cost,
           perHourCents: h,
-          headline: `Expected value: ${money(ev)} (${edgeText(edge, ev)})`,
+          headline: `Expected value: ${money(ev)} (${edgeText(edge)})`,
           detail: `${perRollText(cost)} (${pct(edge.perRoll)}/roll), ${hourText(h)}.${extra}`,
           alternative: alt,
           explanation: explainBet(bet, ctx),
@@ -124,14 +123,14 @@ export function previewAction(
           tier: edgeTier(edge.perResolved),
           perRollCents: cost,
           perHourCents: h,
-          headline: `Expected value of the change: ${money(ev)} (${edgeText(edge, ev)})`,
+          headline: `Expected value of the change: ${money(ev)} (${edgeText(edge)})`,
           detail: `${perRollText(cost)} (${pct(edge.perRoll)}/roll), ${hourText(h)}.`,
           explanation: explainBet(next, ctx),
         };
       }
       case 'remove-bet': {
         const old = state.bets.find((b) => b.id === action.betId);
-        if (!old) return unknown(base, validation);
+        if (!old || !validation.ok) return unknown(base, validation);
         const ev = neg(betEV(old, ctx));
         const cost = neg(lossPerRoll(old, ctx));
         const h = perHour(cost, old, state, rph);
@@ -163,7 +162,7 @@ export function previewAction(
         const loss = lossPerRoll(old, ctx);
         const cost = nowOn === willOn ? ZERO : willOn ? loss : neg(loss);
         const ev = neg(cost);
-        const h = perHour(cost, old, state, rph);
+        const h = perHour(cost, action.working === 'on' ? null : old, state, rph);
         return {
           ...base,
           evCents: ev,
@@ -224,7 +223,7 @@ const ALTERNATIVES: Partial<Record<BetTypeId, BetTypeId[]>> = {
   'place-5': ['come', 'buy-5'],
   'place-9': ['come', 'buy-9'],
   field: ['pass-line', 'come'],
-  'any-7': ['dont-pass', 'dont-come', 'lay-4'],
+  'any-7': ['dont-come', 'lay-4', 'dont-pass'],
   'any-craps': ['pass-line', 'come'],
   'c-e': ['pass-line', 'come'],
   'aces-2': ['pass-line', 'come'],
@@ -238,6 +237,10 @@ const ALTERNATIVES: Partial<Record<BetTypeId, BetTypeId[]>> = {
   'lay-8': ['dont-come', 'dont-pass'],
   'lay-9': ['dont-come', 'dont-pass'],
 };
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
 
 const MIN_IMPROVEMENT = frac(1, 400); // 0.25 percentage points
 
@@ -294,14 +297,18 @@ export function suggestAlternative(
       if ((flat.type === 'pass-line' || flat.type === 'dont-pass') && state.phase !== 'point')
         continue;
       if ((flat.type === 'come' || flat.type === 'dont-come') && flat.point === null) continue;
-      let room: Cents;
-      try {
-        room = maxOddsAmount(state, flat.id);
-      } catch {
-        continue;
-      }
-      if (room <= 0) continue;
-      const amt = suggestAmount(oddsType, Math.min(action.amount, room), state);
+      const point =
+        flat.type === 'pass-line' || flat.type === 'dont-pass' ? state.point : flat.point;
+      if (point === null) continue;
+      const alreadyUp = state.bets
+        .filter((b) => b.parentId === flat.id)
+        .reduce((sum, b) => sum + b.amount, 0);
+      const remaining = maxOddsAmount(state, flat.id) - alreadyUp;
+      if (remaining <= 0) continue;
+      const ratio = payRatio(oddsType, point);
+      const unit = ratio ? (ratio[1] / gcd(ratio[0], ratio[1])) * 100 : 100;
+      const amt = Math.floor(Math.min(remaining, action.amount) / unit) * unit || unit;
+      if (amt > remaining) continue;
       const odds: PlaceAction = {
         type: 'place-bet',
         betType: oddsType,
@@ -315,7 +322,12 @@ export function suggestAlternative(
 
   // 2. Curated list; first legal candidate that is clearly cheaper.
   for (const cand of ALTERNATIVES[action.betType] ?? []) {
-    const amt = suggestAmount(cand, action.amount, state);
+    const def = BET_TYPES[cand];
+    const floor =
+      def.category === 'prop' || def.category === 'hardway'
+        ? state.rules.propMin
+        : state.rules.tableMin;
+    const amt = suggestAmount(cand, Math.max(action.amount, floor), state);
     const alt: PlaceAction = { type: 'place-bet', betType: cand, amount: amt };
     if (!validateAction(state, alt).ok) continue;
     const edge = edgeOfBet(newBet(state, alt), ctx);

@@ -138,6 +138,14 @@ export function nominalVig(type: BetTypeId, amount: Cents, rules: TableRules): C
   return 0;
 }
 
+/**
+ * Vig deducted from a win. With the upfront variant the vig paid at placement covers the bet's first
+ * win; resolveRoll then clears bet.vigPaid, so every later win of a bet that stays up pays vig again.
+ */
+function vigOnWin(bet: Bet, base: Cents, rules: TableRules): Cents {
+  return rules.vig.timing === 'upfront' && bet.vigPaid > 0 ? 0 : computeVig(base, rules);
+}
+
 /** True for bets whose `working` flag can be toggled. */
 export function isToggleable(type: BetTypeId): boolean {
   const c = BET_TYPES[type].category;
@@ -301,11 +309,10 @@ function oddsSpec(
       const p = bet.point ?? r.point;
       if (p === null) return NONE;
       const decided = r.total === 7 || r.total === p;
-      if (!working) return decided ? { kind: 'return', reason: 'odds-off' } : NONE;
+      if (comeOdds && !working) return decided ? { kind: 'return', reason: 'odds-off' } : NONE;
       const ratio = (good ? TRUE_ODDS : LAY_ODDS)[p];
       const wins = good ? r.total === p : r.total === 7;
       const loses = good ? r.total === 7 : r.total === p;
-      void comeOdds;
       if (wins) return win(payout(bet.amount, ratio[0], ratio[1], rules.payoutUnit));
       return loses ? LOSE : NONE;
     },
@@ -314,7 +321,7 @@ function oddsSpec(
 specs.push(oddsSpec('pass-odds', 'Pass Odds', 'ODDS', true, false));
 specs.push(oddsSpec('dont-pass-odds', "Don't Pass Odds", 'DP ODDS', false, false));
 specs.push(oddsSpec('come-odds', 'Come Odds', 'C ODDS', true, true));
-specs.push(oddsSpec('dont-come-odds', "Don't Come Odds", 'DC ODDS', false, true));
+specs.push(oddsSpec('dont-come-odds', "Don't Come Odds", 'DC ODDS', false, false));
 
 const NUMS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
 for (const n of NUMS) {
@@ -345,7 +352,7 @@ for (const n of NUMS) {
       if (!working) return NONE;
       if (r.total === n) {
         const profit = payout(bet.amount, TRUE_ODDS[n][0], TRUE_ODDS[n][1], rules.payoutUnit);
-        return win(profit, rules.vig.timing === 'upfront' ? 0 : computeVig(bet.amount, rules));
+        return win(profit, vigOnWin(bet, bet.amount, rules));
       }
       return r.total === 7 ? LOSE : NONE;
     },
@@ -363,7 +370,7 @@ for (const n of NUMS) {
       if (!working) return NONE;
       if (r.total === 7) {
         const profit = payout(bet.amount, LAY_ODDS[n][0], LAY_ODDS[n][1], rules.payoutUnit);
-        return win(profit, rules.vig.timing === 'upfront' ? 0 : computeVig(profit, rules));
+        return win(profit, vigOnWin(bet, profit, rules));
       }
       return r.total === n ? LOSE : NONE;
     },

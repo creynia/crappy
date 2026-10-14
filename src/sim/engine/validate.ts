@@ -149,12 +149,29 @@ function vigTooHigh(type: BetTypeId, amount: Cents, state: GameState): boolean {
   return vig * 1e6 > base * Math.round(state.rules.vig.rate * 1e6);
 }
 
-/** Smallest clean (full-pay, no vig penalty) amount >= `amount`. */
-export function suggestAmount(betType: BetTypeId, amount: Cents, state: GameState): Cents {
+/**
+ * Smallest clean amount >= `amount`: full-pay, no vig penalty, and at least the table/prop minimum.
+ * `opts.point` (or the parent's number via `opts.parentId`) selects the odds unit for odds bets;
+ * otherwise the bet's own number, then the table point, is used.
+ */
+export function suggestAmount(
+  betType: BetTypeId,
+  amount: Cents,
+  state: GameState,
+  opts?: { point?: PointNumber | null; parentId?: string },
+): Cents {
   const def = BET_TYPES[betType];
-  const point = def.category === 'odds' ? state.point : def.number;
+  let point: PointNumber | null = def.number;
+  if (def.category === 'odds') {
+    point = opts?.point ?? null;
+    if (point === null) {
+      const parent = findParent(state, betType, opts?.parentId);
+      point = parent ? oddsPoint(state, parent) : state.point;
+    }
+  }
   const step = payUnitDollars(betType, point) * def.unitMultiple * 100;
-  let a = Math.max(step, Math.ceil(amount / step) * step);
+  const floor = Math.max(amount, minFor(state, def));
+  let a = Math.max(step, Math.ceil(floor / step) * step);
   for (let i = 0; i < 500; i++, a += step) {
     if (!vigTooHigh(betType, a, state)) return a;
   }
@@ -184,7 +201,7 @@ function warnings(
     out.push({
       code: 'vig-rounding',
       message: `The ${formatMoney(nominalVig(def.id, total, state.rules))} vig is more than 5% at this size. Bet more to make the vig worth it.`,
-      suggestedAmount: suggestAmount(def.id, total, state),
+      suggestedAmount: suggestAmount(def.id, total, state, { point }),
     });
   }
   if (state.phase === 'come-out') {
@@ -409,7 +426,7 @@ function validateWorking(
   if (!bet) return fail('unknown-bet', 'That bet is not on the table.');
   if (!isToggleable(bet.type)) return fail('not-removable', 'This bet is always working.');
   if (action.working !== 'auto' && action.working !== 'on' && action.working !== 'off')
-    return fail('bad-amount', 'Working must be auto, on or off.');
+    return fail('not-removable', 'Working must be auto, on or off.');
   return { ok: true, warnings: [] };
 }
 
@@ -425,8 +442,12 @@ export function validateAction(state: GameState, action: Action): Validation {
       return validateWorking(state, action);
     case 'roll':
       if (action.dice) {
-        const ok = action.dice.every((d) => Number.isInteger(d) && d >= 1 && d <= 6);
-        if (!ok) return fail('bad-amount', 'Dice must show 1 to 6.');
+        const d = action.dice as readonly number[];
+        const ok =
+          Array.isArray(d) &&
+          d.length === 2 &&
+          d.every((x) => Number.isInteger(x) && x >= 1 && x <= 6);
+        if (!ok) return fail('bad-amount', 'A roll needs exactly two dice, each showing 1 to 6.');
       }
       return { ok: true, warnings: [] };
     default:

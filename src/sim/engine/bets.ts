@@ -1,0 +1,51 @@
+import type { BetTypeId } from './types';
+
+/** Every canonical bet id (decisions.md: includes buy/lay 5/6/8/9 and `world`). */
+export const BET_TYPE_IDS: readonly BetTypeId[] = [
+  'pass-line',
+  'dont-pass',
+  'come',
+  'dont-come',
+  'pass-odds',
+  'dont-pass-odds',
+  'come-odds',
+  'dont-come-odds',
+  'place-4',
+  'place-5',
+  'place-6',
+  'place-8',
+  'place-9',
+  'place-10',
+  'buy-4',
+  'buy-5',
+  'buy-6',
+  'buy-8',
+  'buy-9',
+  'buy-10',
+  'lay-4',
+  'lay-5',
+  'lay-6',
+  'lay-8',
+  'lay-9',
+  'lay-10',
+  'field',
+  'big-6',
+  'big-8',
+  'hard-4',
+  'hard-6',
+  'hard-8',
+  'hard-10',
+  'any-7',
+  'any-craps',
+  'yo-11',
+  'aces-2',
+  'boxcars-12',
+  'ace-deuce-3',
+  'horn',
+  'c-e',
+  'world',
+];
+
+export function isBetTypeId(x: unknown): x is BetTypeId {
+  return typeof x === 'string' && (BET_TYPE_IDS as readonly string[]).includes(x);
+}

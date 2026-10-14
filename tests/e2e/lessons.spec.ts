@@ -56,3 +56,10 @@ test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page 
   const q2 = page.locator('fieldset.quiz').first();
   await expect(q2.locator('legend')).toContainText('answered');
 });
+
+test('lesson 1: auto-roll scene completes its step', async ({ page }) => {
+  await page.goto('/#/learn/dice-and-combinations');
+  const scene = await openScene(page, 1);
+  await scene.getByRole('button', { name: /^Auto-roll 600/ }).click();
+  await expect(scene.locator('.sim-step-text')).toContainText('Compare the 7 bar');
+});

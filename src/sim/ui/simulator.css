@@ -250,7 +250,7 @@
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .sim-land .sim-table-wrap {
-    max-width: calc((100dvh - 70px) * 1.875);
+    max-width: calc((100dvh - 100px) * 1.875);
   }
   .sim-rail {
     gap: 4px;

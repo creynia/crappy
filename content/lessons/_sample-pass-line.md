@@ -5,7 +5,7 @@ summary: Placeholder lesson with a scene and one quiz.
 minutes: 4
 ---
 
-The Pass Line wins on a 7 or 11 at the come-out, loses on 2, 3 or 12, and otherwise sets the [[point]].
+The Pass Line wins on a 7 or 11 at the come-out, loses on 2, 3 or 12, and otherwise sets the point.
 
 ```scene
 id: sample-pass

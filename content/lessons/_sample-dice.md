@@ -5,7 +5,7 @@ summary: Placeholder lesson showing every content feature.
 minutes: 3
 ---
 
-Two dice make **36** combinations. The total *7* is the most common. See also the [[point]].
+Two dice make **36** combinations. The total *7* is the most common. See also the point.
 
 :::tip
 Say "seven" out loud only when you mean it at a real table.

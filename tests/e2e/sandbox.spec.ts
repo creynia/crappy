@@ -58,7 +58,10 @@ test.describe('sandbox', () => {
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
     await expect(panel).toBeVisible();
-    await panel.getByRole('button', { name: /^(Run|Auto-roll|Start|Simulate)/i }).first().click();
+    await panel
+      .getByRole('button', { name: /^(Run|Auto-roll|Start|Simulate)/i })
+      .first()
+      .click();
     await expect(panel.locator('svg').first()).toBeVisible({ timeout: 15_000 });
   });
 

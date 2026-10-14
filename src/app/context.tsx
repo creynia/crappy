@@ -6,13 +6,15 @@ import { Store } from './store';
 
 const ContentCtx = createContext<ContentBundle | null>(null);
 const StoreCtx = createContext<Store | null>(null);
+/** Bumped on every store change so consumers re-render even when `children` is the same vnode. */
+const VersionCtx = createContext(0);
 
 export function AppProviders(props: {
   content: ContentBundle;
   store: Store;
   children: ComponentChildren;
 }) {
-  const [, tick] = useReducer((n: number) => n + 1, 0);
+  const [version, tick] = useReducer((n: number) => n + 1, 0);
   const bump = () => tick(0);
   useEffect(() => {
     const off = props.store.subscribe(bump);
@@ -25,7 +27,9 @@ export function AppProviders(props: {
   }, [props.store]);
   return (
     <ContentCtx.Provider value={props.content}>
-      <StoreCtx.Provider value={props.store}>{props.children}</StoreCtx.Provider>
+      <StoreCtx.Provider value={props.store}>
+        <VersionCtx.Provider value={version}>{props.children}</VersionCtx.Provider>
+      </StoreCtx.Provider>
     </ContentCtx.Provider>
   );
 }
@@ -39,6 +43,7 @@ export function useContent(): ContentBundle {
 /** The store; the provider re-renders the tree on every change, so reads are always fresh. */
 export function useStore(): Store {
   const s = useContext(StoreCtx);
+  useContext(VersionCtx); // subscribe to store changes
   if (!s) throw new Error('useStore outside AppProviders');
   return s;
 }

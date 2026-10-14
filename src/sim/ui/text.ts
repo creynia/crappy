@@ -114,8 +114,6 @@ export interface EvFacts {
   combined?: { label: string; edge: number } | null;
 }
 
-const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
   'pass-line': { flat: 'pass-odds', label: 'Pass + Odds' },
   'dont-pass': { flat: 'dont-pass-odds', label: "Don't Pass + Lay odds" },
@@ -179,6 +177,11 @@ function combinedEdge(
  * edge are derived here (engine registry + the preview's explanation), so callers pass only the state.
  * Returns null for actions that are not about a bet (roll, set-working without a bet).
  */
+function bigGcd(a: bigint, b: bigint): bigint {
+  while (b) [a, b] = [b, a % b];
+  return a;
+}
+
 export function buildEvFacts(
   preview: ActionPreview,
   state: Pick<GameState, 'rules' | 'phase' | 'point' | 'bets'>,
@@ -203,12 +206,24 @@ export function buildEvFacts(
   const def = BET_TYPES[type];
   const edge = preview.edge ? fracToNumber(preview.edge.perResolved) : null;
   const rows = preview.explanation.rows;
-  const outOf = rows[0]?.outOf ?? 0;
-  const winWays = rows.filter((r) => r.net.n > 0n).reduce((t, r) => t + r.ways, 0);
+  // exact sum of the winning rows' probabilities (rows can use different bases), e.g. 244/495
+  let wn = 0n;
+  let wd = 1n;
+  for (const r of rows) {
+    if (r.net.n <= 0n) continue;
+    wn = wn * r.probability.d + r.probability.n * wd;
+    wd *= r.probability.d;
+    const g = bigGcd(wn, wd);
+    if (g > 1n) {
+      wn /= g;
+      wd /= g;
+    }
+  }
   let chance = '';
-  if (outOf > 0 && winWays > 0) {
-    const g = gcd(winWays, outOf);
-    chance = `${winWays / g} in ${outOf / g}${def.oneRoll ? ' rolls' : ''} (${Math.round((winWays / outOf) * 100)}%)`;
+  if (wn > 0n) {
+    const p = fracToNumber({ n: wn, d: wd }) * 100;
+    const pct = wd <= 36n ? String(Math.round(p)) : p.toFixed(1).replace(/\.0$/, '');
+    chance = `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
   try {

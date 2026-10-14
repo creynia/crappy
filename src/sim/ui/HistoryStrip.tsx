@@ -42,8 +42,7 @@ export function HistoryStrip({ history, limit = 20, onOpenAll }: HistoryStripPro
   return (
     <div
       class="sim-history"
-      role="list"
-      aria-label="Roll history, newest first"
+      {...(recent.length ? { role: 'list', 'aria-label': 'Roll history, newest first' } : {})}
       onClick={onOpenAll}
     >
       {recent.length === 0 ? <span class="sim-history-empty">No rolls yet</span> : null}

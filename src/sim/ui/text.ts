@@ -1,13 +1,6 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { BET_TYPES } from '../engine/bets';
-import type {
-  Action,
-  Bet,
-  BetTypeId,
-  Cents,
-  GameEvent,
-  GameState,
-} from '../engine/types';
+import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';

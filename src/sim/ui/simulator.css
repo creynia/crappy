@@ -1,0 +1,253 @@
+/* Container layout for <Simulator>: step panel, felt, controls, panels. Colours come from sim.css tokens. */
+.sim-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  color: var(--sim-text);
+  font-size: 0.95rem;
+}
+.sim-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-felt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.sim-felt-body {
+  position: relative;
+}
+.sim-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.sim-controls .sim-roll {
+  width: 100%;
+}
+.sim-ctl-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sim-tab,
+.sim-linkbtn,
+.sim-menu button,
+.sim-next {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  font: inherit;
+  cursor: pointer;
+}
+.sim-tab {
+  flex: 1 1 auto;
+}
+.sim-tab[aria-pressed='true'],
+.sim-tab[aria-expanded='true'] {
+  background: var(--sim-surface-2);
+  border-color: var(--sim-accent);
+}
+.sim-linkbtn {
+  min-height: 32px;
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  color: var(--sim-accent);
+  text-decoration: underline;
+}
+.sim-next {
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  border-color: transparent;
+  font-weight: 700;
+  align-self: flex-start;
+}
+.sim-tab:focus-visible,
+.sim-linkbtn:focus-visible,
+.sim-next:focus-visible,
+.sim-menu :is(button, select, input):focus-visible,
+.sim-center-ind:focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+.sim-center-ind {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-height: 32px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sim-lock,
+.sim-muted {
+  margin: 0;
+  color: var(--sim-muted);
+  font-size: 0.85rem;
+}
+.sim-step {
+  background: var(--sim-surface);
+  border: 1px solid var(--sim-border);
+  border-left: 6px solid var(--sim-accent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-step-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--sim-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sim-step-text,
+.sim-step-hint,
+.sim-step-math p {
+  margin: 0;
+}
+.sim-step-hint {
+  color: var(--sim-text);
+  background: var(--sim-surface-2);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.sim-menu,
+.sim-session-panel,
+.sim-auto {
+  background: var(--sim-surface);
+  border: 1px solid var(--sim-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sim-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-menu-row {
+  display: flex;
+  gap: 8px;
+}
+.sim-menu-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.sim-menu select {
+  min-height: 40px;
+  font: inherit;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.sim-menu-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+}
+.sim-session-panel h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.sim-session-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+}
+.sim-session-grid dt {
+  font-size: 0.78rem;
+  color: var(--sim-muted);
+}
+.sim-session-grid dd {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.sim-session-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+.sim-session-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.sim-session-table th,
+.sim-session-table td {
+  text-align: right;
+  padding: 4px 6px;
+  border-top: 1px solid var(--sim-border);
+}
+.sim-session-table th:first-child {
+  text-align: left;
+}
+.sim-hide-money .sim-status-money {
+  display: none;
+}
+.sim-hide-history .sim-history {
+  display: none;
+}
+.sim-compact .sim-status {
+  font-size: 0.8rem;
+}
+
+/* landscape: table + 180px right rail */
+.sim-land .sim-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  align-items: start;
+  gap: 10px;
+}
+.sim-land .sim-table-wrap {
+  max-width: calc((100dvh - 24px) * 1.875);
+  margin-inline: auto;
+}
+.sim-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-rail .sim-rack {
+  flex-wrap: wrap;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .sim-land .sim-table-wrap {
+    max-width: calc((100dvh - 70px) * 1.875);
+  }
+  .sim-rail {
+    gap: 4px;
+  }
+  .sim-rail .sim-roll {
+    min-height: 48px;
+  }
+  .sim-rail .sim-tab {
+    min-height: 40px;
+  }
+}

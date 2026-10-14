@@ -33,9 +33,13 @@ export function resolveSettings(
   const requested = i.animationSpeed ?? i.speed ?? sceneSpeed;
   return {
     // reduced motion forces instant unless the viewer explicitly picked a speed
-    speed: reduced && !i.animationSpeed && !i.speed ? 'instant' : effectiveSpeed(requested, reduced),
+    speed:
+      reduced && !i.animationSpeed && !i.speed ? 'instant' : effectiveSpeed(requested, reduced),
     skipPreview: i.skipPreview ?? false,
-    rulesPreset: preset && Object.prototype.hasOwnProperty.call(RULE_PRESETS, preset) ? preset : 'standard-vegas',
+    rulesPreset:
+      preset && Object.prototype.hasOwnProperty.call(RULE_PRESETS, preset)
+        ? preset
+        : 'standard-vegas',
     sound: false,
     rollsPerHour: typeof rph === 'number' && rph > 0 ? Math.round(rph) : 100,
     confirmSuckerBets: i.confirmSuckerBets ?? true,

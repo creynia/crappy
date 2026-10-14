@@ -81,7 +81,11 @@ function applySetup(state: GameState, setup: NonNullable<SceneStep['setup']>): G
   return s;
 }
 
-function startStep(scene: SceneConfig, game: GameState, index: number): {
+function startStep(
+  scene: SceneConfig,
+  game: GameState,
+  index: number,
+): {
   game: GameState;
   runtime: SceneRuntime;
 } {
@@ -120,7 +124,11 @@ export function initScene(
 // Matching
 // ---------------------------------------------------------------------------
 
-function totalAfter(game: GameState, action: Extract<Action, { type: 'place-bet' }>, post: boolean) {
+function totalAfter(
+  game: GameState,
+  action: Extract<Action, { type: 'place-bet' }>,
+  post: boolean,
+) {
   const def = BET_TYPES[action.betType];
   const parent =
     def.category === 'odds' ? findParent(game, action.betType, action.parentId) : undefined;
@@ -129,12 +137,7 @@ function totalAfter(game: GameState, action: Extract<Action, { type: 'place-bet'
   return (target?.amount ?? 0) + action.amount;
 }
 
-function matches(
-  m: ActionMatcher,
-  action: Action,
-  game: GameState,
-  post: boolean,
-): boolean {
+function matches(m: ActionMatcher, action: Action, game: GameState, post: boolean): boolean {
   if (m.type !== action.type) return false;
   if (action.type === 'roll') return true;
   let betType: BetTypeId | undefined;
@@ -242,13 +245,13 @@ export function highlightedFor(scene: SceneConfig, step?: SceneStep): BetTypeId[
 }
 
 /** True when the Roll button should be locked by the current step, with the reason. */
-export function rollLock(
-  scene: SceneConfig,
-  rt: SceneRuntime,
-  game: GameState,
-): string | null {
+export function rollLock(scene: SceneConfig, rt: SceneRuntime, game: GameState): string | null {
   const step = currentStep(scene, rt);
-  if (scene.onForcedExhausted === 'block' && game.forcedDice.length === 0 && (scene.forcedDice || step))
+  if (
+    scene.onForcedExhausted === 'block' &&
+    game.forcedDice.length === 0 &&
+    (scene.forcedDice || step)
+  )
     return 'The lesson is over: try the sandbox!';
   if (!allowedActionsFor(scene, step).includes('roll'))
     return step?.hint ?? 'Rolling is switched off in this step.';

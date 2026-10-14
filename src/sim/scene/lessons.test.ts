@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { applyAction, maxOddsAmount, suggestAmount } from '../engine';
-import type { Action, GameEvent, GameState } from '../engine';
+import type { Action, GameState } from '../engine';
 import {
   conditionNeedsRoll,
   gateAction,
@@ -61,18 +61,21 @@ class Run {
   }
   act(action: Action, why: string) {
     const gate = gateAction(this.scene, this.rt, this.game, action);
-    if (!gate.ok) throw new Error(`${why}: gate rejected ${JSON.stringify(action)}: ${gate.message}`);
+    if (!gate.ok)
+      throw new Error(`${why}: gate rejected ${JSON.stringify(action)}: ${gate.message}`);
     const res = applyAction(this.game, action);
-    if (!res.ok) throw new Error(`${why}: engine rejected ${JSON.stringify(action)}: ${res.error.message}`);
+    if (!res.ok)
+      throw new Error(`${why}: engine rejected ${JSON.stringify(action)}: ${res.error.message}`);
     this.game = res.state;
-    this.feed({ kind: 'action', action, events: res.events as GameEvent[] });
+    this.feed({ kind: 'action', action, events: res.events });
   }
 }
 
 function placeFor(run: Run, m: ActionMatcher, why: string) {
   const betType = Array.isArray(m.betType) ? m.betType[0]! : m.betType;
   if (m.type === 'roll') return run.act({ type: 'roll' }, why);
-  if (m.type !== 'place-bet' || !betType) throw new Error(`${why}: cannot script ${JSON.stringify(m)}`);
+  if (m.type !== 'place-bet' || !betType)
+    throw new Error(`${why}: cannot script ${JSON.stringify(m)}`);
   let parentId: string | undefined;
   if (betType === 'come-odds' || betType === 'dont-come-odds') {
     const flat = betType === 'come-odds' ? 'come' : 'dont-come';
@@ -83,7 +86,8 @@ function placeFor(run: Run, m: ActionMatcher, why: string) {
   if (m.oddsMax) {
     const parent =
       parentId ??
-      run.game.bets.find((b) => b.type === (betType === 'pass-odds' ? 'pass-line' : 'dont-pass'))?.id;
+      run.game.bets.find((b) => b.type === (betType === 'pass-odds' ? 'pass-line' : 'dont-pass'))
+        ?.id;
     if (!parent) throw new Error(`${why}: no parent for ${betType}`);
     amount = maxOddsAmount(run.game, parent);
   }
@@ -105,7 +109,11 @@ function satisfy(run: Run, c: Condition, why: string): void {
     return run.feed({ kind: 'auto-roll-completed', rolls: c.autoRollCompleted.minRolls ?? 1 });
   if ('betOnTable' in c) {
     if (run.game.bets.some((b) => b.type === c.betOnTable.type)) return;
-    return placeFor(run, { type: 'place-bet', betType: c.betOnTable.type, minAmount: c.betOnTable.minAmount }, why);
+    return placeFor(
+      run,
+      { type: 'place-bet', betType: c.betOnTable.type, minAmount: c.betOnTable.minAmount },
+      why,
+    );
   }
   // roll-driven conditions: roll until the step advances (bounded)
   const idx = run.rt.stepIndex;

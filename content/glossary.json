@@ -1,0 +1,212 @@
+[
+  {
+    "term": "Shooter",
+    "definition": "The player who is rolling the dice. The dice pass clockwise to a new shooter after a seven-out.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Stickman",
+    "definition": "The dealer in the middle with the long stick. Calls each roll and runs the center bets.",
+    "seeAlso": "table-tour"
+  },
+  {
+    "term": "Boxperson",
+    "definition": "The casino employee who sits between the two dealers and supervises the game.",
+    "seeAlso": "table-tour"
+  },
+  {
+    "term": "Puck",
+    "definition": "A disc that is black OFF on one side and white ON on the other. It marks whether a point is set, and which one.",
+    "seeAlso": "table-tour"
+  },
+  {
+    "term": "Come-out roll",
+    "definition": "The first roll of a round, while the puck is OFF. 7 and 11 are naturals, 2, 3 and 12 are craps, anything else becomes the point.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Point",
+    "definition": "The number (4, 5, 6, 8, 9 or 10) set by the come-out roll. The shooter must roll it again before a 7.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Natural",
+    "definition": "A 7 or 11 on the come-out. Pass Line bets win.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Craps",
+    "definition": "A 2, 3 or 12 on the come-out. Pass Line bets lose. Also the name of the game.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Seven-out",
+    "definition": "A 7 rolled while a point is set. The Pass Line loses and the dice move to the next shooter.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Making the point",
+    "definition": "Rolling the point number again before a 7. The Pass Line wins.",
+    "seeAlso": "come-out-and-point"
+  },
+  {
+    "term": "Hard way",
+    "definition": "A total made as a pair: 2-2, 3-3, 4-4 or 5-5. Any other way to make that total is easy.",
+    "seeAlso": "dice-and-combinations"
+  },
+  {
+    "term": "Easy way",
+    "definition": "Making 4, 6, 8 or 10 without a pair, such as 1-5 for a 6.",
+    "seeAlso": "dice-and-combinations"
+  },
+  {
+    "term": "Combination",
+    "definition": "One specific outcome of the two dice. There are 36, each equally likely.",
+    "seeAlso": "dice-and-combinations"
+  },
+  {
+    "term": "Pass Line",
+    "definition": "The main bet of the game. Wins on a come-out 7 or 11, loses on 2, 3 or 12, and otherwise rides on the point. Pays even money.",
+    "seeAlso": "pass-line"
+  },
+  {
+    "term": "Don't Pass",
+    "definition": "The opposite of the Pass Line. Wins on 2 or 3 (12 is a push) and when 7 comes before the point.",
+    "seeAlso": "dont-side"
+  },
+  {
+    "term": "Contract bet",
+    "definition": "A bet you cannot take down once a point is set, such as the Pass Line after a point is set.",
+    "seeAlso": "pass-line"
+  },
+  {
+    "term": "Even money",
+    "definition": "A 1:1 payout. Bet $10, win $10.",
+    "seeAlso": "pass-line"
+  },
+  {
+    "term": "Expected value (EV)",
+    "definition": "The average result of a bet per dollar over the long run. Almost every bet is negative.",
+    "seeAlso": "expected-value"
+  },
+  {
+    "term": "House edge",
+    "definition": "The negative of EV, as a percentage of the money bet. The Pass Line's is 1.41%.",
+    "seeAlso": "expected-value"
+  },
+  {
+    "term": "Odds bet",
+    "definition": "A bet placed behind a line or Come bet once a point is set. Pays true odds, so its house edge is 0%.",
+    "seeAlso": "odds-bet"
+  },
+  {
+    "term": "True odds",
+    "definition": "A payout that exactly matches the real chance of winning, such as 2:1 on a 4 or 10.",
+    "seeAlso": "odds-bet"
+  },
+  {
+    "term": "3-4-5x odds",
+    "definition": "A common limit: up to 3x your flat bet on 4 and 10, 4x on 5 and 9, 5x on 6 and 8.",
+    "seeAlso": "odds-bet"
+  },
+  {
+    "term": "Come bet",
+    "definition": "Like a Pass bet that starts on the next roll. It moves to a number and then wins if that number rolls before a 7.",
+    "seeAlso": "come-bets"
+  },
+  {
+    "term": "Don't Come",
+    "definition": "The opposite of a Come bet. Wins when 7 comes before its number.",
+    "seeAlso": "dont-side"
+  },
+  {
+    "term": "Working / off",
+    "definition": "A bet that is working can win or lose on the next roll. Odds on Come bets are off on a come-out by default.",
+    "seeAlso": "come-bets"
+  },
+  {
+    "term": "Place bet",
+    "definition": "A bet that a number (4, 5, 6, 8, 9 or 10) rolls before a 7. Pays a little less than true odds.",
+    "seeAlso": "place-bets"
+  },
+  {
+    "term": "Buy bet",
+    "definition": "A bet at true odds with a 5% commission. Best on 4 and 10, and best bought for $20 or more.",
+    "seeAlso": "buy-and-lay"
+  },
+  {
+    "term": "Lay bet",
+    "definition": "The opposite of a buy bet: betting a 7 will come before a number. Pays true odds minus 5% of the win.",
+    "seeAlso": "buy-and-lay"
+  },
+  {
+    "term": "Vig",
+    "definition": "The casino's commission on buy and lay bets. Also called juice.",
+    "seeAlso": "buy-and-lay"
+  },
+  {
+    "term": "Field",
+    "definition": "A one-roll bet on 2, 3, 4, 9, 10, 11 or 12. In the default rules 2 and 12 pay double.",
+    "seeAlso": "field-and-big-6-8"
+  },
+  {
+    "term": "Big 6 / Big 8",
+    "definition": "Even-money bets that 6 or 8 rolls before a 7. Place 6 and 8 pay better.",
+    "seeAlso": "field-and-big-6-8"
+  },
+  {
+    "term": "Proposition bet",
+    "definition": "A one-roll bet in the center of the table, such as Any 7 or Aces. High payouts, high edge.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Hardways",
+    "definition": "Bets that a 4, 6, 8 or 10 comes as a pair before it comes easy or a 7 shows.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Any 7",
+    "definition": "A one-roll center bet that the next roll is a 7. Pays 4 to 1.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Horn",
+    "definition": "A four-way one-roll bet on 2, 3, 11 and 12.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Yo",
+    "definition": "Table slang for 11.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Boxcars",
+    "definition": "Two sixes: a roll of 12.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Snake eyes / Aces",
+    "definition": "Two ones: a roll of 2.",
+    "seeAlso": "sucker-bets"
+  },
+  {
+    "term": "Bankroll",
+    "definition": "The money you set aside for a session.",
+    "seeAlso": "variance-and-bankroll"
+  },
+  {
+    "term": "Variance",
+    "definition": "How far real results swing around the average. High variance means big swings.",
+    "seeAlso": "variance-and-bankroll"
+  },
+  {
+    "term": "Table minimum",
+    "definition": "The smallest bet the table allows on line, Come, place and field bets.",
+    "seeAlso": "table-tour"
+  },
+  {
+    "term": "Rolls per hour",
+    "definition": "The pace of the game, about 100 rolls an hour by default here. Used to turn an edge into an hourly cost.",
+    "seeAlso": "edge-per-roll"
+  }
+]

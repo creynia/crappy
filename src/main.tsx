@@ -1,4 +1,5 @@
 import { render } from 'preact';
+import { registerSW } from './pwa/register';
 
 // TODO(WP3): replace with <App /> (router, store, screens).
 function Hello() {
@@ -12,3 +13,5 @@ function Hello() {
 }
 
 render(<Hello />, document.getElementById('app')!);
+
+registerSW();

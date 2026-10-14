@@ -26,7 +26,11 @@ export function swPlugin(): Plugin {
     },
     transformIndexHtml() {
       return [
-        { tag: 'link', attrs: { rel: 'manifest', href: './manifest.webmanifest' }, injectTo: 'head' },
+        {
+          tag: 'link',
+          attrs: { rel: 'manifest', href: './manifest.webmanifest' },
+          injectTo: 'head',
+        },
         {
           tag: 'link',
           attrs: { rel: 'apple-touch-icon', href: './icons/apple-touch-icon.png' },

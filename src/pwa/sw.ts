@@ -1,6 +1,6 @@
 // Service worker source. Compiled (type-stripped) and injected with the precache
 // list by build/vite-plugin-sw.ts, which emits it as `sw.js`. Not bundled into the app.
-// __PRECACHE__ and __VERSION__ are replaced at build time.
+// The two build-time constants declared below are replaced textually.
 
 declare const __PRECACHE__: string[];
 declare const __VERSION__: string;
@@ -40,14 +40,19 @@ sw.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))),
+        Promise.all(
+          keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k)),
+        ),
       )
       .then(() => sw.clients.claim()),
   );
 });
 
 sw.addEventListener('message', (event) => {
-  if (event.data === 'SKIP_WAITING' || (event.data as { type?: string } | null)?.type === 'SKIP_WAITING') {
+  if (
+    event.data === 'SKIP_WAITING' ||
+    (event.data as { type?: string } | null)?.type === 'SKIP_WAITING'
+  ) {
     void sw.skipWaiting();
   }
 });

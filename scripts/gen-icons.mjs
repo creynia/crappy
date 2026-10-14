@@ -20,7 +20,9 @@ const PIPS = [
 function inRoundRect(px, py, x, y, w, h, r) {
   const cx = Math.min(Math.max(px, x + r), x + w - r);
   const cy = Math.min(Math.max(py, y + r), y + h - r);
-  return (px - cx) ** 2 + (py - cy) ** 2 <= r * r && px >= x && px <= x + w && py >= y && py <= y + h;
+  return (
+    (px - cx) ** 2 + (py - cy) ** 2 <= r * r && px >= x && px <= x + w && py >= y && py <= y + h
+  );
 }
 
 /**

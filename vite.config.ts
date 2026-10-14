@@ -20,11 +20,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       preact(),
       // TODO(WP3): contentPlugin(),   (provides the `virtual:content` module)
-      ...(single
-        ? [viteSingleFile()]
-        : [
-            swPlugin(),
-          ]),
+      ...(single ? [viteSingleFile()] : [swPlugin()]),
     ],
     publicDir: single ? false : 'public',
     build: { outDir: single ? 'dist-single' : 'dist', target: 'es2022' },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Html } from '../components/Html';
+import { Link } from '../components/Link';
 import { useContent } from '../context';
 
 export function Glossary({ query }: { query: URLSearchParams }) {
@@ -37,6 +38,11 @@ export function Glossary({ query }: { query: URLSearchParams }) {
             <dt>{g.term}</dt>
             <dd>
               <Html html={g.definition} />
+              {g.lessonId && (
+                <p>
+                  <Link to={`/learn/${g.lessonId}`}>Learn more in the lesson</Link>
+                </p>
+              )}
               {g.see && g.see.length > 0 && (
                 <p class="muted">
                   See also:{' '}

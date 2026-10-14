@@ -54,13 +54,17 @@ export interface GlossaryEntry {
   slug: string;
   definition: string; // markdown in source, HTML in the bundle
   see?: string[];
+  /** lesson that teaches the term (source field `seeAlso`) */
+  lessonId?: LessonId;
 }
 
 export interface BetCopy {
+  name?: string; // display name (fallback when the engine registry is unavailable)
+  tip?: string;
   summary: string;
   howItWorks: string; // markdown in source, HTML in the bundle
   /** fallback tier, used when the math module cannot supply an edge */
-  verdict: Tier;
+  verdict?: Tier;
   lessonId?: LessonId;
 }
 

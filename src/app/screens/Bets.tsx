@@ -88,7 +88,7 @@ export function BetDetail({ id }: { id: string }) {
       <Link to="/bets" class="back">
         {'←'} All bets
       </Link>
-      <h1>{betLabel(id)}</h1>
+      <h1>{betLabel(id, copy)}</h1>
       <p>
         <TierBadge tier={tier} />
       </p>
@@ -106,6 +106,7 @@ export function BetDetail({ id }: { id: string }) {
         <>
           <p class="lead">{copy.summary}</p>
           <Html html={copy.howItWorks} />
+          {copy.tip && <p class="tip">{copy.tip}</p>}
         </>
       ) : (
         <p class="muted">No description yet.</p>

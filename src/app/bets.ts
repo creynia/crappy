@@ -27,8 +27,8 @@ export function prettyBetName(id: string): string {
     .join(' ');
 }
 
-export function betLabel(id: BetTypeId): string {
-  return safe(() => getBetType(id).label) ?? prettyBetName(id);
+export function betLabel(id: BetTypeId, copy?: BetCopy): string {
+  return safe(() => getBetType(id).label) ?? copy?.name ?? prettyBetName(id);
 }
 
 export function betPayout(id: BetTypeId): string | null {
@@ -77,7 +77,7 @@ export function betRows(bets: Record<string, BetCopy | undefined>): BetRow[] {
     const edge = houseEdge(id);
     return {
       id,
-      label: betLabel(id),
+      label: betLabel(id, bets[id]),
       payout: betPayout(id),
       edge,
       tier: edge !== null ? tierOf(edge) : (bets[id]?.verdict ?? 'fair'),

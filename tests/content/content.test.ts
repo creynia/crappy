@@ -15,6 +15,8 @@ const compiled = src.lessonFiles.map((f) => ({
   lesson: compileLesson(f.source, `content/lessons/${f.file}`, opts),
 }));
 
+const lessonIdSet = new Set(compiled.map((c) => c.lesson.id));
+
 describe('content: lessons', () => {
   it('has lesson files', () => {
     expect(compiled.length).toBeGreaterThan(0);
@@ -103,6 +105,7 @@ describe('content: chapters, glossary, bets', () => {
     expect(glossarySlugs.size).toBe(src.glossary.length);
     for (const g of src.glossary) {
       expect(g.term && g.slug && g.definition).toBeTruthy();
+      if (g.lessonId) expect(lessonIdSet.has(g.lessonId), `${g.slug} lessonId`).toBe(true);
       for (const s of g.see ?? []) expect(glossarySlugs.has(s), `${g.slug} see ${s}`).toBe(true);
     }
   });
@@ -111,7 +114,7 @@ describe('content: chapters, glossary, bets', () => {
     expect(Object.keys(src.bets).sort()).toEqual([...BET_TYPE_IDS].sort());
     const lessonIds = new Set(compiled.map((c) => c.lesson.id));
     for (const [id, b] of Object.entries(src.bets)) {
-      expect(TIERS, id).toContain(b.verdict);
+      if (b.verdict) expect(TIERS, id).toContain(b.verdict);
       expect(b.summary.length, id).toBeGreaterThan(0);
       if (b.lessonId) expect(lessonIds.has(b.lessonId), `${id} lessonId`).toBe(true);
     }

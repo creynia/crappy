@@ -4,6 +4,39 @@ import { compileLesson, renderMarkdown } from './compile';
 import type { BetCopy, Chapter, ContentBundle, GlossaryEntry, Lesson } from './types';
 import type { BetTypeId } from '../sim/engine/types';
 
+interface RawGlossary {
+  term: string;
+  slug?: string;
+  definition: string;
+  see?: string[];
+  seeAlso?: string;
+  lessonId?: string;
+}
+
+export const slugify = (t: string) =>
+  t
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+/** Source entries may omit `slug` (derived from the term) and use `seeAlso: lessonId`. */
+export function normalizeGlossary(g: RawGlossary): GlossaryEntry {
+  const { seeAlso, slug, lessonId, ...rest } = g;
+  const lid = lessonId ?? seeAlso;
+  return { ...rest, slug: slug ?? slugify(g.term), ...(lid ? { lessonId: lid } : {}) };
+}
+
+/** bets.json may be a record keyed by bet id, or an array of `{ id, ...copy }` entries. */
+export function normalizeBets(raw: unknown): Record<string, BetCopy> {
+  if (!Array.isArray(raw)) return raw as Record<string, BetCopy>;
+  const out: Record<string, BetCopy> = {};
+  for (const e of raw as ({ id: string } & BetCopy)[]) {
+    const { id, ...copy } = e;
+    out[id] = copy;
+  }
+  return out;
+}
+
 /** Raw (uncompiled) source files, exposed so content tests can check them directly. */
 export interface ContentSources {
   chapters: Chapter[];
@@ -35,8 +68,8 @@ export function readSources(root: string, includeSamples = false): ContentSource
     : [];
   return {
     chapters: json<Chapter[]>('chapters.json', '_sample-chapters.json', []),
-    glossary: json<GlossaryEntry[]>('glossary.json', '_sample-glossary.json', []),
-    bets: json<Record<string, BetCopy>>('bets.json', '_sample-bets.json', {}),
+    glossary: json<RawGlossary[]>('glossary.json', '_sample-glossary.json', []).map(normalizeGlossary),
+    bets: normalizeBets(json<unknown>('bets.json', '_sample-bets.json', {})),
     samplesActive,
     lessonFiles: files.map((f) => ({
       file: f,

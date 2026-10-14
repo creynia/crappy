@@ -56,19 +56,21 @@ id: l19-s1
 version: 1
 title: Three plans, same dice
 rules: standard-vegas
-bankroll: 50000
+bankroll: 100000
 phase: come-out
 showEV: true
 autoRoll:
   enabled: true
   compareMode: true
-  strategies: [pass-2x-odds, pass-max-odds, place-6-8]
-  defaultStrategy: { id: pass-2x-odds, unit: 1000 }
+  compare:
+    - { id: pass-2x-odds, unit: 1000, oddsMultiple: 2 }
+    - { id: pass-max-odds, unit: 1000 }
+    - { id: place-6-8, unit: 600 }
   rollOptions: [100]
   sessions: [1, 100]
 steps:
   - id: compare
-    text: "Run 100 rolls of each plan on the **same dice**. Compare the expected loss with the swings."
+    text: "Run 100 rolls of each plan on the **same dice**: $10 Pass with 2× odds, $10 Pass with max odds, and $6 on the 6 and 8. Compare the expected loss with the swings."
     completeWhen: { autoRollCompleted: { minRolls: 100 } }
 ```
 

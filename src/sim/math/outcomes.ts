@@ -21,6 +21,9 @@ export interface RawOutcome {
   probability: Fraction;
   net: Fraction;
   push: boolean;
+  /** Dice combinations producing this row, out of the deciding combinations (unreduced). Absent for compound rows. */
+  ways?: number;
+  outOf?: number;
 }
 export interface Distribution {
   rows: RawOutcome[];
@@ -180,11 +183,16 @@ function distribution(
     const rows: RawOutcome[] = immediate.map(({ w, row }) => ({
       ...row,
       probability: frac(w, 36),
+      ways: w,
+      outOf: 36,
     }));
     let rolls = ZERO;
     for (const c of continuing) {
       const p = frac(c.w, 36);
-      for (const r of c.sub.rows) rows.push({ ...r, probability: mul(r.probability, p) });
+      for (const r of c.sub.rows) {
+        const { ways: _w, outOf: _o, ...rest } = r;
+        rows.push({ ...rest, probability: mul(r.probability, p) });
+      }
       rolls = add(rolls, mul(p, c.sub.expectedRolls));
     }
     return { rows, expectedRolls: add(ONE, rolls), vigPaid };
@@ -193,7 +201,12 @@ function distribution(
   if (resolvingWays === 0) throw new Error(`bet ${bet.type} never resolves`);
   // Single-state bet: condition on the rolls that resolve it.
   return {
-    rows: immediate.map(({ w, row }) => ({ ...row, probability: frac(w, resolvingWays) })),
+    rows: immediate.map(({ w, row }) => ({
+      ...row,
+      probability: frac(w, resolvingWays),
+      ways: w,
+      outOf: resolvingWays,
+    })),
     expectedRolls: frac(36, resolvingWays),
     vigPaid,
   };
@@ -249,15 +262,13 @@ export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
 }
 
 export function toOutcomes(d: Distribution): Outcome[] {
-  return d.rows.map((r) => {
-    // Show dice combinations out of 36 whenever the probability is a whole number of them.
-    const inThirtySixths = r.probability.d !== 0n && 36n % r.probability.d === 0n;
-    return {
-      label: r.label,
-      ways: Number(inThirtySixths ? (r.probability.n * 36n) / r.probability.d : r.probability.n),
-      outOf: inThirtySixths ? 36 : Number(r.probability.d),
-      probability: r.probability,
-      net: r.net,
-    };
-  });
+  return d.rows.map((r) => ({
+    label: r.label,
+    // Dice combinations out of the rolls that decide the bet ("1 of 9", "5 of 11"; "6 of 36" for
+    // one-roll bets). Compound rows (line / come bets) fall back to the reduced probability.
+    ways: r.ways ?? Number(r.probability.n),
+    outOf: r.outOf ?? Number(r.probability.d),
+    probability: r.probability,
+    net: r.net,
+  }));
 }

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>crappy table gallery</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        background: var(--sim-bg, #f4f1e8);
+        color: var(--sim-text, #1b1d1c);
+      }
+      .demo {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px 8px;
+        height: 100%;
+        box-sizing: border-box;
+      }
+      .demo-main {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .demo-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .demo-controls .tabs button {
+        min-height: 44px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid var(--sim-border);
+        background: var(--sim-surface-2);
+        color: inherit;
+      }
+      .demo-land {
+        flex-direction: row;
+      }
+      .demo-land .demo-main {
+        flex: 1;
+      }
+      .demo-rail {
+        width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+      .demo-toasts {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        top: 6px;
+        z-index: 40;
+      }
+      .demo-rail .sim-rack {
+        flex-wrap: wrap;
+      }
+      .demo-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding: 12px;
+      }
+      .demo-table-slot {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./demo.tsx"></script>
+  </body>
+</html>

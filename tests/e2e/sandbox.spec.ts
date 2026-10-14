@@ -28,13 +28,11 @@ test.describe('sandbox', () => {
     await page.getByRole('button', { name: 'Center' }).click();
     await page.locator('[data-region="hard-4"]').click();
     const sheet = page.getByRole('dialog');
-    await sheet.getByRole('button', { name: 'Increase amount' }).click();
-    await sheet.getByRole('button', { name: 'Increase amount' }).click(); // $5 -> $15? chip is $5 so step
-    await sheet.getByRole('button', { name: '×2' }).isVisible();
-    // choose exactly $10
-    await sheet.getByRole('button', { name: 'Min' }).click();
-    await sheet.getByRole('button', { name: 'Increase amount' }).click();
-    await expect(sheet.locator('[data-line="loss"]')).toContainText('$');
+    await expect(sheet.getByLabel('Bet amount')).toHaveText('$5');
+    await sheet.getByRole('button', { name: 'Increase amount' }).click(); // $5 chip: $5 -> $10
+    await expect(sheet.getByLabel('Bet amount')).toHaveText('$10');
+    await expect(sheet.locator('.sim-headline')).toContainText('-$1.11');
+    await expect(sheet.locator('[data-line="loss"]')).toContainText('$1.11');
     await expect(sheet).toContainText('Sucker bet');
     await expect(sheet.locator('.sim-oneroll')).toHaveCount(0);
   });
@@ -54,15 +52,12 @@ test.describe('sandbox', () => {
   });
 
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
-    await page.goto(url());
+    await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
     await expect(panel).toBeVisible();
-    await panel
-      .getByRole('button', { name: /^(Run|Auto-roll|Start|Simulate)/i })
-      .first()
-      .click();
-    await expect(panel.locator('svg').first()).toBeVisible({ timeout: 15_000 });
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('sandbox state persists across reload', async ({ page }) => {

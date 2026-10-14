@@ -137,7 +137,7 @@ steps:
 | **Practical extra numbers** | One or two Come bets with odds, or Place 6 and 8 in $6 units | 0.40% / 1.52% | up to ~$10 / $3.91 | You want more numbers working |
 | **Cheap 4 and 10** | Buy for $20+ (never Place). Lay 4/10 for $40+. | 1.67% | n/a | A single number you must have |
 | **Fun per dollar** | Pass + max odds, or 3-point Molly with max odds | 0.37% / 0.40% | $4.19 / ~$10 | You want swings and numbers for a few dollars an hour |
-| **Skip** | Field, Big 6/8, hardways (garnish at $1), props, Horn, World, Iron Cross | 5.56% to 16.67% | $27+ for the big ones | Almost never |
+| **Skip** | Field, Big 6/8, hardways (garnish at $1), props, Horn, World, Iron Cross | 5.56% to 16.67% per bet (Iron Cross mixes 1.52–5.56% bets but costs ≈ $27 an hour) | $27+ for the big ones | Almost never |
 
 Three rules sit under the whole table: **odds are free**, **flat bets set your hourly cost**, and **no plan wins in the long run**.
 

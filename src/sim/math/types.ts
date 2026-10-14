@@ -1,0 +1,50 @@
+import type { Action, Bet, Phase, PointNumber, TableRules, Validation } from '../engine/types';
+import type { Fraction } from './fraction';
+
+export interface Outcome {
+  label: string;
+  ways: number;
+  outOf: number;
+  probability: Fraction;
+  net: Fraction; // cents, incl. vig
+}
+export interface BetCtx {
+  phase: Phase;
+  point: PointNumber | null;
+  rules: TableRules;
+}
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point'>;
+
+export interface EdgeInfo {
+  perResolved: Fraction; // -EV / amount, pushes count as decisions
+  perResolvedExPush: Fraction;
+  expectedRolls: Fraction;
+  perRoll: Fraction;
+}
+
+export type EdgeTier = 'zero' | 'low' | 'medium' | 'high'; // <=0, <2%, 2%-5%, >5%
+
+export interface Explanation {
+  rows: Outcome[];
+  evFormula: string;
+  note?: string;
+}
+export interface Alternative {
+  action: Action;
+  label: string;
+  edge: EdgeInfo;
+  savingsCents: Fraction;
+  message: string;
+}
+export interface ActionPreview {
+  action: Action;
+  validation: Validation;
+  evCents: Fraction;
+  edge: EdgeInfo | null;
+  tier: EdgeTier;
+  perRollCents: Fraction;
+  headline: string;
+  detail: string;
+  alternative: Alternative | null;
+  explanation: Explanation;
+}

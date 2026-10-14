@@ -210,3 +210,31 @@ describe('review fixes', () => {
     expect(on.perHourCents).toEqual(frac(on.perRollCents.n * 100n, on.perRollCents.d));
   });
 });
+
+describe('"Why?" rows count deciding combinations', () => {
+  const ctx = (phase: 'come-out' | 'point' = 'point') => {
+    const s = createGame({ seed: 1, phase, point: phase === 'point' ? 6 : undefined });
+    return { phase: s.phase, point: s.point, rules: s.rules };
+  };
+  const ways = (type: Parameters<typeof explainBet>[0]['type'], amount: number) =>
+    explainBet({ type, amount, point: null }, ctx()).rows.map((r) => `${r.ways}/${r.outOf}`);
+
+  it('hard 4: 1 of 9 deciding rolls wins, 8 of 9 lose (loss row first)', () => {
+    expect(ways('hard-4', 500)).toEqual(['8/9', '1/9']);
+  });
+  it('place 6: 5 of 11; place 4 keeps 3 of 9 (not reduced to 1 of 3)', () => {
+    expect(ways('place-6', 1200)).toEqual(['5/11', '6/11']);
+    expect(ways('place-4', 1000)).toEqual(['3/9', '6/9']);
+  });
+  it('one-roll bets use dice combinations out of 36', () => {
+    expect(ways('any-craps', 500).sort()).toEqual(['32/36', '4/36']);
+  });
+  it('line bets keep exact reduced probabilities', () => {
+    const rows = explainBet({ type: 'pass-line', amount: 1000, point: null }, ctx('come-out')).rows;
+    expect(rows.find((r) => r.label === 'Win on 7 or 11')).toMatchObject({ ways: 8, outOf: 36 });
+    expect(rows.find((r) => r.label === 'Point 4, then Win on 4')).toMatchObject({
+      ways: 1,
+      outOf: 36,
+    });
+  });
+});

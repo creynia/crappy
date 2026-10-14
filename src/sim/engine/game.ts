@@ -1,7 +1,7 @@
+import { BET_TYPES } from './bets';
 import type {
   Action,
   ApplyResult,
-  Bet,
   BetTypeDef,
   BetTypeId,
   Cents,
@@ -47,9 +47,7 @@ export function applyAction(
 ): ApplyResult {
   throw new Error('TODO(engine)');
 }
-export function isWorking(_bet: Bet, _state: GameState): boolean {
-  throw new Error('TODO(engine)');
-}
+export { isWorking } from './working';
 /** bankroll + sum(bet.amount) */
 export function equity(_state: GameState): Cents {
   throw new Error('TODO(engine)');
@@ -58,6 +56,6 @@ export function equity(_state: GameState): Cents {
 export function replay(_initial: GameState, _actions: Action[]): GameState {
   throw new Error('TODO(engine)');
 }
-export function getBetType(_id: BetTypeId): BetTypeDef {
-  throw new Error('TODO(engine)');
+export function getBetType(id: BetTypeId): BetTypeDef {
+  return BET_TYPES[id];
 }

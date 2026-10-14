@@ -20,6 +20,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { TotalsHistogram } from './TotalsHistogram';
+import { fmtMoney } from './text';
 
 export interface AutoRollPanelProps {
   rules?: Partial<TableRules> | RulePresetId;
@@ -79,6 +80,11 @@ type Outcome =
 
 function money(c: number, sign = false): string {
   return formatMoney(Math.round(c), { sign });
+}
+
+/** Exact cents for the summary table, e.g. $1,935.00 */
+function money2(c: number, sign = false): string {
+  return fmtMoney(c, { sign, exact: true });
 }
 
 function randomSeed(): number {
@@ -492,24 +498,32 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     metrics: ReturnType<typeof strategyMetrics>[],
   ): Array<[string, string[]]> {
     const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
-    const perDollar = metrics.map((m) =>
-      Number.isFinite(m.rollsPerDollar) ? m.rollsPerDollar.toFixed(1) : 'no cost',
-    );
-    const perHour = metrics.map((m) => money(m.expectedLossPerRoll * 100 * rollsPerHour));
+    // learner-facing cost rows come from the run's OWN expected loss, so they agree with the
+    // "Expected loss" / "Expected final bankroll" rows (the analytic steady-layout figure is not shown)
+    const lossPerRoll = (): number[] =>
+      o.kind === 'single'
+        ? o.results.map((r) => (r.rollsPlayed > 0 ? r.expectedLoss / r.rollsPlayed : 0))
+        : o.results.map((r) => {
+            const n = Math.max(1, r.expected.length - 1);
+            return (bankroll - r.expected[r.expected.length - 1]!) / n;
+          });
+    const perRoll = lossPerRoll();
+    const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
+    const perHour = perRoll.map((c) => money2(c * rollsPerHour));
     const edge = metrics.map((m) => pct(m.edgeOnAction));
     if (o.kind === 'single') {
       const rs = o.results;
       return [
-        ['Final bankroll', rs.map((r) => money(r.finalEquity))],
-        ['Actual result', rs.map((r) => money(r.finalEquity - bankroll, true))],
-        ['Expected loss', rs.map((r) => money(-r.expectedLoss, true))],
+        ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
+        ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
+        ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
         [
           'Luck (actual minus expected)',
-          rs.map((r) => money(r.finalEquity - bankroll + r.expectedLoss, true)),
+          rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
         ],
-        ['Total wagered', rs.map((r) => money(r.totalWagered))],
+        ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],
-        ['Biggest drop from a peak', rs.map((r) => money(r.maxDrawdown))],
+        ['Biggest drop from a peak', rs.map((r) => money2(r.maxDrawdown))],
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
@@ -520,10 +534,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
     return [
-      ['Median final bankroll', rs.map((r) => money(last(r.p50)))],
-      ['Middle 80% of finals', rs.map((r) => `${money(last(r.p10))} to ${money(last(r.p90))}`)],
-      ['Average final bankroll', rs.map((r) => money(r.meanFinal))],
-      ['Expected final bankroll', rs.map((r) => money(last(r.expected)))],
+      ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
+      ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
+      ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],
+      ['Expected final bankroll', rs.map((r) => money2(last(r.expected)))],
       ['Chance of finishing ahead', rs.map((r) => pct(r.probAhead))],
       ['Busted sessions', rs.map((r) => pct(r.bustRate))],
       ['Edge on action', edge],

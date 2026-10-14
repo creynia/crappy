@@ -3,6 +3,15 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
+const PURE_GLOBALS = [
+  'document',
+  'window',
+  'localStorage',
+  'sessionStorage',
+  'navigator',
+  'requestAnimationFrame',
+].map((name) => ({ name, message: 'The pure sim modules are DOM-free.' }));
+
 export default tseslint.config(
   {
     ignores: [
@@ -45,9 +54,9 @@ export default tseslint.config(
     extends: [...tseslint.configs.recommended],
     languageOptions: { globals: { ...globals.node } },
   },
+  // Layering (docs/design/decisions.md): engine <- math <- strategy; none may import UI, scene or app.
   {
-    // Engine, math and strategy are pure: no UI framework, no DOM, no upward imports.
-    files: ['src/sim/engine/**/*.ts', 'src/sim/math/**/*.ts', 'src/sim/strategy/**/*.ts'],
+    files: ['src/sim/engine/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
       'no-restricted-imports': [
@@ -55,17 +64,91 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['preact', 'preact/*', '**/sim/ui/**', '**/sim/scene/**', '**/app/**'],
-              message: 'Pure sim modules must not import UI, scene or app code.',
+              group: [
+                'preact',
+                'preact/*',
+                '../ui',
+                '../ui/*',
+                '../scene',
+                '../scene/*',
+                '../index',
+                '../../*',
+                '**/app/**',
+                '**/sim/ui/**',
+                '**/sim/scene/**',
+                '../math',
+                '../math/*',
+                '../strategy',
+                '../strategy/*',
+              ],
+              message: 'The engine imports nothing outside src/sim/engine.',
             },
           ],
         },
       ],
-      'no-restricted-globals': [
+      'no-restricted-globals': ['error', ...PURE_GLOBALS],
+    },
+  },
+  {
+    files: ['src/sim/math/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
         'error',
-        { name: 'document', message: 'The pure sim modules are DOM-free.' },
-        { name: 'window', message: 'The pure sim modules are DOM-free.' },
+        {
+          patterns: [
+            {
+              group: [
+                'preact',
+                'preact/*',
+                '../ui',
+                '../ui/*',
+                '../scene',
+                '../scene/*',
+                '../index',
+                '../../*',
+                '**/app/**',
+                '**/sim/ui/**',
+                '**/sim/scene/**',
+                '../strategy',
+                '../strategy/*',
+              ],
+              message: 'Math may import only the engine.',
+            },
+          ],
+        },
       ],
+      'no-restricted-globals': ['error', ...PURE_GLOBALS],
+    },
+  },
+  {
+    files: ['src/sim/strategy/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'preact',
+                'preact/*',
+                '../ui',
+                '../ui/*',
+                '../scene',
+                '../scene/*',
+                '../index',
+                '../../*',
+                '**/app/**',
+                '**/sim/ui/**',
+                '**/sim/scene/**',
+              ],
+              message: 'Strategy may import only the engine and math.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': ['error', ...PURE_GLOBALS],
     },
   },
   prettier,

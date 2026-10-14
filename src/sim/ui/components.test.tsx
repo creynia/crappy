@@ -12,6 +12,9 @@ import { Table } from './Table';
 import { Toasts } from './Toasts';
 import { portraitLayout } from './layouts';
 import { buildEvFacts } from './text';
+import { createGame } from '../engine';
+import { previewAction } from '../math';
+import type { BetTypeId } from '../engine/types';
 import type { Bet, RollRecord } from '../engine/types';
 import type { EdgeTier } from '../math/types';
 
@@ -110,8 +113,24 @@ describe('Table', () => {
       />,
     );
     fireEvent.click(document.querySelector('[data-stack="b9"]')!);
-    expect(onStackTap).toHaveBeenCalledWith('b9');
+    expect(onStackTap).toHaveBeenCalledWith('b9', ['b9']);
     expect(onRegionTap).not.toHaveBeenCalled();
+  });
+
+  it('stacks are keyboard reachable', () => {
+    const onStackTap = vi.fn();
+    render(
+      <Table
+        layout={portraitLayout}
+        bets={[bet('b9', 'field', 500)]}
+        point={null}
+        onStackTap={onStackTap}
+      />,
+    );
+    const s = document.querySelector('[data-stack="b9"]')!;
+    expect(s.getAttribute('tabindex')).toBe('0');
+    fireEvent.keyDown(s, { key: 'Enter' });
+    expect(onStackTap).toHaveBeenCalled();
   });
 
   it('dims disabled regions and announces why', () => {
@@ -390,54 +409,58 @@ describe('BetSheet', () => {
     expect(screen.queryByRole('button', { name: 'Why?' })).toBeNull();
   });
 
+  const game = createGame({
+    point: 6,
+    bankroll: 100000,
+    bets: [
+      { ref: 'p', type: 'pass-line', amount: 1000 },
+      { type: 'pass-odds', amount: 3000, parentRef: 'p' },
+    ],
+  });
+  const real = (betType: BetTypeId, amount: number) => {
+    const p = previewAction(game, { type: 'place-bet', betType, amount });
+    return { preview: p, facts: buildEvFacts(p, game) };
+  };
+  const lines = (k: string) => document.querySelector(`[data-line="${k}"]`)!;
+
   it('shows the section 6.1 lines, bold per-hour and note for one-roll bets', () => {
-    const facts = buildEvFacts(preview('avoid'), {
-      amount: 1000,
-      oneRoll: true,
-      chance: '1 in 6 rolls (17%)',
-      pays: '4 to 1',
-    });
-    sheet({ preview: preview('avoid'), facts, confirmSucker: false });
-    const lines = (k: string) => document.querySelector(`[data-line="${k}"]`)!;
-    expect(lines('edge').textContent).toContain('House edge 1.41%');
-    expect(lines('loss').textContent).toContain('Expected loss on this $10 bet');
+    sheet({ ...real('field', 500), confirmSucker: false });
+    expect(lines('edge').textContent).toContain('House edge');
+    expect(lines('loss').textContent).toContain('Expected loss on this $5 bet');
     expect(lines('hour').querySelector('strong')).toBeTruthy();
     expect(lines('hour').textContent).toContain('One-roll bet: its edge is paid on every roll');
-    expect(lines('chance').textContent).toContain('pays 4 to 1');
+    expect(lines('chance').textContent).toContain('pays');
     expect(document.querySelector('[data-line="combined"]')).toBeNull();
   });
 
-  it('shows the combined edge when a line bet has odds, and "free bet" for odds', () => {
-    const facts = buildEvFacts(preview('good'), {
-      amount: 1000,
-      oneRoll: false,
-      chance: '5 in 11 (45%)',
-      pays: '7 to 6',
-      combined: { label: 'Pass + Odds', edge: 0.0037 },
-    });
-    sheet({ facts });
-    expect(document.querySelector('[data-line="combined"]')!.textContent).toContain(
-      'Pass + Odds together: 0.37% per dollar',
-    );
-    expect(document.querySelector('[data-line="hour"] strong')).toBeNull();
+  it('hard 4 is not marked one-roll and pays 7 to 1', () => {
+    sheet({ ...real('hard-4', 500), confirmSucker: false });
+    expect(lines('hour').querySelector('strong')).toBeNull();
+    expect(lines('chance').textContent).toContain('pays 7 to 1');
   });
 
-  it('free bets say $0.00: a free bet', () => {
-    const p = preview('free', {
-      edge: { perResolved: fr(0), perResolvedExPush: fr(0), expectedRolls: fr(1), perRoll: fr(0) },
-    });
-    sheet({
-      preview: p,
-      facts: buildEvFacts(p, {
-        amount: 3000,
-        oneRoll: false,
-        chance: '5 in 11 (45%)',
-        pays: '6 to 5',
-      }),
-    });
-    expect(document.querySelector('[data-line="loss"]')!.textContent).toContain(
-      '$0.00: a free bet',
-    );
+  it('shows the combined edge on odds, and "free bet"', () => {
+    sheet(real('pass-odds', 3000));
+    expect(lines('combined').textContent).toContain('Pass + Odds together:');
+    expect(lines('loss').textContent).toContain('$0.00: a free bet');
+  });
+
+  it('sucker confirmation still applies when showEV is false', () => {
+    const p = sheet({ ...real('hard-4', 500), showEV: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Place anyway' }));
+    expect(p.onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Tap again/ }));
+    expect(p.onConfirm).toHaveBeenCalledOnce();
+  });
+
+  it('removing a bet that gives up EV needs a second tap', () => {
+    const rm = previewAction(game, { type: 'remove-bet', betId: 'b1' });
+    const onRemove = vi.fn();
+    sheet({ mode: 'manage', onRemove, removePreview: { ...rm, tier: 'avoid' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Tap again to remove' }));
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 
   it('manage mode offers Remove and a working toggle', () => {

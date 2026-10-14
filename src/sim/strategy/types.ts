@@ -83,7 +83,7 @@ export interface ManyResult {
   p90: Float64Array;
   expected: Float64Array;
   bustRate: number;
-  /** Share of sessions still solvent (not busted) after each roll; [0] = 1. */
+  /** Share of sessions still solvent (not busted) after each roll. [0] is the share able to bet at all (1 unless the bankroll is below the table minimum). */
   survival: Float64Array;
   /** Final equity of every session (cents), in seed order. */
   finals: Int32Array;

@@ -1,5 +1,7 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import type { Bet, BetTypeId, Cents, GameEvent } from '../engine/types';
+import { BET_TYPES } from '../engine/bets';
+import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
+import { betEdge } from '../math';
 import type { RegionDef } from './layouts/types';
 
 // ---------- money ----------
@@ -112,30 +114,121 @@ export interface EvFacts {
   combined?: { label: string; edge: number } | null;
 }
 
-export interface EvFactsInput {
-  amount: Cents;
-  oneRoll: boolean;
-  chance: string;
-  pays: string;
-  combined?: { label: string; edge: number } | null;
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
+  'pass-line': { flat: 'pass-odds', label: 'Pass + Odds' },
+  'dont-pass': { flat: 'dont-pass-odds', label: "Don't Pass + Lay odds" },
+  come: { flat: 'come-odds', label: 'Come + Odds' },
+  'dont-come': { flat: 'dont-come-odds', label: "Don't Come + Lay odds" },
+};
+const ODDS_FLAT: Partial<Record<BetTypeId, BetTypeId>> = {
+  'pass-odds': 'pass-line',
+  'dont-pass-odds': 'dont-pass',
+  'come-odds': 'come',
+  'dont-come-odds': 'dont-come',
+};
+
+/** Combined flat + odds edge per dollar, when the flat bet has (or is getting) odds. */
+function combinedEdge(
+  type: BetTypeId,
+  amount: Cents,
+  state: Pick<GameState, 'rules' | 'phase' | 'point' | 'bets'>,
+  action: Action,
+): { label: string; edge: number } | null {
+  // Flat line/come bets are priced as placed on a come-out roll (1.41%, 1.36%), the figure the lessons quote.
+  const ctx = { phase: 'come-out' as const, point: null, rules: state.rules };
+  let flatType: BetTypeId;
+  let flatAmount: Cents;
+  let oddsAmount: Cents;
+  let label: string;
+  const flatLink = FLAT_ODDS[type];
+  const parentType = ODDS_FLAT[type];
+  if (flatLink) {
+    const own =
+      action.type === 'set-amount' ? state.bets.find((b) => b.id === action.betId) : undefined;
+    const odds = state.bets.filter(
+      (b) =>
+        b.type === flatLink.flat &&
+        (own ? b.parentId === own.id : type === 'pass-line' || type === 'dont-pass'),
+    );
+    flatType = type;
+    flatAmount = amount;
+    oddsAmount = odds.reduce((t, b) => t + b.amount, 0);
+    label = flatLink.label;
+  } else if (parentType) {
+    const parent =
+      action.type === 'place-bet' && action.parentId
+        ? state.bets.find((b) => b.id === action.parentId)
+        : state.bets.find((b) => b.type === parentType);
+    if (!parent) return null;
+    flatType = parentType;
+    flatAmount = parent.amount;
+    const existing = state.bets.filter((b) => b.type === type && b.parentId === parent.id);
+    oddsAmount =
+      existing.reduce((t, b) => t + b.amount, 0) + (action.type === 'place-bet' ? amount : 0);
+    label = FLAT_ODDS[parentType]!.label;
+  } else return null;
+  if (oddsAmount <= 0 || flatAmount <= 0) return null;
+  const flat = fracToNumber(betEdge(flatType, flatAmount, ctx).perResolved);
+  return { label, edge: (flat * flatAmount) / (flatAmount + oddsAmount) };
 }
 
-/** Per-hour cost and rolls per hour come from the preview (math applies the 392/557 factor for off-on-come-out bets). */
+/**
+ * Builds the curriculum 6.1 facts for the sheet from a preview. oneRoll, chance, pays and the combined
+ * edge are derived here (engine registry + the preview's explanation), so callers pass only the state.
+ * Returns null for actions that are not about a bet (roll, set-working without a bet).
+ */
 export function buildEvFacts(
-  preview: Pick<ActionPreview, 'edge' | 'perHourCents' | 'rollsPerHour'>,
-  input: EvFactsInput,
-): EvFacts {
+  preview: ActionPreview,
+  state: Pick<GameState, 'rules' | 'phase' | 'point' | 'bets'>,
+): EvFacts | null {
+  const a = preview.action;
+  let type: BetTypeId | undefined;
+  let amount: Cents | undefined;
+  let bet: Bet | undefined;
+  if (a.type === 'place-bet') {
+    type = a.betType;
+    amount = a.amount;
+  } else if (a.type === 'set-amount') {
+    bet = state.bets.find((b) => b.id === a.betId);
+    type = bet?.type;
+    amount = a.amount;
+  } else if (a.type === 'remove-bet' || a.type === 'set-working') {
+    bet = state.bets.find((b) => b.id === a.betId);
+    type = bet?.type;
+    amount = bet?.amount;
+  }
+  if (!type || amount === undefined) return null;
+  const def = BET_TYPES[type];
   const edge = preview.edge ? fracToNumber(preview.edge.perResolved) : null;
+  const rows = preview.explanation.rows;
+  const outOf = rows[0]?.outOf ?? 0;
+  const winWays = rows.filter((r) => r.net.n > 0n).reduce((t, r) => t + r.ways, 0);
+  let chance = '';
+  if (outOf > 0 && winWays > 0) {
+    const g = gcd(winWays, outOf);
+    chance = `${winWays / g} in ${outOf / g}${def.oneRoll ? ' rolls' : ''} (${Math.round((winWays / outOf) * 100)}%)`;
+  }
+  let pays: string;
+  try {
+    pays = def.describePayout(state.rules, bet?.point ?? state.point);
+  } catch {
+    pays = '';
+  }
   return {
-    amount: input.amount,
+    amount,
     edge,
-    expectedLossCents: edge === null ? 0 : input.amount * edge,
+    expectedLossCents: edge === null ? 0 : amount * edge,
     perHourCents: preview.edge ? fracToNumber(preview.perHourCents) : null,
     rollsPerHour: preview.rollsPerHour,
-    oneRoll: input.oneRoll,
-    chance: input.chance,
-    pays: input.pays,
-    combined: input.combined ?? null,
+    oneRoll: def.oneRoll,
+    chance,
+    pays,
+    combined:
+      a.type === 'place-bet' || a.type === 'set-amount'
+        ? combinedEdge(type, amount, state, a)
+        : null,
   };
 }
 

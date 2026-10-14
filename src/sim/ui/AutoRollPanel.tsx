@@ -53,9 +53,22 @@ const PRESET_LABEL: Record<RulePresetId, string> = {
 };
 const COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
 
+type Metrics = ReturnType<typeof strategyMetrics>;
 type Outcome =
-  | { kind: 'single'; results: SessionResult[]; specs: StrategySpec[]; cfg: SessionConfig }
-  | { kind: 'many'; results: ManyResult[]; specs: StrategySpec[]; cfg: SessionConfig };
+  | {
+      kind: 'single';
+      results: SessionResult[];
+      specs: StrategySpec[];
+      cfg: SessionConfig;
+      metrics: Metrics[];
+    }
+  | {
+      kind: 'many';
+      results: ManyResult[];
+      specs: StrategySpec[];
+      cfg: SessionConfig;
+      metrics: Metrics[];
+    };
 
 function money(c: number, sign = false): string {
   return formatMoney(Math.round(c), { sign });
@@ -105,6 +118,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
+  const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
+  if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
+  // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
+  const effUnit = unitOptions.includes(unit)
+    ? unit
+    : (unitOptions.find((u) => u >= unit) ?? unitOptions[unitOptions.length - 1]!);
   const running = progress !== null;
   const lensGroups = (['lowest-edge', 'practical', 'fun'] as const).map((lens) => ({
     lens,
@@ -112,7 +131,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   }));
 
   const specFor = (id: StrategyId): StrategySpec => {
-    const spec: StrategySpec = { id, unit };
+    const spec: StrategySpec = { id, unit: effUnit };
     if (oddsMultiple !== undefined) spec.oddsMultiple = oddsMultiple;
     if (id === 'my-layout') spec.layout = layout ?? [];
     return spec;
@@ -120,6 +139,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
+    // computed once per run, with the rules this run uses
+    const metricsFor = (specs: StrategySpec[]): Metrics[] =>
+      specs.map((s) => strategyMetrics(s, rules));
     const specs = strategyIds.map(specFor);
     const base = {
       rolls,
@@ -131,7 +153,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        setOutcome({ kind: 'single', results, specs, cfg });
+        setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
         props.onCompleted?.(results[0]!);
       } else {
         const ac = new AbortController();
@@ -142,7 +164,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           specs.length > 1
             ? await simulateManyCompare(base, specs, sessions, o)
             : [await simulateMany(cfg, sessions, o)];
-        setOutcome({ kind: 'many', results, specs, cfg });
+        setOutcome({ kind: 'many', results, specs, cfg, metrics: metricsFor(specs) });
         props.onCompleted?.(results[0]!);
       }
     } catch (e) {
@@ -243,9 +265,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
         <div style={group} role="group" aria-label="Unit">
           <span>Unit</span>
-          {UNITS.filter((u) => u >= rules.tableMin).map((u) =>
-            button(unit === u, money(u), () => setUnit(u), u),
-          )}
+          {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
         </div>
         <div style={group} role="group" aria-label="Odds">
           <span>Odds</span>
@@ -401,7 +421,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         expected: r.expected,
       }));
     }
-    const metrics = o.specs.map((s) => strategyMetrics(s, rules));
+    const metrics = o.metrics;
     return (
       <>
         {o.kind === 'many' && (

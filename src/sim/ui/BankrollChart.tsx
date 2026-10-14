@@ -1,3 +1,4 @@
+import { useId } from 'preact/hooks';
 import type { Cents } from '../engine/types';
 
 /** One drawn series. All arrays are indexed by roll (0 = start). Money in cents; survival in 0..1. */
@@ -27,8 +28,11 @@ export interface BankrollChartProps {
 
 const W = 640;
 const H = 300;
-const M = { l: 58, r: 14, t: 14, b: 38 };
+const M = { l: 58, r: 96, t: 14, b: 38 };
 const MAX_POINTS = 360;
+/** Line dash per series so lines differ without colour; expected lines are dotted. */
+export const SERIES_DASH: Array<string | undefined> = [undefined, '14 5', '3 3 10 3'];
+const EXPECTED_DASH = '2 4';
 export const SERIES_COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
 const hidden = {
   position: 'absolute',
@@ -149,10 +153,23 @@ export function BankrollChart({
     return up.length ? `M${up.join('L')}L${down.join('L')}Z` : '';
   };
 
+  // direct end label per series; nudged apart when the lines finish close together
+  const endLabels = series
+    .map((s, k) => ({
+      id: s.id,
+      color: SERIES_COLORS[k % SERIES_COLORS.length]!,
+      text: s.label.length > 14 ? `${s.label.slice(0, 13)}…` : s.label,
+      y: py(s.line[Math.min(last, s.line.length - 1)] ?? 0),
+    }))
+    .sort((a, b) => a.y - b.y);
+  for (let i = 1; i < endLabels.length; i++) {
+    endLabels[i]!.y = Math.max(endLabels[i]!.y, endLabels[i - 1]!.y + 13);
+  }
+
   const fmtY = (v: number) => (money$ ? formatAxisMoney(v) : `${Math.round(v * 100)}%`);
   const fmtVal = (v: number) => (money$ ? money(v) : `${Math.round(v * 1000) / 10}%`);
   const checkpoints = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * last));
-  const ids = `chart-${mode}`;
+  const ids = useId();
   const desc = [
     summary,
     ...series.map((s) => {
@@ -247,6 +264,13 @@ export function BankrollChart({
             </text>
           </g>
         )}
+        <g font-size="11" aria-hidden="true" data-role="end-labels">
+          {endLabels.map((l) => (
+            <text key={l.id} x={px(last) + 6} y={l.y + 4} fill={l.color}>
+              {l.text}
+            </text>
+          ))}
+        </g>
         {series.map((s, k) => {
           const c = SERIES_COLORS[k % SERIES_COLORS.length]!;
           return (
@@ -266,7 +290,7 @@ export function BankrollChart({
                   fill="none"
                   stroke={c}
                   stroke-width="1.5"
-                  stroke-dasharray="6 4"
+                  stroke-dasharray={EXPECTED_DASH}
                   stroke-opacity="0.85"
                   data-role="expected"
                 />
@@ -277,6 +301,7 @@ export function BankrollChart({
                 stroke={c}
                 stroke-width="2.25"
                 stroke-linejoin="round"
+                stroke-dasharray={SERIES_DASH[k % SERIES_DASH.length]}
                 data-role="line"
               />
             </g>
@@ -305,7 +330,15 @@ export function BankrollChart({
                 aria-hidden="true"
                 style={{ verticalAlign: 'middle', marginRight: 4 }}
               >
-                <line x1="0" x2="28" y1="5" y2="5" stroke={c} stroke-width="3" />
+                <line
+                  x1="0"
+                  x2="28"
+                  y1="5"
+                  y2="5"
+                  stroke={c}
+                  stroke-width="3"
+                  stroke-dasharray={SERIES_DASH[k % SERIES_DASH.length]}
+                />
               </svg>
               {s.label}
               {s.band ? ' (median, shaded 10th to 90th percentile)' : ''}
@@ -327,7 +360,7 @@ export function BankrollChart({
                 y2="5"
                 stroke="currentColor"
                 stroke-width="2"
-                stroke-dasharray="6 4"
+                stroke-dasharray={EXPECTED_DASH}
               />
             </svg>
             Expected (start minus expected loss)

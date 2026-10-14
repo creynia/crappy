@@ -134,11 +134,15 @@ function molly(state: GameState, spec: StrategySpec): Plan {
 
 function placeNumbers(state: GameState, items: Array<[BetTypeId, Cents]>, withField = 0): Plan {
   const b = new Builder(state);
-  if (state.phase !== 'point') return b.plan();
   const missing: Array<[BetTypeId, Cents]> = [];
   if (withField > 0 && !find(state, 'field')) missing.push(['field', withField]);
   for (const it of items) if (!find(state, it[0])) missing.push(it);
-  // Field is one-roll: if only the field is missing, still re-place it.
+  if (state.phase !== 'point') {
+    // Nothing is placed on the come-out, but a player who could never afford the layout is bust.
+    const total = items.reduce((a, [, x]) => a + x, 0) + withField;
+    if (state.bets.length === 0 && total > b.cash) b.blocked = true;
+    return b.plan();
+  }
   b.placeAll(missing);
   if (b.blocked && state.bets.length > 0) b.blocked = false;
   return b.plan();

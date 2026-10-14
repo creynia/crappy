@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useMemo, useRef } from 'preact/hooks';
+import { useId, useMemo, useRef } from 'preact/hooks';
 import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
 import { ChipStack } from './ChipStack';
 import { Dice } from './Dice';
@@ -8,7 +8,7 @@ import { regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
 import { Puck } from './Puck';
 import { RegionArt } from './regionArt';
-import { regionAriaLabel } from './text';
+import { betLabel, fmtMoney, regionAriaLabel } from './text';
 import './sim.css';
 
 export interface TableProps {
@@ -29,13 +29,15 @@ export interface TableProps {
   rollingDice?: { dice: DicePair | null; durationMs: number } | null;
   selectedRegion?: RegionId | null;
   onRegionTap?: (id: RegionId) => void;
-  onStackTap?: (betId: string) => void;
+  /** `betId` is the first bet of that type at the spot; `allIds` lists every bet merged into the stack. */
+  onStackTap?: (betId: string, allIds: readonly string[]) => void;
   class?: string;
 }
 
 interface Placed {
   key: string;
   region: RegionDef;
+  type: BetTypeId;
   x: number;
   y: number;
   amount: Cents;
@@ -52,7 +54,7 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
     if (!region) continue;
     byRegion.set(region.id, [...(byRegion.get(region.id) ?? []), b]);
     const pos = spotPosition(region, b.type);
-    const key = `${pos.x},${pos.y}`;
+    const key = `${pos.x},${pos.y},${b.type}`;
     const prev = stacks.get(key);
     const off = offIds.has(b.id);
     if (prev) {
@@ -60,7 +62,16 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
       prev.betIds.push(b.id);
       prev.off = prev.off && off;
     } else {
-      stacks.set(key, { key, region, x: pos.x, y: pos.y, amount: b.amount, betIds: [b.id], off });
+      stacks.set(key, {
+        key,
+        region,
+        type: b.type,
+        x: pos.x,
+        y: pos.y,
+        amount: b.amount,
+        betIds: [b.id],
+        off,
+      });
     }
   }
   return { byRegion, stacks: [...stacks.values()] };
@@ -83,6 +94,7 @@ export function Table({
   class: cls,
 }: TableProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const feltId = `felt-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
   const { byRegion, stacks } = useMemo(
@@ -131,12 +143,12 @@ export function Table({
         aria-label={layout.id === 'center' ? 'Center proposition bets' : 'Craps table'}
       >
         <defs>
-          <radialGradient id={`felt-${layout.id}`} cx="50%" cy="45%" r="75%">
+          <radialGradient id={feltId} cx="50%" cy="45%" r="75%">
             <stop offset="0%" stop-color="var(--felt-hi)" />
             <stop offset="100%" stop-color="var(--felt-lo)" />
           </radialGradient>
         </defs>
-        <rect x="0" y="0" width={w} height={h} fill={`url(#felt-${layout.id})`} />
+        <rect x="0" y="0" width={w} height={h} fill={`url(#${feltId})`} />
         {layout.regions.map((region) => {
           const disabled = disabledRegions?.has(region.id) ?? false;
           const rbets = byRegion.get(region.id) ?? [];
@@ -147,7 +159,7 @@ export function Table({
               key={region.id}
               class={`sim-region${disabled ? ' is-disabled' : ''}${highlighted ? ' is-highlighted' : ''}${selectedRegion === region.id ? ' is-selected' : ''}`}
               role="button"
-              tabIndex={0}
+              tabindex={0}
               data-region={region.id}
               aria-label={regionAriaLabel(region, { bets: rbets, offIds, disabled })}
               aria-disabled={disabled || undefined}
@@ -187,9 +199,19 @@ export function Table({
               <g
                 key={s.key}
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
+                role="button"
+                tabindex={0}
+                aria-label={`Edit ${betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onStackTap?.(s.betIds[0]!);
+                  onStackTap?.(s.betIds[0]!, s.betIds);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onStackTap?.(s.betIds[0]!, s.betIds);
+                  }
                 }}
                 data-stack={s.betIds[0]}
                 data-count={nums}

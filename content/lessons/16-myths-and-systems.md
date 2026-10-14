@@ -1,7 +1,7 @@
 ---
 id: myths-and-systems
 title: Myths, systems and dice control
-chapter: the-math-that-matters
+chapter: math-that-matters
 summary: No betting system changes the house edge. Spot the gambler's fallacy and weigh dice control honestly.
 minutes: 5
 ---

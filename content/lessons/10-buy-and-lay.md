@@ -1,7 +1,7 @@
 ---
 id: buy-and-lay
 title: "Buy and Lay bets: paying commission"
-chapter: more-ways-to-bet
+chapter: more-bets
 summary: Buy bets pay true odds minus a commission, and Lay bets are the Don't-side version. Learn when Buy beats Place.
 minutes: 7
 ---

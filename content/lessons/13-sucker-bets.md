@@ -1,7 +1,7 @@
 ---
 id: sucker-bets
 title: Hardways, props and the middle of the table
-chapter: more-ways-to-bet
+chapter: more-bets
 summary: The loud bets in the center of the table, what they pay, and why they cost so much.
 minutes: 7
 ---

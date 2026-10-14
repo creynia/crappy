@@ -1,7 +1,7 @@
 ---
 id: field-and-big-6-8
 title: Field and Big 6/8
-chapter: more-ways-to-bet
+chapter: more-bets
 summary: Why seven numbers beat four only on paper, and why Big 6/8 is just a worse Place 6/8.
 minutes: 5
 ---

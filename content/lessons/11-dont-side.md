@@ -1,7 +1,7 @@
 ---
 id: dont-side
 title: The Don't side
-chapter: more-ways-to-bet
+chapter: more-bets
 summary: Bet against the shooter. Don't Pass, Don't Come and lay odds, and how the two sides compare.
 minutes: 6
 ---

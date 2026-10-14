@@ -1,7 +1,7 @@
 ---
 id: variance-and-bankroll
 title: Variance, swings and bankroll
-chapter: the-math-that-matters
+chapter: math-that-matters
 summary: Why short sessions are mostly luck, what odds do to your swings, and how much to bring.
 minutes: 7
 ---

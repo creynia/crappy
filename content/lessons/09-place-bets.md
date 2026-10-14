@@ -1,7 +1,7 @@
 ---
 id: place-bets
 title: Place bets
-chapter: more-ways-to-bet
+chapter: more-bets
 summary: Bet a number directly, without waiting for a Come bet to travel, and learn which numbers are cheap.
 minutes: 6
 ---

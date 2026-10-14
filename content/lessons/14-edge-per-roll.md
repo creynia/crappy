@@ -1,7 +1,7 @@
 ---
 id: edge-per-roll
 title: Edge per bet vs edge per roll, and the cost of an hour
-chapter: the-math-that-matters
+chapter: math-that-matters
 summary: Why a one-roll bet that "only" costs 5.56% is far more expensive per hour than a Pass Line bet.
 minutes: 6
 ---

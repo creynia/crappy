@@ -1,13 +1,26 @@
-import type { BetTypeId, SceneConfig } from '../sim';
+import type { BetTypeId } from '../sim/engine';
+import type { SceneConfig } from '../sim/scene';
 
 export type LessonId = string;
 export type ChapterId = string;
 
+/** Five EV tiers (decisions.md): free <=0, good <=2%, fair <=5%, poor <9%, avoid >=9%. */
+export type Tier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
+export const TIERS: readonly Tier[] = ['free', 'good', 'fair', 'poor', 'avoid'];
+export const TIER_LABEL: Record<Tier, string> = {
+  free: 'Free bet',
+  good: 'Good bet',
+  fair: 'Fair',
+  poor: 'Costly',
+  avoid: 'Sucker bet',
+};
+
 export interface Quiz {
+  /** `<lessonId>-q<n>` (1-based) unless the author gave one */
   id: string;
   prompt: string;
   choices: string[];
-  /** index into `choices` */
+  /** index into `choices` (0-based) */
   answer: number;
   explanation: string;
 }
@@ -35,17 +48,19 @@ export interface Chapter {
   lessons: LessonId[];
 }
 
+/** Source form (content/glossary.json) has markdown; the compiled bundle holds HTML. */
 export interface GlossaryEntry {
   term: string;
   slug: string;
-  definition: string; // markdown
+  definition: string; // markdown in source, HTML in the bundle
   see?: string[];
 }
 
 export interface BetCopy {
   summary: string;
-  howItWorks: string; // markdown
-  verdict: 'best' | 'ok' | 'avoid';
+  howItWorks: string; // markdown in source, HTML in the bundle
+  /** fallback tier, used when the math module cannot supply an edge */
+  verdict: Tier;
   lessonId?: LessonId;
 }
 

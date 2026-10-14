@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
+import { contentPlugin } from './build/vite-plugin-content';
 
 const shared = {
-  plugins: [preact()],
+  plugins: [preact(), contentPlugin()],
   define: { __SINGLE_FILE__: false, __APP_VERSION__: JSON.stringify('test') },
 };
 const exclude = ['tests/e2e/**', 'node_modules/**'];

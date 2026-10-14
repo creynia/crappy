@@ -57,6 +57,8 @@ Rules:
 - `scene` blocks are `SceneConfig` YAML (money in cents, canonical bet ids from `src/sim/engine/bets.ts`).
   They are checked with `validateScene`; a bad scene fails the build with the file name.
   Scene ids must be unique inside a lesson.
+- Quiz `q`, `options` and `explain` are plain text (not Markdown); HTML is escaped, not rendered.
+- Headings: write `##` (or any level); the compiler shifts the lesson's headings so the shallowest becomes an `<h2>` under the page's `<h1>`.
 - `quiz` blocks are a YAML list of `{ id?, q, options, answer, explain }`. The id defaults to
   `<lessonId>-q<n>` (1-based across the lesson); progress is stored under that id, so do not reorder
   questions in a published lesson without giving them explicit ids. Need 2+ distinct options.

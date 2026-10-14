@@ -34,7 +34,7 @@ describe('Store', () => {
     s.markQuiz('a', 'a-q1', false);
     s.markQuiz('a', 'a-q1', true);
     s.markQuiz('a', 'a-q1', false);
-    expect(s.lesson('a')?.quizzes['a-q1']).toEqual({ correct: true, attempts: 3 });
+    expect(s.lesson('a')?.quizzes['a-q1']).toEqual({ correct: true, attempts: 3, firstTry: false });
     s.markSceneStep('a', 's', 2);
     s.markSceneStep('a', 's', 1);
     s.markSceneComplete('a', 's');
@@ -120,5 +120,60 @@ describe('Perfect Strategy badge', () => {
     expect(hasPerfectStrategyBadge(c, s)).toBe(false);
     s.markQuiz('final-exam', 'final-exam-q4', true);
     expect(hasPerfectStrategyBadge(c, s)).toBe(true);
+  });
+});
+
+describe('Perfect Strategy badge: first attempts only', () => {
+  it('wrong-then-right does not count', async () => {
+    const { hasPerfectStrategyBadge, finalExamScore } = await import('../../src/app/store');
+    const c = bundle(['final-exam']);
+    c.lessons[0]!.blocks = Array.from({ length: 5 }, (_, i) => ({
+      kind: 'quiz' as const,
+      quiz: {
+        id: `final-exam-q${i + 1}`,
+        prompt: 'p',
+        choices: ['a', 'b'],
+        answer: 0,
+        explanation: 'e',
+      },
+    }));
+    const s = new Store(new MemoryStorage());
+    for (let i = 1; i <= 3; i++) s.markQuiz('final-exam', `final-exam-q${i}`, true);
+    s.markQuiz('final-exam', 'final-exam-q4', false);
+    s.markQuiz('final-exam', 'final-exam-q4', true);
+    s.markQuiz('final-exam', 'final-exam-q5', false);
+    s.markQuiz('final-exam', 'final-exam-q5', true);
+    expect(finalExamScore(c, s)).toBeCloseTo(0.6);
+    expect(hasPerfectStrategyBadge(c, s)).toBe(false);
+  });
+});
+
+describe('resetLesson (exam retake)', () => {
+  it('clears quizzes but keeps completion, so a retake can earn first-try credit', async () => {
+    const { finalExamScore } = await import('../../src/app/store');
+    const c = bundle(['final-exam']);
+    c.lessons[0]!.blocks = [
+      {
+        kind: 'quiz',
+        quiz: {
+          id: 'final-exam-q1',
+          prompt: 'p',
+          choices: ['a', 'b'],
+          answer: 0,
+          explanation: 'e',
+        },
+      },
+    ];
+    const s = new Store(new MemoryStorage());
+    s.markQuiz('final-exam', 'final-exam-q1', false);
+    s.markQuiz('final-exam', 'final-exam-q1', true);
+    s.completeLesson('final-exam');
+    expect(finalExamScore(c, s)).toBe(0);
+    s.resetLesson('final-exam');
+    expect(s.status('final-exam')).toBe('done');
+    s.markQuiz('final-exam', 'final-exam-q1', true);
+    expect(finalExamScore(c, s)).toBe(1);
+    expect(() => s.resetLesson('nope')).not.toThrow();
+    expect(s.lesson('constructor')).toBeUndefined();
   });
 });

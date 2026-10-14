@@ -60,6 +60,15 @@ describe('storage', () => {
     });
   });
 
+  it('ignores prototype-polluting keys', () => {
+    const raw = JSON.parse(
+      '{"version":1,"lessons":{"__proto__":{"quizzes":{}},"constructor":{"quizzes":{}},"ok":{"quizzes":{"__proto__":{"correct":true}}}}}',
+    ) as unknown;
+    const d = sanitize(raw)!;
+    expect(Object.keys(d.lessons)).toEqual(['ok']);
+    expect(Object.keys(d.lessons.ok!.quizzes)).toEqual([]);
+  });
+
   it('save reports failure instead of throwing', () => {
     const bad = {
       getItem: () => null,

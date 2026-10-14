@@ -37,7 +37,8 @@ export function createStorage(): StorageLike {
 export interface LessonProgress {
   startedAt?: number;
   completedAt?: number;
-  quizzes: Record<string, { correct: boolean; attempts: number }>;
+  /** `firstTry`: the first attempt was correct (retries never count toward the exam badge) */
+  quizzes: Record<string, { correct: boolean; attempts: number; firstTry?: boolean }>;
   scenes: Record<string, { completed: boolean; step: number }>;
 }
 
@@ -74,6 +75,10 @@ export function defaultPersisted(): PersistedV1 {
   return { version: 1, lessons: {}, settings: { ...DEFAULT_SETTINGS } };
 }
 
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const safeEntries = (o: Record<string, unknown>) =>
+  Object.entries(o).filter(([k]) => !UNSAFE_KEYS.has(k));
+
 const isObj = (x: unknown): x is Record<string, unknown> =>
   typeof x === 'object' && x !== null && !Array.isArray(x);
 const num = (x: unknown): number | undefined =>
@@ -103,7 +108,7 @@ export function sanitize(raw: unknown): PersistedV1 | null {
   if (!isObj(raw) || raw.version !== 1) return null;
   const lessons: Record<string, LessonProgress> = {};
   if (isObj(raw.lessons)) {
-    for (const [id, v] of Object.entries(raw.lessons)) {
+    for (const [id, v] of safeEntries(raw.lessons)) {
       if (!isObj(v)) continue;
       const p: LessonProgress = { quizzes: {}, scenes: {} };
       const s = num(v.startedAt);
@@ -111,14 +116,15 @@ export function sanitize(raw: unknown): PersistedV1 | null {
       if (s !== undefined) p.startedAt = s;
       if (c !== undefined) p.completedAt = c;
       if (isObj(v.quizzes))
-        for (const [qid, q] of Object.entries(v.quizzes))
+        for (const [qid, q] of safeEntries(v.quizzes))
           if (isObj(q))
             p.quizzes[qid] = {
               correct: q.correct === true,
               attempts: Math.max(0, Math.floor(num(q.attempts) ?? 0)),
+              ...(typeof q.firstTry === 'boolean' ? { firstTry: q.firstTry } : {}),
             };
       if (isObj(v.scenes))
-        for (const [sid, sc] of Object.entries(v.scenes))
+        for (const [sid, sc] of safeEntries(v.scenes))
           if (isObj(sc))
             p.scenes[sid] = {
               completed: sc.completed === true,

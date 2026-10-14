@@ -68,6 +68,9 @@ h3 {
   padding-top: calc(0.6rem + env(safe-area-inset-top));
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--gold);
   font-weight: 800;
   font-size: 1.25rem;
@@ -293,8 +296,9 @@ main {
 }
 
 .back {
-  display: inline-block;
-  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .prose :is(p, ul, ol, table) {
   margin: 0.7rem 0;
@@ -414,6 +418,14 @@ main {
 }
 .lesson-foot {
   margin-top: 2rem;
+}
+.exam-score {
+  margin-top: 1.5rem;
+}
+.prevnext a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .prevnext {
   display: flex;

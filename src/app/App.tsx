@@ -1,10 +1,10 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useReducer, useRef } from 'preact/hooks';
 import { UpdateToast, type UpdateSubscribe } from './components/UpdateToast';
 import { Shell } from './components/Shell';
 import { useStore } from './context';
 import { consumeFreshNav, useRoute } from './router';
 import { renderRoute } from './routes';
-import { applyTheme } from './theme';
+import { applyTheme, onReducedMotionChange } from './theme';
 
 const SCROLL_KEY = 'crappy:scroll';
 
@@ -27,7 +27,26 @@ export function App(props: { onUpdateAvailable?: UpdateSubscribe }) {
   const route = useRoute();
   const store = useStore();
   const { theme, animationSpeed, reduceMotion } = store.settings;
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
   useEffect(() => applyTheme(store.settings), [theme, animationSpeed, reduceMotion]);
+  // OS reduced-motion preference can change while the app is open.
+  useEffect(
+    () =>
+      onReducedMotionChange(() => {
+        applyTheme(store.settings);
+        rerender(0);
+      }),
+    [store],
+  );
+  // Move focus to the page after a route change (not on first load).
+  const firstRoute = useRef(true);
+  useEffect(() => {
+    if (firstRoute.current) {
+      firstRoute.current = false;
+      return;
+    }
+    document.getElementById('main')?.focus({ preventScroll: true });
+  }, [route.path]);
 
   // Remember scroll per hash; top on new navigation, restore on back/forward into a lesson.
   useEffect(() => {

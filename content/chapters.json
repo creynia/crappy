@@ -1,0 +1,65 @@
+[
+  {
+    "id": "foundations",
+    "title": "Foundations",
+    "summary": "Dice, the table and how a round works.",
+    "lessons": [
+      "dice-and-combinations",
+      "table-tour",
+      "come-out-and-point"
+    ]
+  },
+  {
+    "id": "core-game",
+    "title": "The core game",
+    "summary": "Pass, odds and Come: the heart of low-edge craps.",
+    "lessons": [
+      "pass-line",
+      "expected-value",
+      "odds-bet",
+      "come-bets",
+      "checkpoint-core"
+    ]
+  },
+  {
+    "id": "more-bets",
+    "title": "More ways to bet",
+    "summary": "Place, buy, lay, the Don't side, Field, Big 6/8 and the center props.",
+    "lessons": [
+      "place-bets",
+      "buy-and-lay",
+      "dont-side",
+      "field-and-big-6-8",
+      "sucker-bets"
+    ]
+  },
+  {
+    "id": "math-that-matters",
+    "title": "The math that matters",
+    "summary": "Edge per roll, variance, bankroll and the myths.",
+    "lessons": [
+      "edge-per-roll",
+      "variance-and-bankroll",
+      "myths-and-systems"
+    ]
+  },
+  {
+    "id": "real-casino",
+    "title": "The real casino",
+    "summary": "How to behave and bet at a live table.",
+    "lessons": [
+      "etiquette"
+    ]
+  },
+  {
+    "id": "perfect-strategy",
+    "title": "Perfect strategy",
+    "summary": "Three lenses on the best way to play: lowest edge, practical, most fun per dollar.",
+    "lessons": [
+      "strategy-lowest-edge",
+      "strategy-practical",
+      "strategy-fun-per-dollar",
+      "final-exam"
+    ]
+  }
+]

@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
             // TODO(WP4): swPlugin(),   (service worker + manifest/apple-touch-icon HTML transform)
           ]),
     ],
+    publicDir: single ? false : 'public',
     build: { outDir: single ? 'dist-single' : 'dist', target: 'es2022' },
   };
 });

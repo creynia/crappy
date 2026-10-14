@@ -439,19 +439,17 @@ export function legalBetTypes(state: GameState): BetTypeId[] {
   const rich: GameState = { ...state, bankroll: 1e12 };
   const out: BetTypeId[] = [];
   for (const [id, def] of Object.entries(BET_TYPES) as [BetTypeId, BetTypeDef][]) {
-    const amount = Math.max(minFor(state, def), 100) * 1;
+    const amount = Math.max(minFor(state, def), 100);
     const unit = 100 * def.unitMultiple;
     const probe = Math.ceil(amount / unit) * unit;
-    let ok = false;
-    if (def.category === 'odds' && (id === 'come-odds' || id === 'dont-come-odds')) {
-      ok = state.bets.some(
-        (b) =>
-          validateAction(rich, { type: 'place-bet', betType: id, amount: probe, parentId: b.id })
-            .ok,
-      );
-    } else {
-      ok = validateAction(rich, { type: 'place-bet', betType: id, amount: probe }).ok;
-    }
+    const viaParent = id === 'come-odds' || id === 'dont-come-odds';
+    const ok = viaParent
+      ? state.bets.some(
+          (b) =>
+            validateAction(rich, { type: 'place-bet', betType: id, amount: probe, parentId: b.id })
+              .ok,
+        )
+      : validateAction(rich, { type: 'place-bet', betType: id, amount: probe }).ok;
     if (ok) out.push(id);
   }
   return out;

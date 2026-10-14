@@ -56,19 +56,21 @@ id: l19-s1
 version: 1
 title: Three plans, same dice
 rules: standard-vegas
-bankroll: 50000
+bankroll: 100000
 phase: come-out
 showEV: true
 autoRoll:
   enabled: true
   compareMode: true
-  strategies: [pass-2x-odds, pass-max-odds, place-6-8]
-  defaultStrategy: { id: pass-2x-odds, unit: 1000 }
+  compare:
+    - { id: pass-2x-odds, unit: 1000, oddsMultiple: 2 }
+    - { id: pass-max-odds, unit: 1000 }
+    - { id: place-6-8, unit: 600 }
   rollOptions: [100]
   sessions: [1, 100]
 steps:
   - id: compare
-    text: "Run 100 rolls of each plan on the **same dice**. Compare the expected loss with the swings."
+    text: "Run 100 rolls of each plan on the **same dice**: $10 Pass with 2× odds, $10 Pass with max odds, and $6 on the 6 and 8. Compare the expected loss with the swings."
     completeWhen: { autoRollCompleted: { minRolls: 100 } }
 ```
 
@@ -85,6 +87,7 @@ allowedBets: [pass-line, pass-odds, place-6, place-8, buy-4, place-4]
 showEV: true
 steps:
   - id: pass
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Bet $10 on the **Pass Line**."
     highlightedBets: [pass-line]
     completeWhen: { action: { type: place-bet, betType: pass-line, amount: 1000 } }
@@ -94,22 +97,27 @@ steps:
     allowedActions: [roll]
     completeWhen: { point: 5 }
   - id: odds
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Take the **maximum odds**."
     highlightedBets: [pass-odds]
     completeWhen: { action: { type: place-bet, betType: pass-odds, oddsMax: true } }
   - id: place-6
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Place the 6 in a **$6** unit."
     highlightedBets: [place-6]
     completeWhen: { action: { type: place-bet, betType: place-6, amount: 600 } }
   - id: place-8
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Place the 8 in a **$6** unit."
     highlightedBets: [place-8]
     completeWhen: { action: { type: place-bet, betType: place-8, amount: 600 } }
   - id: compare-4
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Tap **Place 4** and read its edge. Don't place it."
     highlightedBets: [place-4]
     completeWhen: { previewed: place-4 }
   - id: buy-4
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Buy the 4 for **$20** instead."
     highlightedBets: [buy-4]
     completeWhen: { action: { type: place-bet, betType: buy-4, minAmount: 2000 } }

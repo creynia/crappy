@@ -117,3 +117,96 @@ describe('explainBet', () => {
     expect(e.evFormula).toBe('5/11 × $14.00 − 6/11 × $12.00 = -$0.18');
   });
 });
+
+describe('review fixes', () => {
+  it('add-odds suggestion uses the remaining odds room and the number unit', () => {
+    const s = createGame({
+      seed: 1,
+      phase: 'point',
+      point: 4,
+      bets: [
+        { ref: 'pl', type: 'pass-line', amount: 1000 },
+        { type: 'pass-odds', amount: 2000, parentRef: 'pl' },
+      ],
+    });
+    const alt = suggestAlternative(s, { type: 'place-bet', betType: 'hard-4', amount: 2000 });
+    expect(alt?.action).toMatchObject({ betType: 'pass-odds', amount: 1000 });
+    expect(alt?.message).toMatch(/^Add Pass Odds/);
+  });
+
+  it('no add-odds suggestion when the odds are maxed', () => {
+    const s = createGame({
+      seed: 1,
+      phase: 'point',
+      point: 4,
+      bets: [
+        { ref: 'pl', type: 'pass-line', amount: 1000 },
+        { type: 'pass-odds', amount: 3000, parentRef: 'pl' },
+      ],
+    });
+    const alt = suggestAlternative(s, { type: 'place-bet', betType: 'hard-4', amount: 2000 });
+    expect(alt?.action.type === 'place-bet' && alt.action.betType).not.toBe('pass-odds');
+  });
+
+  it('come-odds amount is a multiple of the come bet number unit', () => {
+    const s = createGame({
+      seed: 1,
+      phase: 'point',
+      point: 4,
+      bets: [{ type: 'come', amount: 1000, point: 6 }],
+    });
+    const alt = suggestAlternative(s, { type: 'place-bet', betType: 'hard-4', amount: 700 });
+    expect(alt?.action).toMatchObject({ betType: 'come-odds', amount: 500 });
+  });
+
+  it('removing a contract bet shows the validation message, not a saving', () => {
+    const s = createGame({
+      seed: 1,
+      phase: 'point',
+      point: 4,
+      bets: [{ type: 'pass-line', amount: 1000 }],
+    });
+    const pv = previewAction(s, { type: 'remove-bet', betId: s.bets[0]!.id });
+    expect(pv.validation.ok).toBe(false);
+    expect(pv.headline).not.toMatch(/saves|gives up/);
+    if (!pv.validation.ok) expect(pv.headline).toBe(pv.validation.message);
+  });
+
+  it('$1 props still get an alternative, raised to the table minimum', () => {
+    const s = createGame({ seed: 1, phase: 'point', point: 4 });
+    const alt = suggestAlternative(s, { type: 'place-bet', betType: 'any-craps', amount: 100 });
+    expect(alt).not.toBeNull();
+    expect(alt?.action).toMatchObject({ type: 'place-bet', betType: 'come' });
+    if (alt?.action.type === 'place-bet') expect(alt.action.amount).toBeGreaterThanOrEqual(500);
+  });
+
+  it('any-7 suggests dont-come on a point and lay-4 on the come-out', () => {
+    const onPoint = createGame({ seed: 1, phase: 'point', point: 4 });
+    expect(
+      suggestAlternative(onPoint, { type: 'place-bet', betType: 'any-7', amount: 500 })?.action,
+    ).toMatchObject({ betType: 'dont-come' });
+    expect(
+      suggestAlternative(comeOut(), { type: 'place-bet', betType: 'any-7', amount: 500 })?.action,
+    ).toMatchObject({ betType: 'lay-4' });
+  });
+
+  it('outcomes are shown as dice combinations out of 36', () => {
+    const s = comeOut();
+    const e = explainBet(
+      { type: 'any-7', amount: 500, point: null },
+      { phase: s.phase, point: s.point, rules: s.rules },
+    );
+    expect(e.rows.map((r) => `${r.ways}/${r.outOf}`)).toEqual(['30/36', '6/36']);
+  });
+
+  it('turning a bet explicitly on is not scaled by 392/557', () => {
+    const s = createGame({ seed: 1, bets: [{ type: 'place-6', amount: 600 }] });
+    const id = s.bets[0]!.id;
+    const on = previewAction(
+      s,
+      { type: 'set-working', betId: id, working: 'on' },
+      { rollsPerHour: 100 },
+    );
+    expect(on.perHourCents).toEqual(frac(on.perRollCents.n * 100n, on.perRollCents.d));
+  });
+});

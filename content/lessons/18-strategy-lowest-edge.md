@@ -27,7 +27,7 @@ By that pure measure, the ranking at a 3-4-5x table is:
 | 5 | Place 6 or 8 (in $6 units) | 1.52% |
 | 6 | Buy 4/10, Lay 4/10 (vig on win, bought for $20+ and laid for $40+) | 1.67% |
 
-Buy and lay bets only reach 1.67% at the right sizes. Casinos round the 5% commission down to whole dollars with a $1 minimum, so a $10 buy on the 4 pays $1 (10%) and costs 3.33%. Buy for **$20 or more**; lay the 4 or 10 for **$40 or more**.
+Buy and lay bets only reach 1.67% at the right sizes. Casinos round the 5% commission down to whole dollars with a $1 minimum, so a $10 buy on the 4 still pays a $1 vig (10% of the bet) and costs 3.33%. Buy for **$20 or more**; lay the 4 or 10 for **$40 or more**.
 
 So the **mathematically perfect recipe** is:
 
@@ -67,6 +67,7 @@ showEV: true
 evDetail: full
 steps:
   - id: dont-pass
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Bet the table minimum on **Don't Pass**."
     highlightedBets: [dont-pass]
     completeWhen: { action: { type: place-bet, betType: dont-pass, minAmount: 500 } }
@@ -76,11 +77,13 @@ steps:
     allowedActions: [roll]
     completeWhen: { point: 6 }
   - id: lay
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Lay the **maximum odds** behind your Don't Pass. Tap it to see the free bet."
     highlightedBets: [dont-pass-odds]
     allowedBets: [dont-pass-odds]
     completeWhen: { action: { type: place-bet, betType: dont-pass-odds, oddsMax: true } }
   - id: dont-come
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Add a **Don't Come** bet for more action."
     highlightedBets: [dont-come]
     allowedBets: [dont-come]
@@ -91,6 +94,7 @@ steps:
     allowedActions: [roll]
     completeWhen: { event: bet-travelled }
   - id: lay-come
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Lay the maximum odds on the Don't Come too."
     highlightedBets: [dont-come-odds]
     allowedBets: [dont-come-odds]
@@ -108,20 +112,21 @@ id: l18-s2
 version: 1
 title: Optimum vs near-optimum, 10,000 rolls
 rules: standard-vegas
-bankroll: 100000
+bankroll: 1000000
 phase: come-out
 showEV: true
 autoRoll:
   enabled: true
   compareMode: true
-  strategies: [pass-max-odds, dont-pass-max-lay]
-  defaultStrategy: { id: dont-pass-max-lay, unit: 1000 }
+  compare:
+    - { id: pass-max-odds, unit: 1000 }
+    - { id: dont-pass-max-lay, unit: 1000 }
   rollOptions: [1000, 10000]
   sessions: [1]
 steps:
   - id: compare
     text: "Run both strategies on the **same dice** for 10,000 rolls. They aren't mirror images, so compare their paths and their expected-loss lines."
-    completeWhen: { autoRollCompleted: { minRolls: 10000 } }
+    completeWhen: { autoRollCompleted: {} }
 ```
 
 ```quiz

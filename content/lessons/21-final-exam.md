@@ -65,7 +65,7 @@ steps:
   options: ["$0.37", "$4", "$14", "$37"]
   answer: 1
   explain: "≈ 29.6 decisions × $10 × 1.414% ≈ $4.19."
-- q: Lay $40 against the 10 wins. You collect (vig 5% of win)...
+- q: Lay $40 against the 10 wins. Your net win is (vig 5% of win)...
   options: ["$20", "$19", "$40", "$38"]
   answer: 1
   explain: "Lay 2 to win 1: $20, less a $1 vig."

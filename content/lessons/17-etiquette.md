@@ -26,7 +26,7 @@ Real tables move fast, but the rules of the road are simple.
 * Don't blame the shooter, or the Don't bettors.
 * When you leave, ask to "**color up**" to bigger chips between rolls.
 
-**Tipping ("toking").** Dealers rely on tips. The craps way is to **bet for them**: "a $1 Yo for the dealers", or a small Pass Line bet "for the boys". Tipping isn't required, but it's customary when you win. If you want your tip to last, a line bet with odds for the dealers is cheaper for you than a prop bet.
+**Tipping ("toking").** Dealers rely on tips. The craps way is to **bet for them**: "a $1 Yo for the dealers", or a small Pass Line bet "for the boys". Tipping isn't required, but it's customary when you win. If you want your tip to last, a line bet with odds for the dealers costs you far less than a prop bet in expected loss.
 
 :::tip
 Ask questions during a slow moment. Dealers are paid to help, and quiet tables are the best place to learn.
@@ -47,22 +47,26 @@ bets:
 allowedBets: [pass-odds, place-8, hard-8]
 steps:
   - id: odds
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Odds are yours to place. Add the **maximum odds** behind your Pass Line."
     highlightedBets: [pass-odds]
     allowedBets: [pass-odds]
     completeWhen: { action: { type: place-bet, betType: pass-odds, oddsMax: true } }
   - id: short-pay
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Tap the **8** and try a $5 chip. Read the note: $5 on the 8 pays $5.83 here, and most casinos pay $5. Don't confirm."
     highlightedBets: [place-8]
     allowedBets: [place-8]
     completeWhen: { previewed: place-8 }
     advance: button
   - id: place-8
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Say it like a pro: **\"$6, place the 8.\"** Place $6 on the 8."
     highlightedBets: [place-8]
     allowedBets: [place-8]
     completeWhen: { action: { type: place-bet, betType: place-8, amount: 600 } }
   - id: hard-8
+    allowedActions: [place-bet, set-amount, remove-bet]
     text: "Now **\"$1 hard 8.\"** Place $1 on the Hard 8."
     highlightedBets: [hard-8]
     allowedBets: [hard-8]

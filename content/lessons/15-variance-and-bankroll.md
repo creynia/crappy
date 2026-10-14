@@ -82,14 +82,14 @@ autoRoll:
 steps:
   - id: flat-100
     text: "Start with $100 and play $10 Pass, no odds, for an hour, 50 times over. How many runs go broke? (About 7%.)"
-    completeWhen: { autoRollCompleted: { minRolls: 100 } }
+    completeWhen: { autoRollCompleted: {} }
   - id: odds-100
     text: "Now add **max odds** with the same $100. Watch the survival chart: most runs can't afford the bets."
-    completeWhen: { autoRollCompleted: { minRolls: 100 } }
+    completeWhen: { autoRollCompleted: {} }
   - id: odds-500
     text: "Give yourself $500 and run max odds again. About 7% go broke."
     setup: { bankroll: 50000 }
-    completeWhen: { autoRollCompleted: { minRolls: 100 } }
+    completeWhen: { autoRollCompleted: {} }
 ```
 
 ```quiz

@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { Link } from '../components/Link';
 import { TierBadge } from '../components/TierBadge';
 import { Html } from '../components/Html';
-import { betRows, formatEdge, betLabel, betPayout, houseEdge, tierOf } from '../bets';
+import { shortPayout, betRows, formatEdge, betLabel, betPayout, houseEdge, tierOf } from '../bets';
 import type { BetRow } from '../bets';
 import { useContent } from '../context';
 import { NotFound } from './NotFound';
@@ -62,7 +62,7 @@ export function BetsList() {
                 <td>
                   <Link to={`/bets/${r.id}`}>{r.label}</Link>
                 </td>
-                <td>{r.payout ?? '--'}</td>
+                <td title={r.payout ?? undefined}>{shortPayout(r.id, r.payout) ?? '--'}</td>
                 <td class="num">{formatEdge(r.edge)}</td>
                 <td>
                   <TierBadge tier={r.tier} />

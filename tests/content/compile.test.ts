@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileLesson } from '../../src/content/compile';
+import { compileLesson, minHeadingDepth } from '../../src/content/compile';
 
 const head = '---\nid: t\ntitle: T\nsummary: S\nminutes: 2\n---\n';
 
@@ -38,5 +38,28 @@ describe('compileLesson', () => {
     const l = compileLesson(head + 'The [[point]] is set.', 't.md', opts);
     expect(JSON.stringify(l.blocks[0])).toContain('#/glossary?term=point');
     expect(() => compileLesson(head + '[[nope]]', 't.md', opts)).toThrow(/nope/);
+  });
+});
+
+describe('heading levels', () => {
+  it('shifts the shallowest heading to h2', () => {
+    const l = compileLesson(head + '### A\n\ntext\n\n#### B\n\n:::tip\n### C\n:::\n', 't.md');
+    const html = JSON.stringify(l.blocks);
+    expect(html).toContain('<h2>A</h2>');
+    expect(html).toContain('<h3>B</h3>');
+    expect(html).toContain('<h2>C</h2>');
+  });
+  it('leaves h2 lessons alone and ignores # inside code fences', () => {
+    const l = compileLesson(head + '## A\n\n```text\n# not a heading\n```\n', 't.md');
+    expect(JSON.stringify(l.blocks)).toContain('<h2>A</h2>');
+  });
+});
+
+describe('minHeadingDepth', () => {
+  it('ignores headings inside nested / longer fences and handles setext headings', () => {
+    const body = '#### Real\n\n````md\n```\n# fake\n```\n# still fake\n````\n\nSetext\n------\n';
+    expect(minHeadingDepth(body)).toBe(2);
+    expect(minHeadingDepth('#### Real\n\n````md\n```\n# fake\n```\n# still fake\n````\n')).toBe(4);
+    expect(minHeadingDepth('no headings')).toBe(7);
   });
 });

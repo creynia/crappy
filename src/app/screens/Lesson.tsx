@@ -1,9 +1,10 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { Html } from '../components/Html';
 import { Link } from '../components/Link';
 import { LessonScene } from '../components/LessonScene';
 import { Quiz } from '../components/Quiz';
 import { useContent, useStore } from '../context';
+import { FINAL_EXAM_ID, finalExamScore } from '../store';
 import { NotFound } from './NotFound';
 
 export function LessonView({ id }: { id: string }) {
@@ -11,6 +12,7 @@ export function LessonView({ id }: { id: string }) {
   const store = useStore();
   const idx = content.lessons.findIndex((l) => l.id === id);
   const lesson = content.lessons[idx];
+  const [retakes, setRetakes] = useState(0);
   useEffect(() => {
     if (lesson) store.start(lesson.id);
   }, [lesson?.id]);
@@ -55,7 +57,7 @@ export function LessonView({ id }: { id: string }) {
           case 'quiz':
             return (
               <Quiz
-                key={`${lesson.id}:${b.quiz.id}`}
+                key={`${lesson.id}:${b.quiz.id}:${retakes}`}
                 quiz={b.quiz}
                 answeredBefore={progress?.quizzes[b.quiz.id]?.correct === true}
                 onAnswer={(ok) => store.markQuiz(lesson.id, b.quiz.id, ok)}
@@ -63,6 +65,25 @@ export function LessonView({ id }: { id: string }) {
             );
         }
       })}
+      {lesson.id === FINAL_EXAM_ID && (
+        <section class="card exam-score" aria-label="Exam score">
+          <p>
+            First-try score:{' '}
+            <strong>{Math.round((finalExamScore(content, store) ?? 0) * 100)}%</strong> (80% earns
+            the Perfect Strategy badge). Only your first answer to each question counts.
+          </p>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onClick={() => {
+              store.resetLesson(lesson.id);
+              setRetakes((n) => n + 1);
+            }}
+          >
+            Retake exam
+          </button>
+        </section>
+      )}
       <footer class="lesson-foot">
         <button
           type="button"

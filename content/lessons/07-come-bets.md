@@ -34,7 +34,6 @@ point: 6
 bets:
   - { ref: p, type: pass-line, amount: 1000 }
   - { type: pass-odds, amount: 5000, parentRef: p }
-forcedDice: [[5, 4], [3, 6], [2, 3]]
 allowedBets: [come, come-odds]
 highlightedBets: [come]
 showEV: true
@@ -44,18 +43,26 @@ ui:
 steps:
   - id: come
     text: "The point is 6. Put **$10** in the **Come** area."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen: { action: { type: place-bet, betType: come, amount: 1000 } }
   - id: travel
     text: "Roll: 9. Your Come bet moves to the 9 box."
+    allowedActions: [roll]
+    forcedDice: [[5, 4]]
     completeWhen: { event: bet-travelled }
   - id: odds
     text: "Add **$40 odds** on your Come bet (tap it on the 9 box, then Odds)."
+    allowedActions: [place-bet, set-amount, remove-bet]
     completeWhen: { action: { type: place-bet, betType: come-odds, amount: 4000 } }
   - id: win
     text: "Roll: 9! Your Come bet wins $10 and its odds win $60. Your Pass bet on 6 is still riding."
+    allowedActions: [roll]
+    forcedDice: [[3, 6]]
     completeWhen: { event: bet-won, betType: come }
   - id: five
     text: "Roll: 5. Nothing happens to any of your bets."
+    allowedActions: [roll]
+    forcedDice: [[2, 3]]
     completeWhen: { rolls: 1 }
 ```
 

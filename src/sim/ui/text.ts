@@ -1,4 +1,4 @@
-import type { ActionPreview } from '../math/types';
+import type { ActionPreview, EdgeTier } from '../math/types';
 import type { Bet, BetTypeId, Cents, GameEvent } from '../engine/types';
 import type { RegionDef } from './layouts/types';
 
@@ -63,7 +63,7 @@ export function betLabel(type: BetTypeId): string {
 
 // ---------- tiers (decisions.md: free | good | fair | poor | avoid) ----------
 
-export type UiTier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
+export type UiTier = EdgeTier;
 export const TIER_LABEL: Record<UiTier, string> = {
   free: 'Free bet',
   good: 'Good bet',
@@ -117,23 +117,21 @@ export interface EvFactsInput {
   oneRoll: boolean;
   chance: string;
   pays: string;
-  rollsPerHour?: number;
-  /** 392/557 for bets that are off on come-outs; default 1 */
-  workingFraction?: number;
   combined?: { label: string; edge: number } | null;
 }
 
-export function buildEvFacts(preview: Pick<ActionPreview, 'edge'>, input: EvFactsInput): EvFacts {
+/** Per-hour cost and rolls per hour come from the preview (math applies the 392/557 factor for off-on-come-out bets). */
+export function buildEvFacts(
+  preview: Pick<ActionPreview, 'edge' | 'perHourCents' | 'rollsPerHour'>,
+  input: EvFactsInput,
+): EvFacts {
   const edge = preview.edge ? fracToNumber(preview.edge.perResolved) : null;
-  const perRoll = preview.edge ? fracToNumber(preview.edge.perRoll) : null;
-  const rph = input.rollsPerHour ?? 100;
   return {
     amount: input.amount,
     edge,
     expectedLossCents: edge === null ? 0 : input.amount * edge,
-    perHourCents:
-      perRoll === null ? null : input.amount * perRoll * rph * (input.workingFraction ?? 1),
-    rollsPerHour: rph,
+    perHourCents: preview.edge ? fracToNumber(preview.perHourCents) : null,
+    rollsPerHour: preview.rollsPerHour,
     oneRoll: input.oneRoll,
     chance: input.chance,
     pays: input.pays,

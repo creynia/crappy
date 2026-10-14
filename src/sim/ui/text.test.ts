@@ -123,6 +123,8 @@ describe('tiers and ev facts', () => {
           expectedRolls: { n: 1n, d: 1n },
           perRoll: { n: 1n, d: 216n },
         },
+        perHourCents: { n: 120000n, d: 216n },
+        rollsPerHour: 100,
       },
       { amount: 1200, oneRoll: false, chance: '5 in 11 (45%)', pays: '7 to 6' },
     );

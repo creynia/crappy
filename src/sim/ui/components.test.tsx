@@ -13,6 +13,7 @@ import { Toasts } from './Toasts';
 import { portraitLayout } from './layouts';
 import { buildEvFacts } from './text';
 import type { Bet, RollRecord } from '../engine/types';
+import type { EdgeTier } from '../math/types';
 
 afterEach(cleanup);
 
@@ -28,7 +29,7 @@ const bet = (id: string, type: Bet['type'], amount: number, point: Bet['point'] 
   vigPaid: 0,
 });
 
-function preview(tier: string, over: Partial<SheetPreview> = {}): SheetPreview {
+function preview(tier: EdgeTier, over: Partial<SheetPreview> = {}): SheetPreview {
   return {
     action: { type: 'place-bet', betType: 'pass-line', amount: 1000 },
     validation: { ok: true, warnings: [] },
@@ -41,6 +42,8 @@ function preview(tier: string, over: Partial<SheetPreview> = {}): SheetPreview {
     },
     tier,
     perRollCents: fr(-4),
+    perHourCents: fr(176),
+    rollsPerHour: 100,
     headline: 'Expected value: -$0.14 (house edge 1.41%)',
     detail: 'detail text',
     alternative: null,
@@ -297,7 +300,7 @@ describe('BetSheet', () => {
     ['poor', 'Costly'],
     ['avoid', 'Sucker bet'],
   ])('tier %s shows the label %s', (tier, label) => {
-    sheet({ preview: preview(tier) });
+    sheet({ preview: preview(tier as EdgeTier) });
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   });
 

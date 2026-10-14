@@ -4,7 +4,7 @@ import type { ActionPreview } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
 import './sim.css';
 
-export type SheetPreview = Omit<ActionPreview, 'tier'> & { tier: string };
+export type SheetPreview = ActionPreview;
 
 export interface TypeOption {
   id: BetTypeId;

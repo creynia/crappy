@@ -116,8 +116,10 @@ function mockPreview(tier: EdgeTier | 'invalid'): SheetPreview {
       expectedRolls: frac(8),
       perRoll: frac(edgeN, 80000),
     },
-    tier: ({ invalid: 'good' } as Record<string, string>)[tier] ?? tier,
+    tier: tier === 'invalid' ? 'good' : tier,
     perRollCents: frac(-4),
+    perHourCents: frac(tier === 'avoid' ? 1389 : 176),
+    rollsPerHour: 100,
     headline,
     detail: "About -$0.04 per roll while it's working",
     alternative:

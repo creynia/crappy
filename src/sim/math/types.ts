@@ -22,7 +22,8 @@ export interface EdgeInfo {
   perRoll: Fraction;
 }
 
-export type EdgeTier = 'zero' | 'low' | 'medium' | 'high'; // <=0, <2%, 2%-5%, >5%
+/** By edge per bet resolved: free <=0, good <=2%, fair <=5%, poor <9%, avoid >=9% (only `avoid` needs a second tap). */
+export type EdgeTier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
 
 export interface Explanation {
   rows: Outcome[];
@@ -43,8 +44,16 @@ export interface ActionPreview {
   edge: EdgeInfo | null;
   tier: EdgeTier;
   perRollCents: Fraction;
+  /** Expected COST per hour, cents (positive = costs money, like perRollCents): amount x per-roll edge x rollsPerHour, x 392/557 for bets off on come-outs. */
+  perHourCents: Fraction;
+  rollsPerHour: number;
   headline: string;
   detail: string;
   alternative: Alternative | null;
   explanation: Explanation;
+}
+
+export interface PreviewOptions {
+  /** default 100 */
+  rollsPerHour?: number;
 }

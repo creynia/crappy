@@ -28,9 +28,11 @@
     "preact": "^10.29.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10",
     "@playwright/test": "1.56.1",
     "@preact/preset-vite": "^2.10.6",
+    "@testing-library/preact": "^3.2.4",
     "@types/node": "^22",
     "eslint": "^10",
     "eslint-config-prettier": "^10.1.8",

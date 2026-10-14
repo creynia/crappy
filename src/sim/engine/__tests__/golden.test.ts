@@ -180,4 +180,27 @@ describe('golden payouts', () => {
     expect(r.state.stats.totalVig).toBe($(1));
     expect(r.state.stats.totalWon).toBe($(39));
   });
+
+  it('upfront vig: buy-4 $20 wins three times; the first is covered by the upfront vig, later wins pay $1 each', () => {
+    const rules = {
+      vig: { rate: 0.05, timing: 'upfront' as const, rounding: 'floor-dollar-min-1' as const },
+    };
+    let s = game({ phase: 'point', point: 9, rules, bets: [B('buy-4', 20)] });
+    expect(s.bankroll).toBe($(1000 - 21));
+    const profits: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const before = equity(s);
+      s = roll(s, 1, 3).state;
+      profits.push(equity(s) - before);
+    }
+    expect(profits).toEqual([$(40), $(39), $(39)]);
+    expect(s.bets[0]!.vigPaid).toBe(0);
+    expect(s.stats.totalVig).toBe($(3)); // 1 upfront + 2 on later wins
+    // lay: same
+    let l = game({ phase: 'point', point: 9, rules, bets: [B('lay-4', 40)] });
+    const b0 = equity(l);
+    l = roll(l, 3, 4).state;
+    l = roll(l, 3, 4).state;
+    expect(equity(l) - b0).toBe($(20) + $(19));
+  });
 });

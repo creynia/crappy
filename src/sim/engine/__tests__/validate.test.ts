@@ -242,6 +242,41 @@ describe('suggestAmount', () => {
   });
 });
 
+describe('suggestAmount for odds and minimums', () => {
+  it('uses the parent bet number, not the table point', () => {
+    let s = game({ phase: 'point', point: 6 });
+    s = bet(s, 'come', 10);
+    s = roll(s, 2, 3).state; // travels to 5
+    s = bet(s, 'come', 10);
+    const id = s.bets.find((b) => b.type === 'come' && b.point === 5)!.id;
+    expect(suggestAmount('come-odds', $(5), s, { parentId: id })).toBe($(6)); // 3:2 -> $2 units
+    expect(suggestAmount('come-odds', $(5), s, { point: 6 })).toBe($(5)); // 6:5 -> $5 units
+    expect(suggestAmount('come-odds', $(5), s, { point: 5 })).toBe($(6));
+  });
+  it('respects table and prop minimums', () => {
+    const s = game({ phase: 'point', point: 6 });
+    expect(suggestAmount('place-6', $(1), s)).toBe($(6));
+    expect(suggestAmount('place-5', $(1), s)).toBe($(5));
+    expect(suggestAmount('pass-line', $(1), s)).toBe($(5));
+    expect(suggestAmount('hard-6', $(1), s)).toBe($(1));
+    expect(suggestAmount('any-7', 0, s)).toBe($(1));
+  });
+});
+
+describe('input checks', () => {
+  it('roll needs exactly two valid dice', () => {
+    expect(code(game(), { type: 'roll', dice: [1, 2, 3] as never })).toBe('bad-amount');
+    expect(code(game(), { type: 'roll', dice: [1] as never })).toBe('bad-amount');
+    expect(code(game(), { type: 'roll', dice: [1, 6] })).toBe('ok');
+  });
+  it('set-working rejects unknown values with not-removable, not bad-amount', () => {
+    const s = bet(pointState(), 'place-6', 12);
+    expect(code(s, { type: 'set-working', betId: s.bets[0]!.id, working: 'maybe' as never })).toBe(
+      'not-removable',
+    );
+  });
+});
+
 describe('legalBetTypes', () => {
   it('come-out vs point', () => {
     const co = legalBetTypes(game());

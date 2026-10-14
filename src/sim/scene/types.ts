@@ -51,6 +51,8 @@ export interface SceneConfig {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** per-strategy specs to compare side by side (implies compareMode) */
+    compare?: StrategySpec[];
   };
   steps?: SceneStep[];
 }
@@ -106,6 +108,8 @@ export interface SceneRuntime {
   stepStartRoll: number;
   counters: Record<string, number>;
   done: boolean;
+  /** current step's condition is met but the step waits for the Next button (advance: 'button') */
+  satisfied?: boolean;
 }
 
 export type SceneInput =

@@ -19,22 +19,27 @@ export const NUMBER_WORD: Record<PointNumber, string> = {
 };
 
 function boxBetTypes(n: PointNumber): BetTypeId[] {
-  const t: BetTypeId[] = [`place-${n}`, `buy-${n}`, `lay-${n}`, 'come-odds', 'dont-come-odds'] as BetTypeId[];
+  const t: BetTypeId[] = [
+    `place-${n}`,
+    `buy-${n}`,
+    `lay-${n}`,
+    'come-odds',
+    'dont-come-odds',
+  ] as BetTypeId[];
   return t;
 }
 
 /** A number box with chip spots placed relative to its rect (see simulator.md section 3.2). */
 export function numberBox(n: PointNumber, rect: Rect): RegionDef {
   const { x, y, w, h } = rect;
-  const cx = x + w / 2;
   const k = w / 280; // horizontal scale relative to the portrait box
   const spots: Partial<Record<ChipSpotKey, { x: number; y: number }>> = {
-    'dc-point': { x: x + 62 * k, y: y + h * 0.13 },
-    lay: { x: x + 135 * k, y: y + h * 0.13 },
-    main: { x: cx - 50 * k, y: y + h * 0.62 },
-    buy: { x: cx + 50 * k, y: y + h * 0.62 },
-    'come-point': { x: x + 78 * k, y: y + h * 0.86 },
-    odds: { x: x + 118 * k, y: y + h * 0.86 - 20 },
+    'dc-point': { x: x + 62 * k, y: y + h * 0.14 },
+    lay: { x: x + 135 * k, y: y + h * 0.14 },
+    'come-point': { x: x + 44 * k, y: y + h * 0.5 },
+    odds: { x: x + w - 44 * k, y: y + h * 0.5 },
+    main: { x: x + w * 0.3, y: y + h * 0.8 },
+    buy: { x: x + w * 0.7, y: y + h * 0.8 },
   };
   return {
     id: `box-${n}` as RegionId,

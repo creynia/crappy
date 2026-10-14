@@ -1,5 +1,5 @@
 import type { PointNumber } from '../../engine/types';
-import { centerOf, numberBox, puckForBox } from './shared';
+import { numberBox, puckForBox } from './shared';
 import type { Rect, RegionDef, TableLayout } from './types';
 
 const BW = 280;
@@ -38,7 +38,7 @@ const regions: RegionDef[] = [
     label: 'Field',
     sublabel: 'One roll. 2 and 12 pay double',
     betTypes: ['field'],
-    chipSpots: { main: { x: fieldRect.x + 430, y: fieldRect.y + 110 } },
+    chipSpots: { main: { x: fieldRect.x + 620, y: fieldRect.y + 100 } },
   },
   {
     id: 'dont-come',
@@ -46,7 +46,7 @@ const regions: RegionDef[] = [
     label: "Don't Come",
     sublabel: 'Bar 12. Pays 1 to 1',
     betTypes: ['dont-come'],
-    chipSpots: { main: { x: dcRect.x + 330, y: dcRect.y + 58 } },
+    chipSpots: { main: { x: dcRect.x + 372, y: dcRect.y + 52 } },
   },
   {
     id: 'big-6',
@@ -54,7 +54,7 @@ const regions: RegionDef[] = [
     label: 'Big 6',
     sublabel: 'Pays 1 to 1',
     betTypes: ['big-6'],
-    chipSpots: { main: centerOf(big6Rect) },
+    chipSpots: { main: { x: big6Rect.x + big6Rect.w * 0.68, y: big6Rect.y + big6Rect.h * 0.45 } },
   },
   {
     id: 'big-8',
@@ -62,7 +62,7 @@ const regions: RegionDef[] = [
     label: 'Big 8',
     sublabel: 'Pays 1 to 1',
     betTypes: ['big-8'],
-    chipSpots: { main: centerOf(big8Rect) },
+    chipSpots: { main: { x: big8Rect.x + big8Rect.w * 0.68, y: big8Rect.y + big8Rect.h * 0.45 } },
   },
   {
     id: 'dont-pass',
@@ -70,7 +70,10 @@ const regions: RegionDef[] = [
     label: "Don't Pass Bar",
     sublabel: 'Bar 12. Pays 1 to 1',
     betTypes: ['dont-pass', 'dont-pass-odds'],
-    chipSpots: { main: { x: dpRect.x + 150, y: dpRect.y + 56 }, odds: { x: dpRect.x + 215, y: dpRect.y + 40 } },
+    chipSpots: {
+      main: { x: dpRect.x + 150, y: dpRect.y + 56 },
+      odds: { x: dpRect.x + 215, y: dpRect.y + 40 },
+    },
   },
   {
     id: 'pass',
@@ -79,7 +82,10 @@ const regions: RegionDef[] = [
     sublabel: 'Pays 1 to 1',
     betTypes: ['pass-line', 'pass-odds'],
     shape: 'pass-arc',
-    chipSpots: { main: { x: passRect.x + 150, y: passRect.y + 62 }, odds: { x: passRect.x + 215, y: passRect.y + 44 } },
+    chipSpots: {
+      main: { x: passRect.x + 150, y: passRect.y + 62 },
+      odds: { x: passRect.x + 215, y: passRect.y + 44 },
+    },
   },
 ];
 

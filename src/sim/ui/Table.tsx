@@ -1,0 +1,230 @@
+import type { JSX } from 'preact';
+import { useMemo, useRef } from 'preact/hooks';
+import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
+import { ChipStack } from './ChipStack';
+import { Dice } from './Dice';
+import type { Dice as DicePair } from '../engine/types';
+import { regionIdForBet, spotPosition } from './layouts';
+import type { RegionDef, RegionId, TableLayout } from './layouts/types';
+import { Puck } from './Puck';
+import { RegionArt } from './regionArt';
+import { regionAriaLabel } from './text';
+import './sim.css';
+
+export interface TableProps {
+  layout: TableLayout;
+  bets: readonly Bet[];
+  point: PointNumber | null;
+  /** ids of bets that are not currently working */
+  offBetIds?: ReadonlySet<string>;
+  /** regions dimmed to 40% (scene allowedBets); they stay focusable and announce why */
+  disabledRegions?: ReadonlySet<RegionId>;
+  highlightedBets?: readonly BetTypeId[];
+  fieldPays?: { 2: number; 12: number };
+  /** bets that just lost: ghost stacks slide to the dealer and fade */
+  lostBets?: readonly Bet[];
+  /** bets that just won: highlight flash, plus a payout stack that slides in from the dealer */
+  wonBets?: readonly { bet: Bet; payout: Cents }[];
+  /** dice overlay while rolling */
+  rollingDice?: { dice: DicePair | null; durationMs: number } | null;
+  selectedRegion?: RegionId | null;
+  onRegionTap?: (id: RegionId) => void;
+  onStackTap?: (betId: string) => void;
+  class?: string;
+}
+
+interface Placed {
+  key: string;
+  region: RegionDef;
+  x: number;
+  y: number;
+  amount: Cents;
+  betIds: string[];
+  off: boolean;
+}
+
+function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySet<string>) {
+  const byRegion = new Map<RegionId, Bet[]>();
+  const stacks = new Map<string, Placed>();
+  for (const b of bets) {
+    const rid = regionIdForBet(b.type, b.point);
+    const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
+    if (!region) continue;
+    byRegion.set(region.id, [...(byRegion.get(region.id) ?? []), b]);
+    const pos = spotPosition(region, b.type);
+    const key = `${pos.x},${pos.y}`;
+    const prev = stacks.get(key);
+    const off = offIds.has(b.id);
+    if (prev) {
+      prev.amount += b.amount;
+      prev.betIds.push(b.id);
+      prev.off = prev.off && off;
+    } else {
+      stacks.set(key, { key, region, x: pos.x, y: pos.y, amount: b.amount, betIds: [b.id], off });
+    }
+  }
+  return { byRegion, stacks: [...stacks.values()] };
+}
+
+export function Table({
+  layout,
+  bets,
+  point,
+  offBetIds,
+  disabledRegions,
+  highlightedBets,
+  fieldPays = { 2: 2, 12: 2 },
+  lostBets,
+  wonBets,
+  rollingDice,
+  selectedRegion,
+  onRegionTap,
+  onStackTap,
+  class: cls,
+}: TableProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const empty = useMemo(() => new Set<string>(), []);
+  const offIds = offBetIds ?? empty;
+  const { byRegion, stacks } = useMemo(
+    () => placeBets(layout, bets, offIds),
+    [layout, bets, offIds],
+  );
+  const { w, h } = layout.viewBox;
+  const hasPuck = layout.puckRadius > 0;
+  const puckPos = point ? layout.puck[point] : layout.puck.off;
+  const hl = new Set<string>(highlightedBets ?? []);
+  const wonIds = new Set((wonBets ?? []).map((x) => x.bet.id));
+
+  const moveFocus = (from: Element, dir: 1 | -1) => {
+    const all = [...(svgRef.current?.querySelectorAll<SVGGElement>('[data-region]') ?? [])];
+    const i = all.indexOf(from as SVGGElement);
+    const next = all[(i + dir + all.length) % all.length];
+    next?.focus();
+  };
+  const onKey = (e: JSX.TargetedKeyboardEvent<SVGGElement>, id: RegionId) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onRegionTap?.(id);
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveFocus(e.currentTarget, 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(e.currentTarget, -1);
+    }
+  };
+
+  const ghostPos = (b: Bet) => {
+    const rid = regionIdForBet(b.type, b.point);
+    const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
+    return region ? spotPosition(region, b.type) : null;
+  };
+
+  return (
+    <div class={`sim-table-wrap sim-table-${layout.id}${cls ? ' ' + cls : ''}`}>
+      <svg
+        ref={svgRef}
+        class="sim-table"
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="group"
+        aria-label={layout.id === 'center' ? 'Center proposition bets' : 'Craps table'}
+      >
+        <defs>
+          <radialGradient id={`felt-${layout.id}`} cx="50%" cy="45%" r="75%">
+            <stop offset="0%" stop-color="var(--felt-hi)" />
+            <stop offset="100%" stop-color="var(--felt-lo)" />
+          </radialGradient>
+        </defs>
+        <rect x="0" y="0" width={w} height={h} fill={`url(#felt-${layout.id})`} />
+        {layout.regions.map((region) => {
+          const disabled = disabledRegions?.has(region.id) ?? false;
+          const rbets = byRegion.get(region.id) ?? [];
+          const highlighted = rbets.length === 0 && region.betTypes.some((t) => hl.has(t));
+          const { x, y, w: rw, h: rh } = region.rect;
+          return (
+            <g
+              key={region.id}
+              class={`sim-region${disabled ? ' is-disabled' : ''}${highlighted ? ' is-highlighted' : ''}${selectedRegion === region.id ? ' is-selected' : ''}`}
+              role="button"
+              tabIndex={0}
+              data-region={region.id}
+              aria-label={regionAriaLabel(region, { bets: rbets, offIds, disabled })}
+              aria-disabled={disabled || undefined}
+              onClick={() => onRegionTap?.(region.id)}
+              onKeyDown={(e) => onKey(e, region.id)}
+            >
+              <RegionArt region={region} ctx={{ fieldPays, point }} />
+              <rect class="sim-hit" x={x} y={y} width={rw} height={rh} rx="14" />
+              <rect
+                class="sim-focus-ring"
+                x={x - 4}
+                y={y - 4}
+                width={rw + 8}
+                height={rh + 8}
+                rx="18"
+              />
+              {highlighted ? (
+                <rect
+                  class="sim-pulse"
+                  x={x - 2}
+                  y={y - 2}
+                  width={rw + 4}
+                  height={rh + 4}
+                  rx="16"
+                />
+              ) : null}
+            </g>
+          );
+        })}
+        {hasPuck ? (
+          <Puck x={puckPos.x} y={puckPos.y} r={layout.puckRadius} on={point !== null} />
+        ) : null}
+        <g class="sim-chips">
+          {stacks.map((s) => {
+            const nums = s.betIds.length;
+            return (
+              <g
+                key={s.key}
+                class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStackTap?.(s.betIds[0]!);
+                }}
+                data-stack={s.betIds[0]}
+                data-count={nums}
+              >
+                <ChipStack x={s.x} y={s.y} amount={s.amount} r={layout.chipRadius} off={s.off} />
+              </g>
+            );
+          })}
+          {(lostBets ?? []).map((b) => {
+            const p = ghostPos(b);
+            return p ? (
+              <g key={'lost-' + b.id} class="sim-ghost sim-ghost-lose">
+                <ChipStack x={p.x} y={p.y} amount={b.amount} r={layout.chipRadius} />
+              </g>
+            ) : null;
+          })}
+          {(wonBets ?? []).map(({ bet, payout }) => {
+            const p = ghostPos(bet);
+            return p && payout > 0 ? (
+              <g
+                key={'won-' + bet.id}
+                class="sim-ghost sim-ghost-win"
+                transform={`translate(${layout.chipRadius * 1.9} ${-layout.chipRadius * 0.6})`}
+              >
+                <ChipStack x={p.x} y={p.y} amount={payout} r={layout.chipRadius * 0.8} />
+              </g>
+            ) : null;
+          })}
+        </g>
+      </svg>
+      {rollingDice ? (
+        <div class="sim-dice-overlay" aria-hidden={rollingDice.dice ? undefined : true}>
+          <Dice dice={rollingDice.dice} rolling durationMs={rollingDice.durationMs} />
+        </div>
+      ) : null}
+    </div>
+  );
+}

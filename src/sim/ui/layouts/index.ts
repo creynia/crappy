@@ -7,7 +7,11 @@ export * from './types';
 export { portraitLayout, landscapeLayout, centerLayout };
 
 export function layoutFor(kind: TableLayout['id']): TableLayout {
-  return kind === 'portrait' ? portraitLayout : kind === 'landscape' ? landscapeLayout : centerLayout;
+  return kind === 'portrait'
+    ? portraitLayout
+    : kind === 'landscape'
+      ? landscapeLayout
+      : centerLayout;
 }
 
 export function findRegion(layout: TableLayout, id: RegionId): RegionDef | undefined {
@@ -46,7 +50,7 @@ export function regionIdForBet(type: string, point: number | null): RegionId | n
     case 'hard-6':
     case 'hard-8':
     case 'hard-10':
-      return type as RegionId;
+      return type;
   }
   const m = /^(place|buy|lay)-(\d+)$/.exec(type);
   return m ? (`box-${m[2]}` as RegionId) : null;
@@ -64,8 +68,10 @@ export function spotPosition(region: RegionDef, type: string): Point2 {
     return { x: b.x + 26, y: b.y + 30 };
   }
   if (type === 'pass-odds' || type === 'dont-pass-odds') return s.odds ?? s.main ?? fallback;
-  if (type === 'come') return region.id.startsWith('box-') ? (s['come-point'] ?? fallback) : (s.main ?? fallback);
-  if (type === 'dont-come') return region.id.startsWith('box-') ? (s['dc-point'] ?? fallback) : (s.main ?? fallback);
+  if (type === 'come')
+    return region.id.startsWith('box-') ? (s['come-point'] ?? fallback) : (s.main ?? fallback);
+  if (type === 'dont-come')
+    return region.id.startsWith('box-') ? (s['dc-point'] ?? fallback) : (s.main ?? fallback);
   if (type.startsWith('buy-')) return s.buy ?? fallback;
   if (type.startsWith('lay-')) return s.lay ?? fallback;
   return s.main ?? fallback;

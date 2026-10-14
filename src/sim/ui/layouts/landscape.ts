@@ -1,5 +1,5 @@
 import type { PointNumber } from '../../engine/types';
-import { centerOf, numberBox, puckForBox } from './shared';
+import { numberBox, puckForBox } from './shared';
 import type { Rect, RegionDef, TableLayout } from './types';
 
 const order: PointNumber[] = [4, 5, 6, 8, 9, 10];
@@ -21,7 +21,7 @@ const regions: RegionDef[] = [
     label: "Don't Come",
     sublabel: 'Bar 12. Pays 1 to 1',
     betTypes: ['dont-come'],
-    chipSpots: { main: centerOf(dcRect) },
+    chipSpots: { main: { x: dcRect.x + dcRect.w / 2, y: dcRect.y + dcRect.h * 0.52 } },
   },
   ...boxes.map(([n, r]) => numberBox(n, r)),
   {
@@ -30,7 +30,7 @@ const regions: RegionDef[] = [
     label: 'Big 6',
     sublabel: 'Pays 1 to 1',
     betTypes: ['big-6'],
-    chipSpots: { main: centerOf(big6Rect) },
+    chipSpots: { main: { x: big6Rect.x + big6Rect.w * 0.68, y: big6Rect.y + big6Rect.h * 0.45 } },
   },
   {
     id: 'big-8',
@@ -38,7 +38,7 @@ const regions: RegionDef[] = [
     label: 'Big 8',
     sublabel: 'Pays 1 to 1',
     betTypes: ['big-8'],
-    chipSpots: { main: centerOf(big8Rect) },
+    chipSpots: { main: { x: big8Rect.x + big8Rect.w * 0.68, y: big8Rect.y + big8Rect.h * 0.45 } },
   },
   {
     id: 'come',
@@ -54,7 +54,7 @@ const regions: RegionDef[] = [
     label: 'Field',
     sublabel: 'One roll. 2 and 12 pay double',
     betTypes: ['field'],
-    chipSpots: { main: { x: fieldRect.x + 760, y: fieldRect.y + 100 } },
+    chipSpots: { main: { x: fieldRect.x + 900, y: fieldRect.y + 90 } },
   },
   {
     id: 'dont-pass',
@@ -62,7 +62,10 @@ const regions: RegionDef[] = [
     label: "Don't Pass Bar",
     sublabel: 'Bar 12. Pays 1 to 1',
     betTypes: ['dont-pass', 'dont-pass-odds'],
-    chipSpots: { main: { x: dpRect.x + 420, y: dpRect.y + 54 }, odds: { x: dpRect.x + 490, y: dpRect.y + 38 } },
+    chipSpots: {
+      main: { x: dpRect.x + 420, y: dpRect.y + 54 },
+      odds: { x: dpRect.x + 490, y: dpRect.y + 38 },
+    },
   },
   {
     id: 'pass',
@@ -71,7 +74,10 @@ const regions: RegionDef[] = [
     sublabel: 'Pays 1 to 1',
     betTypes: ['pass-line', 'pass-odds'],
     shape: 'pass-arc',
-    chipSpots: { main: { x: passRect.x + 420, y: passRect.y + 58 }, odds: { x: passRect.x + 490, y: passRect.y + 40 } },
+    chipSpots: {
+      main: { x: passRect.x + 420, y: passRect.y + 58 },
+      odds: { x: passRect.x + 490, y: passRect.y + 40 },
+    },
   },
 ];
 

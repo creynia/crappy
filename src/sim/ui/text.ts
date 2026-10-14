@@ -10,7 +10,9 @@ export function fmtMoney(cents: number, opts?: { sign?: boolean; exact?: boolean
   const abs = Math.abs(Math.round(cents));
   const dollars = Math.floor(abs / 100);
   const rem = abs % 100;
-  const body = dollars.toLocaleString('en-US') + (rem !== 0 || opts?.exact ? '.' + String(rem).padStart(2, '0') : '');
+  const body =
+    dollars.toLocaleString('en-US') +
+    (rem !== 0 || opts?.exact ? '.' + String(rem).padStart(2, '0') : '');
   const sign = neg ? '-' : opts?.sign && abs !== 0 ? '+' : '';
   return `${sign}$${body}`;
 }
@@ -129,7 +131,8 @@ export function buildEvFacts(preview: Pick<ActionPreview, 'edge'>, input: EvFact
     amount: input.amount,
     edge,
     expectedLossCents: edge === null ? 0 : input.amount * edge,
-    perHourCents: perRoll === null ? null : input.amount * perRoll * rph * (input.workingFraction ?? 1),
+    perHourCents:
+      perRoll === null ? null : input.amount * perRoll * rph * (input.workingFraction ?? 1),
     rollsPerHour: rph,
     oneRoll: input.oneRoll,
     chance: input.chance,
@@ -140,10 +143,17 @@ export function buildEvFacts(preview: Pick<ActionPreview, 'edge'>, input: EvFact
 
 // ---------- roll descriptions ----------
 
-const NICKNAME: Record<number, string> = { 2: 'snake eyes', 3: 'ace-deuce', 11: 'yo', 12: 'boxcars' };
+const NICKNAME: Record<number, string> = {
+  2: 'snake eyes',
+  3: 'ace-deuce',
+  11: 'yo',
+  12: 'boxcars',
+};
 
 export function describeRoll(events: readonly GameEvent[]): string {
-  const roll = events.find((e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled');
+  const roll = events.find(
+    (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
+  );
   const parts: string[] = [];
   if (roll) {
     const r = roll.roll;
@@ -176,8 +186,10 @@ export function describeRoll(events: readonly GameEvent[]): string {
   const pushes: string[] = [];
   const returned: string[] = [];
   for (const e of events) {
-    if (e.type === 'bet-won') wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
-    else if (e.type === 'bet-lost') losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
+    if (e.type === 'bet-won')
+      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
+    else if (e.type === 'bet-lost')
+      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
     else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
     else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
   }

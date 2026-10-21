@@ -1,9 +1,12 @@
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, isBonusType } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import type { BetTypeId, Cents, GameState } from '../engine/types';
 import { distributionFor, isLineLike, isOddsType, toOutcomes } from './outcomes';
 import { add, div, frac, mul, neg, sub, toNumber, ZERO, ONE, type Fraction } from './fraction';
 import type { BetCtx, BetLike, EdgeInfo, Outcome } from './types';
+
+/** Expected rolls in one shooter's hand (come-out to seven-out): 1671/196 = 8.5255. */
+export const HAND_ROLLS: Fraction = frac(1671, 196);
 
 export function betOutcomes(bet: BetLike, ctx: BetCtx): Outcome[] {
   return toOutcomes(distributionFor(bet, ctx));
@@ -81,11 +84,14 @@ export function edgeOfBet(bet: BetLike, ctx: BetCtx): EdgeInfo {
   }
   const perResolved = neg(div(ev, base));
   const perResolvedExPush = neg(div(ev, mul(base, sub(ONE, pPush))));
+  // A bonus bet can only go up once per shooter, so its cost is spread over a whole hand of rolls
+  // (1671/196 on average) even when it resolves early.
+  const perRollBase = isBonusType(bet.type) ? HAND_ROLLS : d.expectedRolls;
   return {
     perResolved,
     perResolvedExPush,
     expectedRolls: d.expectedRolls,
-    perRoll: div(perResolved, d.expectedRolls),
+    perRoll: div(perResolved, perRollBase),
   };
 }
 
@@ -101,6 +107,14 @@ export function lossPerRoll(bet: BetLike, ctx: BetCtx): Fraction {
   if (isOddsType(bet.type) || bet.amount <= 0) return ZERO;
   if (isLineLike(bet.type)) {
     // Amortized over whole line decisions, whether or not a point is set.
+    const e = edgeOfBet(
+      { type: bet.type, amount: bet.amount, point: null },
+      { ...ctx, ...COME_OUT },
+    );
+    return mul(frac(bet.amount), e.perRoll);
+  }
+  if (isBonusType(bet.type)) {
+    // Amortized over the whole hand from its start, whatever the progress so far.
     const e = edgeOfBet(
       { type: bet.type, amount: bet.amount, point: null },
       { ...ctx, ...COME_OUT },

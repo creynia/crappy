@@ -4,9 +4,10 @@
  *
  *   #/play?seed=123&skip=4&rules=odds-10x&bankroll=480&point=8&bets=pass-line:10,pass-odds:30,come@6:5
  *
- * - `bankroll` is the rack in dollars; `point` sets the point phase (absent = come-out)
- * - `bets` is a comma list of `type[@point][:dollars]`: `@point` is the number a come / don't-come
- *   bet (or its odds) sits on, or the collected numbers of a bonus bet (`small@2.3.4`)
+ * - `bankroll` is the rack plus the money on the table, in dollars; `point` sets the point phase
+ * - `bets` is a comma list of `type[@at][:dollars][!on|!off]`: `@at` is the number a come /
+ *   don't-come bet (or its odds) sits on, the dice pair of a hop bet (`hop@2-4:1`) or the
+ *   collected numbers of a bonus bet (`small@2.3:1`); `!on` / `!off` is the working override
  * - `skip` is how many rolls the seed had already produced, so the next roll is the same one
  * Every part is validated through the engine; bad parts are skipped and reported.
  */
@@ -15,7 +16,16 @@ import { createGame, type BetInit } from '../engine/game';
 import { rollDice } from '../engine/rng';
 import { RULE_PRESETS } from '../engine/rules';
 import { POINT_NUMBERS } from '../engine/types';
-import type { Bet, Cents, GameState, PointNumber, RulePresetId, TableRules } from '../engine/types';
+import type {
+  Bet,
+  Cents,
+  Dice,
+  GameState,
+  PointNumber,
+  RulePresetId,
+  TableRules,
+  WorkingMode,
+} from '../engine/types';
 import type { SceneConfig } from '../scene/types';
 
 export interface ShareState {
@@ -23,11 +33,24 @@ export interface ShareState {
   /** rolls already drawn from the seed */
   skip: number;
   rules: RulePresetId;
-  /** rack, cents */
+  /** rack plus the money on the table, cents */
   bankroll: Cents;
   point: PointNumber | null;
   bets: BetInit[];
 }
+
+/** Where a live table's RNG stands: the link's `skip` plus the rolls drawn since it opened. */
+export interface RngPosition {
+  /** `skip` the table booted with (0 for a fresh table) */
+  bootSkip: number;
+  /** forced (`?dice=`) rolls the table booted with; they do not draw from the RNG */
+  bootForced: number;
+}
+export const FRESH_RNG: RngPosition = { bootSkip: 0, bootForced: 0 };
+
+/** The largest bankroll a link may set (cents): $10,000,000. */
+export const MAX_BANKROLL: Cents = 1_000_000_000;
+const MAX_SKIP_DIGITS = 6;
 
 const COMES = new Set(['come', 'dont-come']);
 const COME_ODDS: Record<string, string> = { 'come-odds': 'come', 'dont-come-odds': 'dont-come' };
@@ -45,19 +68,22 @@ export function presetOf(rules: TableRules): RulePresetId | null {
 // bets param
 // ---------------------------------------------------------------------------
 
-/** `pass-line:10,come@8:5,come-odds@8:10,small@2.3:1` for the bets on the table. */
+/** `pass-line:10,come@8:5,come-odds@8:10,hop@2-4:1,small@2.3:1,place-6:12!off` for the table. */
 export function serializeBets(bets: readonly Bet[]): string {
   const parts: string[] = [];
   for (const b of bets) {
     const def = BET_TYPES[b.type];
-    let tag = b.type;
+    let tag: string = b.type;
     if (COMES.has(b.type) || b.type in COME_ODDS) {
       const point = b.type in COME_ODDS ? bets.find((p) => p.id === b.parentId)?.point : b.point;
       if (point) tag += `@${point}`;
+    } else if (b.type === 'hop' && b.hop) {
+      tag += `@${b.hop[0]}-${b.hop[1]}`;
     } else if (def.category === 'bonus' && b.progress?.length) {
       tag += `@${b.progress.join('.')}`;
     }
-    parts.push(`${tag}:${b.amount / 100}`);
+    const working = b.working === 'auto' ? '' : `!${b.working}`;
+    parts.push(`${tag}:${b.amount / 100}${working}`);
   }
   return parts.join(',');
 }
@@ -68,14 +94,17 @@ export interface ParsedBets {
   skipped: string[];
 }
 
+const PART = /^([a-z0-9-]+)(?:@([0-9.-]+))?(?::(\d{1,7}(?:\.\d{1,2})?))?(?:!(on|off))?$/;
+
 /** Tolerant parser: unknown types, bad amounts or numbers are skipped, never thrown. */
 export function parseBets(s: string | null | undefined): ParsedBets {
   const out: ParsedBets = { bets: [], skipped: [] };
   if (!s) return out;
+  const comeRefs = new Set<string>();
   for (const raw of s.split(',')) {
     const part = raw.trim();
     if (!part) continue;
-    const m = /^([a-z0-9-]+)(?:@([0-9.]+))?(?::(\d+(?:\.\d{1,2})?))?$/.exec(part);
+    const m = PART.exec(part);
     if (!m || !isBetTypeId(m[1])) {
       out.skipped.push(part);
       continue;
@@ -88,22 +117,37 @@ export function parseBets(s: string | null | undefined): ParsedBets {
       continue;
     }
     const init: BetInit = { type, amount };
+    if (m[4]) init.working = m[4] as WorkingMode;
     const at = m[2];
-    if (at !== undefined) {
+    if (type === 'hop') {
+      const pair = at !== undefined ? /^([1-6])-([1-6])$/.exec(at) : null;
+      if (!pair) {
+        out.skipped.push(part);
+        continue;
+      }
+      init.hop = [Number(pair[1]), Number(pair[2])] as unknown as Dice;
+    } else if (at !== undefined) {
       if (COMES.has(type) || type in COME_ODDS) {
-        const point = Number(at);
+        const point = /^\d+$/.test(at) ? Number(at) : NaN;
         if (!POINT_NUMBERS.includes(point as PointNumber)) {
           out.skipped.push(part);
           continue;
         }
         if (COMES.has(type)) {
+          const ref = `${type}@${point}`;
+          if (comeRefs.has(ref)) {
+            // one come / don't-come bet per number
+            out.skipped.push(part);
+            continue;
+          }
+          comeRefs.add(ref);
           init.point = point as PointNumber;
-          init.ref = `${type}@${point}`;
+          init.ref = ref;
         } else {
           init.parentRef = `${COME_ODDS[type]}@${point}`;
         }
       } else if (def.category === 'bonus') {
-        const nums = at.split('.').map(Number);
+        const nums = at.split('.').map((x) => (/^\d+$/.test(x) ? Number(x) : NaN));
         if (nums.some((n) => !Number.isInteger(n) || n < 2 || n > 12)) {
           out.skipped.push(part);
           continue;
@@ -126,12 +170,16 @@ export function parseBets(s: string | null | undefined): ParsedBets {
 // state <-> params
 // ---------------------------------------------------------------------------
 
+/** Rolls the RNG has produced for this table: the link's skip plus the unforced rolls since. */
+export function rngDraws(game: GameState, pos: RngPosition = FRESH_RNG): number {
+  return pos.bootSkip + Math.max(0, game.rollCount - pos.bootForced);
+}
+
 /** The share state of a live sandbox game. */
-export function shareStateOf(game: GameState): ShareState {
+export function shareStateOf(game: GameState, pos: RngPosition = FRESH_RNG): ShareState {
   return {
     seed: game.seed,
-    // forced (?dice=) rolls do not draw from the RNG, so they are not skipped
-    skip: game.rollCount - game.history.filter((r) => r.forced).length,
+    skip: rngDraws(game, pos),
     rules: presetOf(game.rules) ?? 'standard-vegas',
     // the bets are placed again on load, so share the rack plus what is on the table
     bankroll: game.bankroll + game.bets.reduce((t, b) => t + b.amount + b.vigPaid, 0),
@@ -152,14 +200,15 @@ export function toParams(s: ShareState, bets: readonly Bet[] = []): URLSearchPar
   return p;
 }
 
-/** `https://host/path#/play?...` for the live game (base = location without hash). */
-export function buildShareUrl(base: string, game: GameState): string {
-  // keep the bets list readable: ':' ',' '@' and '.' are safe inside a fragment query
-  const q = toParams(shareStateOf(game), game.bets)
+/** `https://host/path#/play?...` for the live game (base = origin + pathname). */
+export function buildShareUrl(base: string, game: GameState, pos: RngPosition = FRESH_RNG): string {
+  // keep the bets list readable: ':' ',' '@' '!' and '.' are safe inside a fragment query
+  const q = toParams(shareStateOf(game, pos), game.bets)
     .toString()
     .replace(/%3A/gi, ':')
     .replace(/%2C/gi, ',')
-    .replace(/%40/gi, '@');
+    .replace(/%40/gi, '@')
+    .replace(/%21/gi, '!');
   return `${base}#/play?${q}`;
 }
 
@@ -167,6 +216,8 @@ export interface ShareBoot {
   game: GameState;
   /** bets or params that were skipped, as short messages for toasts */
   skipped: string[];
+  /** the RNG position the table starts from */
+  rng: RngPosition;
 }
 
 /** Draws `n` rolls from the seeded RNG so the next roll matches the shared table. */
@@ -182,7 +233,7 @@ function advanceRng(game: GameState, n: number): GameState {
  */
 export function bootFromParams(
   url: URLSearchParams,
-  defaults: { rules: RulePresetId; bankroll: Cents; seed: number },
+  defaults: { rules: RulePresetId; bankroll: Cents; seed: number; forced?: number },
 ): ShareBoot | null {
   if (!url.has('bets') && !url.has('bankroll') && !url.has('point') && !url.has('skip'))
     return null;
@@ -192,21 +243,27 @@ export function bootFromParams(
   const rulesParam = url.get('rules');
   const rules = isPresetId(rulesParam) ? rulesParam : defaults.rules;
   const bankParam = url.get('bankroll');
-  const bankroll =
-    bankParam && /^\d+(\.\d{1,2})?$/.test(bankParam) && Number(bankParam) > 0
+  let bankroll = defaults.bankroll;
+  if (bankParam !== null) {
+    const cents = /^\d{1,8}(\.\d{1,2})?$/.test(bankParam)
       ? Math.round(Number(bankParam) * 100)
-      : defaults.bankroll;
-  if (bankParam && bankroll === defaults.bankroll && Number(bankParam) * 100 !== bankroll)
-    skipped.push(`bankroll "${bankParam}"`);
+      : NaN;
+    if (Number.isSafeInteger(cents) && cents > 0 && cents <= MAX_BANKROLL) bankroll = cents;
+    else skipped.push(`bankroll "${bankParam}"`);
+  }
   const pointParam = url.get('point');
   let point: PointNumber | null = null;
-  if (pointParam) {
-    const n = Number(pointParam);
+  if (pointParam !== null) {
+    const n = /^\d+$/.test(pointParam) ? Number(pointParam) : NaN;
     if (POINT_NUMBERS.includes(n as PointNumber)) point = n as PointNumber;
     else skipped.push(`point "${pointParam}"`);
   }
   const skipParam = url.get('skip');
-  const skip = skipParam && /^\d{1,6}$/.test(skipParam) ? Number(skipParam) : 0;
+  let skip = 0;
+  if (skipParam !== null) {
+    if (new RegExp(`^\\d{1,${MAX_SKIP_DIGITS}}$`).test(skipParam)) skip = Number(skipParam);
+    else skipped.push(`skip "${skipParam}"`);
+  }
   const parsed = parseBets(url.get('bets'));
   for (const s of parsed.skipped) skipped.push(`bet "${s}"`);
 
@@ -227,7 +284,16 @@ export function bootFromParams(
     }
   }
   const game = advanceRng(createGame({ ...base, bets: kept }), skip);
-  return { game, skipped };
+  return { game, skipped, rng: { bootSkip: skip, bootForced: defaults.forced ?? 0 } };
+}
+
+/** One short line for a toast / announcer: the first few skipped parts, then "+N more". */
+export function describeSkipped(skipped: readonly string[], max = 5, width = 40): string {
+  const shown = skipped
+    .slice(0, max)
+    .map((s) => (s.length > width ? s.slice(0, width - 1) + '…' : s));
+  const more = skipped.length - shown.length;
+  return `Skipped from the link: ${shown.join('; ')}${more > 0 ? ` (+${more} more)` : ''}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,8 +301,12 @@ export function bootFromParams(
 // ---------------------------------------------------------------------------
 
 /** The live table as a lesson scene block (the YAML shape `validateScene` accepts). */
-export function toSceneConfig(game: GameState, id = 'shared-table'): SceneConfig {
-  const s = shareStateOf(game);
+export function toSceneConfig(
+  game: GameState,
+  id = 'shared-table',
+  pos: RngPosition = FRESH_RNG,
+): SceneConfig {
+  const s = shareStateOf(game, pos);
   return {
     id,
     version: 1,
@@ -255,8 +325,12 @@ const yamlScalar = (v: unknown): string =>
   typeof v === 'string' ? (/^[A-Za-z0-9 _-]+$/.test(v) ? v : JSON.stringify(v)) : String(v);
 
 /** Hand-rolled YAML for the flat scene shape above (no runtime YAML dependency). */
-export function toSceneYaml(game: GameState, id = 'shared-table'): string {
-  const sc = toSceneConfig(game, id);
+export function toSceneYaml(
+  game: GameState,
+  id = 'shared-table',
+  pos: RngPosition = FRESH_RNG,
+): string {
+  const sc = toSceneConfig(game, id, pos);
   const lines: string[] = [];
   lines.push(`id: ${yamlScalar(sc.id)}`, 'version: 1', `title: ${yamlScalar(sc.title)}`);
   lines.push(`rules: ${yamlScalar(sc.rules)}`, `bankroll: ${sc.bankroll}`, `seed: ${sc.seed}`);
@@ -269,6 +343,8 @@ export function toSceneYaml(game: GameState, id = 'shared-table'): string {
       fields.push(`type: ${b.type}`, `amount: ${b.amount}`);
       if (b.point !== undefined) fields.push(`point: ${b.point}`);
       if (b.parentRef) fields.push(`parentRef: ${yamlScalar(b.parentRef)}`);
+      if (b.hop) fields.push(`hop: [${b.hop[0]}, ${b.hop[1]}]`);
+      if (b.working) fields.push(`working: ${b.working}`);
       if (b.progress?.length) fields.push(`progress: [${b.progress.join(', ')}]`);
       lines.push(`  - { ${fields.join(', ')} }`);
     }

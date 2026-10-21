@@ -1,11 +1,11 @@
 import { useState } from 'preact/hooks';
 import { equity } from '../engine/game';
-import type { Cents, Dice as DicePair, RulePresetId } from '../engine/types';
+import type { Cents, Dice as DicePair, RulePresetId, TableRules } from '../engine/types';
 import { initScene } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { loadSandbox } from './persist';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
-import { bootFromParams } from './shareLink';
+import { bootFromParams, type RngPosition } from './shareLink';
 import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
 
@@ -42,13 +42,28 @@ function isPreset(s: string): s is RulePresetId {
   return (PRESETS as string[]).includes(s);
 }
 
+/** Custom rules carry no preset id (resolveRules fills in the default). */
+function withoutPreset(r: TableRules): Partial<TableRules> {
+  const { presetId: _preset, ...rest } = r;
+  return rest;
+}
+
 export function buildCore(
   scene: SceneConfig,
   settings: ResolvedSimSettings,
   mode: 'sandbox' | 'embedded',
   persistKey: string | undefined,
   url: URLSearchParams,
-): { core: Core; startEquity: Cents; chip?: Cents; skipped?: string[] } {
+): {
+  core: Core;
+  startEquity: Cents;
+  chip?: Cents;
+  customRules?: Partial<TableRules>;
+  /** parts of a shared link the table could not use */
+  skipped?: string[];
+  /** RNG position of a shared link (so re-sharing keeps the place in the dice sequence) */
+  rng?: RngPosition;
+} {
   const sandbox = mode === 'sandbox';
   const hasUrl =
     sandbox &&
@@ -60,10 +75,12 @@ export function buildCore(
   const withRules: SceneConfig = rules !== undefined ? { ...scene, rules } : scene;
   if (sandbox && persistKey && !hasUrl && !scene.steps?.length) {
     const saved = loadSandbox(persistKey);
+    // I033: a sandbox saved with custom rules comes back with them, unless a scene or URL picks rules
+    const custom = saved?.presetId === 'custom' && scene.rules === undefined && !url.has('rules');
     if (
       saved &&
       saved.startBankroll === (scene.bankroll ?? 50_000) &&
-      saved.presetId === String(typeof rules === 'string' ? rules : 'custom')
+      (custom || saved.presetId === String(typeof rules === 'string' ? rules : 'custom'))
     ) {
       return {
         core: {
@@ -72,6 +89,9 @@ export function buildCore(
         },
         startEquity: saved.startBankroll,
         ...(saved.chip ? { chip: saved.chip } : {}),
+        ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
+        // forced rolls never drew from the RNG (the history keeps the last 200, plenty for a sandbox)
+        rng: { bootSkip: 0, bootForced: saved.game.history.filter((r) => r.forced).length },
       };
     }
   }
@@ -85,6 +105,7 @@ export function buildCore(
           rules: typeof rules === 'string' ? rules : settings.rulesPreset,
           bankroll: scene.bankroll ?? 50_000,
           seed: seed ?? randomSeed(),
+          forced: dice.length,
         })
       : null;
   if (shared) {
@@ -93,6 +114,7 @@ export function buildCore(
       core: { game, rt: { stepIndex: 0, stepStartRoll: 0, counters: {}, done: true } },
       startEquity: equity(game),
       skipped: shared.skipped,
+      rng: shared.rng,
     };
   }
   const sc: SceneConfig = {
@@ -100,7 +122,12 @@ export function buildCore(
     ...(dice.length ? { forcedDice: [...(scene.forcedDice ?? []), ...dice] } : {}),
   };
   const init = initScene(sc, { seed: seed ?? (scene.steps?.length ? 1 : randomSeed()) });
-  return { core: { game: init.game, rt: init.runtime }, startEquity: equity(init.game) };
+  return {
+    core: { game: init.game, rt: init.runtime },
+    startEquity: equity(init.game),
+    // ?dice= rolls are forced: they do not advance the seed's sequence
+    rng: { bootSkip: 0, bootForced: dice.length },
+  };
 }
 
 /** Initial settings (with the sandbox `speed` URL param) and the boot core (URL params or saved sandbox). */

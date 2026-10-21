@@ -446,3 +446,51 @@
 .sim-sweep-table td {
   padding: 4px 3px;
 }
+
+/* Opened Auto-roll / Session panels scroll to the top edge, clear of the sticky header (I050). */
+.sim-autoroll,
+.sim-session-panel {
+  scroll-margin-top: 8px;
+}
+
+/* in-sim question (scene step `ask`) */
+.sim-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sim-ask-q {
+  margin: 0;
+  font-weight: 600;
+}
+.sim-ask-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-ask-opt {
+  font: inherit;
+  text-align: left;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  cursor: pointer;
+}
+.sim-ask-opt[data-state='correct'] {
+  border-color: #2b8a3e;
+  box-shadow: inset 0 0 0 1px #2b8a3e;
+}
+.sim-ask-opt[data-state='wrong'] {
+  border-color: #c92a2a;
+  box-shadow: inset 0 0 0 1px #c92a2a;
+}
+.sim-ask-opt:disabled:not([data-state]) {
+  opacity: 0.6;
+}
+.sim-ask-feedback {
+  margin: 0;
+  min-height: 1.2em;
+}

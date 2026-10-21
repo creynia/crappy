@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
-import type { Bet, Cents, RulePresetId } from '../engine/types';
+import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
@@ -10,9 +10,10 @@ import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
-import { buildShareUrl, toSceneYaml } from './shareLink';
+import { buildShareUrl, describeSkipped, FRESH_RNG, toSceneYaml } from './shareLink';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
@@ -30,6 +31,7 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { usePanelReveal } from './usePanelReveal';
 import './sim.css';
 import './simulator.css';
 
@@ -46,11 +48,15 @@ const isCenterBet = (b: Bet) => {
 };
 
 export function Simulator(props: SimulatorInternalProps) {
-  const [scene, setScene] = useState<SceneConfig>(props.scene ?? SANDBOX_SCENE);
+  const initialScene = props.scene ?? SANDBOX_SCENE;
   const mode = props.mode ?? (props.scene ? 'embedded' : 'sandbox');
   const sandbox = mode === 'sandbox';
+  const { settings, setSettings, boot } = useUrlBoot(props, initialScene, mode);
+  // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
+  const [scene, setScene] = useState<SceneConfig>(() =>
+    boot.customRules ? { ...initialScene, rules: boot.customRules } : initialScene,
+  );
   const ui = scene.ui ?? {};
-  const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -68,7 +74,12 @@ export function Simulator(props: SimulatorInternalProps) {
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
-  const togglePanel = (name: keyof Panels) => setPanels((p) => ({ ...p, [name]: !p[name] }));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const requestReveal = usePanelReveal(panels, rootRef);
+  const togglePanel = (name: keyof Panels) => {
+    requestReveal(name);
+    setPanels((p) => ({ ...p, [name]: !p[name] }));
+  };
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
   const landscape = useLandscape(scene);
@@ -100,8 +111,11 @@ export function Simulator(props: SimulatorInternalProps) {
   useEffect(() => {
     emit({ type: 'ready', state: coreRef.current.game });
     // parts of a shared link the table could not use
-    if (boot.skipped?.length)
-      pushToast(`Skipped from the link: ${boot.skipped.join('; ')}.`, 'info');
+    if (boot.skipped?.length) {
+      const text = describeSkipped(boot.skipped);
+      pushToast(text, 'info');
+      announce(text);
+    }
     return () => anim.cancel();
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
@@ -153,7 +167,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | Partial<TableRules> }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
@@ -175,33 +189,38 @@ export function Simulator(props: SimulatorInternalProps) {
   // Share links (I071): the live table as a URL (Web Share, else the clipboard) or a scene block.
   const shareBase = () => {
     try {
-      return `${location.origin}${location.pathname}${location.search}`;
+      return `${location.origin}${location.pathname}`;
     } catch {
       return '';
     }
   };
+  // Where this table stands in its dice sequence: the link's skip (if any) plus rolls since.
+  const rngPos = boot.rng ?? FRESH_RNG;
   const copyText = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
       pushToast(`${what} copied to the clipboard.`, 'info');
     } catch {
-      pushToast(`Could not copy. ${what}: ${text}`, 'info');
+      pushToast(`Could not copy the ${what.toLowerCase()}.`, 'info');
     }
   };
   const shareTable = async () => {
-    const url = buildShareUrl(shareBase(), coreRef.current.game);
+    const url = buildShareUrl(shareBase(), coreRef.current.game, rngPos);
     const nav = typeof navigator === 'undefined' ? undefined : navigator;
     if (nav?.share) {
       try {
         await nav.share({ title: 'Craps table', url });
         return;
-      } catch {
-        /* cancelled or unsupported: fall back to the clipboard */
+      } catch (e) {
+        // the person closed the share sheet: nothing to do
+        if (e instanceof Error && e.name === 'AbortError') return;
+        /* unsupported: fall back to the clipboard */
       }
     }
     await copyText(url, 'Link');
   };
-  const copyScene = () => copyText(toSceneYaml(coreRef.current.game), 'Scene YAML');
+  const copyScene = () =>
+    copyText(toSceneYaml(coreRef.current.game, 'shared-table', rngPos), 'Scene YAML');
 
   // ---------- imperative handle ----------
   useEffect(() => {
@@ -221,6 +240,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
   const rulesSelectValue = typeof scene.rules === 'string' ? scene.rules : settings.rulesPreset;
+  // I033: a rules object (the custom editor, or a restored custom sandbox) shows as "Custom"
+  const menuRulesValue = typeof scene.rules === 'object' ? 'custom' : rulesSelectValue;
 
   const tableProps = {
     bets: game.bets,
@@ -268,6 +289,14 @@ export function Simulator(props: SimulatorInternalProps) {
       rt={rt}
       hintVisible={hintVisible}
       onNext={() => feedInput({ kind: 'acknowledged' })}
+      onAnswer={(choice) => {
+        const ask = step?.ask;
+        if (!step || !ask) return;
+        const correct = choice === ask.answer;
+        emit({ type: 'step-answered', stepId: step.id, index: rt.stepIndex, choice, correct });
+        announce(askFeedback(ask, choice));
+        feedInput({ kind: 'answered', correct });
+      }}
       onRestart={() => resetGame()}
     />
   );
@@ -285,6 +314,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   return (
     <div
+      ref={rootRef}
       class={`sim-root${landscape ? ' sim-land' : ''}${ui.compact ? ' sim-compact' : ''}${ui.showBankroll === false ? ' sim-hide-money' : ''}${ui.showHistory === false ? ' sim-hide-history' : ''}`}
       data-testid="simulator"
       data-mode={mode}
@@ -346,7 +376,8 @@ export function Simulator(props: SimulatorInternalProps) {
           busy={anim.busy}
           onRebet={rebet}
           onReset={resetGame}
-          rulesValue={rulesSelectValue}
+          rulesValue={menuRulesValue}
+          currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
           {...(sandbox

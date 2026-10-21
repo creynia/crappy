@@ -1,7 +1,7 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { BET_TYPES } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge } from '../math';
+import { betEdge, betStdDev } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
@@ -113,6 +113,8 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
+  swingCents?: number | null;
 }
 
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
@@ -266,7 +268,36 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    swingCents: swingOf(type, amount, bet?.point ?? state.point, state),
   };
+}
+
+function swingOf(
+  type: BetTypeId,
+  amount: Cents,
+  point: GameState['point'],
+  state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+): number | null {
+  try {
+    return betStdDev(
+      { type, amount, point },
+      { phase: state.phase, point: state.point, rules: state.rules },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** "Typical swing" line under the expected loss; odds bets have no edge, so they say so. */
+export function swingCopy(
+  swingCents: number,
+  edge: number | null,
+  expectedLossCents: number,
+): string {
+  const swing = fmtMoney(swingCents, { exact: true });
+  return edge !== null && edge > 0
+    ? `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`
+    : `No edge, but it adds ±${swing} of swing.`;
 }
 
 // ---------- roll descriptions ----------

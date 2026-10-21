@@ -5,7 +5,14 @@ import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { Action, BetTypeId, GameState } from '../engine/types';
 import type { BetInit } from '../engine';
-import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
+import {
+  buildEvFacts,
+  describeRoll,
+  fmtMoney,
+  normalizeTier,
+  regionAriaLabel,
+  swingCopy,
+} from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
   n: 1,
@@ -224,5 +231,30 @@ describe('combined edge with two Come bets', () => {
     const refAction = { ...action, betId: byType(ref, 'come').id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
     expect(combinedOf(s, action)!.edge).toBeCloseTo(14 / 2365, 12);
+  });
+});
+
+describe('typical swing', () => {
+  it('pass $10 swings about $10.00 with a $0.14 edge; pass-odds $30 on the 4 swings $42.43', () => {
+    const pass = createGame({ bankroll: 100000 });
+    const f = buildEvFacts(
+      previewAction(pass, { type: 'place-bet', betType: 'pass-line', amount: 1000 }),
+      pass,
+    )!;
+    expect(Math.round(f.swingCents!)).toBe(1000);
+    expect(swingCopy(f.swingCents!, f.edge, f.expectedLossCents)).toBe(
+      'Typical swing per decision: ±$10.00 (the edge is $0.14).',
+    );
+    const four = createGame({
+      phase: 'point',
+      point: 4,
+      bets: [{ type: 'pass-line', amount: 1000 }],
+    });
+    const o = buildEvFacts(
+      previewAction(four, { type: 'place-bet', betType: 'pass-odds', amount: 3000 }),
+      four,
+    )!;
+    expect(Math.round(o.swingCents!)).toBe(4243);
+    expect(swingCopy(o.swingCents!, 0, 0)).toBe('No edge, but it adds ±$42.43 of swing.');
   });
 });

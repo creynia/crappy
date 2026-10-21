@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, RULE_PRESETS } from '../engine/rules';
 import type { BetTypeId, TableRules } from '../engine/types';
-import { betEdge, betEV, betOutcomes } from './ev';
-import { frac, type Fraction } from './fraction';
+import { betEdge, betEV, betOutcomes, betStdDev, betVariance, perRollVariance } from './ev';
+import { add, frac, mul, sub, type Fraction } from './fraction';
 import { edgeTier } from './tiers';
 import type { BetCtx } from './types';
 
@@ -136,5 +136,91 @@ describe('exact facts', () => {
     expect(t('hard-6', 5)).toBe('avoid');
     expect(t('any-7', 5)).toBe('avoid');
     expect(t('horn', 4)).toBe('avoid');
+  });
+});
+
+describe('exact variance (cents^2; $1 = 10000)', () => {
+  // Reference: field $1 (2:1 on 2 and 12, 1:1 on 3 4 9 10 11, lose 5 6 7 8), summed over 36 dice.
+  const fieldNet = (t: number) =>
+    t === 2 || t === 12 ? 200 : [3, 4, 9, 10, 11].includes(t) ? 100 : -100;
+  const fieldRef = (() => {
+    let ev = frac(0);
+    let m2 = frac(0);
+    for (let a = 1; a <= 6; a++) {
+      for (let b = 1; b <= 6; b++) {
+        const net = fieldNet(a + b);
+        ev = add(ev, frac(net, 36));
+        m2 = add(m2, frac(net * net, 36));
+      }
+    }
+    return { ev, var: sub(m2, mul(ev, ev)) };
+  })();
+
+  it('pass-line $1 from come-out: Var = 1 - (7/495)^2 dollars^2', () => {
+    const c = { phase: 'come-out', point: null, rules: DEFAULT_RULES } as BetCtx;
+    same(
+      betVariance({ type: 'pass-line', amount: 100, point: null }, c),
+      frac(10000n * 244976n, 245025n),
+    );
+    expect(betStdDev({ type: 'pass-line', amount: 100, point: null }, c)).toBeCloseTo(99.99, 2);
+  });
+
+  it('field $1 matches the 36-outcome reference loop (377/324 dollars^2)', () => {
+    const c = comeOut();
+    same(fieldRef.var, frac(3770000, 324));
+    same(betEV({ type: 'field', amount: 100, point: null }, c), fieldRef.ev);
+    same(betVariance({ type: 'field', amount: 100, point: null }, c), fieldRef.var);
+  });
+
+  it('any-7 $1 at 4:1: EV -1/6, Var = 125/36 dollars^2', () => {
+    const c = comeOut();
+    same(betEV({ type: 'any-7', amount: 100, point: null }, c), frac(-50, 3));
+    same(betVariance({ type: 'any-7', amount: 100, point: null }, c), frac(312500, 9));
+  });
+
+  it('place-6 $6 conditional on resolution: EV -1/11, Var = 5070/121 dollars^2', () => {
+    const c = onPoint(6);
+    same(betEV({ type: 'place-6', amount: 600, point: null }, c), frac(-100, 11));
+    same(betVariance({ type: 'place-6', amount: 600, point: null }, c), frac(50700000, 121));
+  });
+
+  it('pass-odds $1 on 4 (2:1): EV 0, Var = 2 dollars^2', () => {
+    const c = onPoint(4);
+    same(betEV({ type: 'pass-odds', amount: 100, point: null }, c), frac(0));
+    same(betVariance({ type: 'pass-odds', amount: 100, point: null }, c), frac(20000));
+  });
+
+  it('perRollVariance: one-roll bets that resolve every roll equal betVariance', () => {
+    const c = comeOut();
+    same(perRollVariance({ type: 'field', amount: 100, point: null }, c), frac(3770000, 324));
+    same(perRollVariance({ type: 'any-7', amount: 100, point: null }, c), frac(312500, 9));
+  });
+
+  it('perRollVariance on pass-line with point 6, $1: 246875/81 cents^2', () => {
+    // per roll: win 5/36 (+100c), lose 6/36 (-100c), else 0 -> E = -100/36, Var = 11/36*10^4 - (100/36)^2
+    same(
+      perRollVariance({ type: 'pass-line', amount: 100, point: 6 }, onPoint(6)),
+      frac(246875, 81),
+    );
+  });
+
+  it('perRollVariance counts the non-resolving rolls as zero: place-6 $6 = 16595/1296 dollars^2', () => {
+    same(
+      perRollVariance({ type: 'place-6', amount: 600, point: null }, onPoint(6)),
+      frac(10371875, 81),
+    );
+  });
+
+  it('rejects come-out line bets', () => {
+    expect(() =>
+      perRollVariance(
+        { type: 'pass-line', amount: 100, point: null },
+        {
+          phase: 'come-out',
+          point: null,
+          rules: DEFAULT_RULES,
+        },
+      ),
+    ).toThrow(/several rolls/);
   });
 });

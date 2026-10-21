@@ -581,13 +581,13 @@
 .sim-why-btn {
   align-self: flex-start;
 }
-.sim-why table {
+.sim-why > table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
-.sim-why th,
-.sim-why td {
+.sim-why > table th,
+.sim-why > table td {
   text-align: left;
   padding: 3px 6px;
   border-bottom: 1px solid var(--sim-border);
@@ -770,4 +770,93 @@
     transform: translateY(40px);
     opacity: 0.6;
   }
+}
+
+/* "Why?" 36-dice grid: letters + patterns carry meaning, colour only reinforces */
+.sim-dicegrid {
+  margin: 0.75rem 0 0.5rem;
+}
+.sim-dicegrid table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  margin: 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.sim-dicegrid th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+  padding: 0 0.25rem;
+}
+.sim-dg-corner {
+  font-size: 0.625rem;
+  line-height: 1.1;
+  opacity: 0.7;
+  text-align: center;
+  min-width: 3.2rem;
+}
+.sim-dg-cell,
+.sim-dg-key {
+  width: 2rem;
+  height: 2rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  border: 2px solid currentColor;
+}
+.sim-dg-key {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  line-height: 1.25rem;
+  vertical-align: middle;
+}
+.sim-dg-cell.is-win,
+.sim-dg-key.is-win {
+  background: #bfe9c8;
+  color: #0b5a22;
+}
+.sim-dg-cell.is-lose,
+.sim-dg-key.is-lose {
+  background: #f6c4c4;
+  color: #8a1010;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    rgb(138 16 16 / 0.25) 4px 6px
+  );
+}
+.sim-dg-cell.is-push,
+.sim-dg-key.is-push {
+  background: #fff2b3;
+  color: #6b5200;
+  border-style: dashed;
+}
+.sim-dg-cell.is-travel,
+.sim-dg-key.is-travel {
+  background: #cfe0fb;
+  color: #123f86;
+  border-style: dotted;
+}
+.sim-dg-cell.is-none,
+.sim-dg-key.is-none {
+  background: transparent;
+  color: var(--sim-muted, #666);
+  border-color: #bbb;
+}
+.sim-dg-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  justify-content: center;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+}
+.sim-dg-caption {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 0.375rem;
 }

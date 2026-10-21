@@ -125,3 +125,31 @@ describe('auto-roll compare scene', () => {
     await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true));
   });
 });
+
+describe('auto-roll sweep scene', () => {
+  const scene: SceneConfig = {
+    id: 'sw',
+    version: 1,
+    bankroll: 100000,
+    allowedBets: [],
+    autoRoll: {
+      enabled: true,
+      sweep: { strategy: 'pass-max-odds', oddsMultiples: [0, 2] },
+    },
+    steps: [{ id: 'run', text: 'Run it.', completeWhen: { autoRollCompleted: { minRolls: 100 } } }],
+  };
+  it('shows the sweep panel and completes the step when it finishes', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="sweep-panel"]')).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByTestId('sweep-run'));
+    await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true), {
+      timeout: 15_000,
+    });
+    expect(container.querySelectorAll('[data-testid="sweep-row"]')).toHaveLength(2);
+  });
+});

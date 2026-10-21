@@ -20,7 +20,7 @@ import {
   parentFor,
   placeAction,
 } from './simHelpers';
-import { betLabel, buildEvFacts, fmtMoney } from './text';
+import { betLabel, buildEvFacts, fmtMoney, typeEdgeLabel } from './text';
 import type { SimulatorEvent } from './types';
 import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
@@ -115,9 +115,16 @@ export function buildSheetModel(
         const allowed = betTypeAllowed(scene, rt, t);
         const odds = BET_TYPES[t].category === 'odds';
         const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
+        // the amount tapping this type would actually place, so the label and the tap agree
+        // the selected type is priced at the sheet's own amount; others at the amount a tap would place
+        const tapAmount =
+          t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
+        const edge = typeEdgeLabel(t, tapAmount, game);
+        const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
         return {
           id: t,
           label: betLabel(t),
+          ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
           enabled: allowed && hasParent,
           ...(!allowed
             ? { reason: 'Not available in this lesson' }

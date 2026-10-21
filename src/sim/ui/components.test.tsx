@@ -466,6 +466,18 @@ describe('BetSheet', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Confirm' }).disabled).toBe(true);
   });
 
+  it("type switcher shows each option's edge with a text tier", () => {
+    sheet({
+      typeOptions: [
+        { id: 'place-4', label: 'Place 4', enabled: true, edgeText: '6.67%', tier: 'poor' },
+        { id: 'buy-4', label: 'Buy 4', enabled: false, edgeText: '1.67%', tier: 'good' },
+      ],
+      selectedType: 'place-4',
+    });
+    expect(screen.getByRole('radio', { name: /^Place 4 6\.67% Costly$/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Buy 4 1\.67% Good bet$/ })).toBeTruthy();
+  });
+
   it('segmented control reports type changes and disables illegal types', () => {
     const p = sheet({
       typeOptions: [
@@ -633,5 +645,99 @@ describe('DiceGrid', () => {
     expect(screen.getByText('Win (4)')).toBeTruthy();
     expect(screen.getByText('extra')).toBeTruthy();
     expect(screen.getAllByLabelText(/1 and 1, total 2: wins/)).toHaveLength(1);
+  });
+});
+
+describe('StepPanel ask', () => {
+  const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+  const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+  it('renders keyboard-reachable option buttons and live feedback', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const picks: number[] = [];
+    const { container, rerender } = render(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 0, correct: false }}
+      />,
+    );
+    const opts = container.querySelectorAll<HTMLButtonElement>('button.sim-ask-opt');
+    expect(opts).toHaveLength(2);
+    // not a live region: the simulator's one announcer speaks it
+    expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBeNull();
+    expect(container.querySelector('[role="group"]')!.getAttribute('aria-labelledby')).toBe(
+      'ask-q-s',
+    );
+    fireEvent.click(opts[0]!);
+    expect(picks).toEqual([0]);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 1, correct: false }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Not quite');
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('b is right');
+    expect(opts[1]!.disabled).toBe(false); // retry allowed
+    fireEvent.click(opts[1]!);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 2, correct: true }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Correct.');
+    expect(opts[0]!.disabled).toBe(true);
+  });
+});
+
+describe('StepPanel ask focus', () => {
+  it('hands focus to the Roll button after a correct answer (the options disable)', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+    const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+    const ui = (correct: boolean) => (
+      <div class="sim-root">
+        <StepPanel
+          step={step}
+          index={0}
+          total={1}
+          hintVisible={false}
+          showNext={false}
+          done={false}
+          onNext={() => undefined}
+          asked={{ count: 1, correct }}
+        />
+        <button type="button" class="sim-roll" disabled={!correct}>
+          Roll
+        </button>
+      </div>
+    );
+    const { container, rerender } = render(ui(false));
+    container.querySelector<HTMLButtonElement>('.sim-ask-opt')!.focus();
+    rerender(ui(true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).toBe(container.querySelector('.sim-roll'));
+    expect(container.querySelector('.sim-ask-feedback')!.hasAttribute('tabindex')).toBe(false);
   });
 });

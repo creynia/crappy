@@ -1,3 +1,4 @@
+import { useId } from 'preact/hooks';
 import type { Cents, GameState } from '../engine/types';
 import { tableExpectedLossPerRoll } from '../math/ev';
 import { toNumber } from '../math/fraction';
@@ -10,6 +11,7 @@ import { fmtMoney } from './text';
 export interface Panels {
   auto: boolean;
   session: boolean;
+  log: boolean;
   menu: boolean;
 }
 
@@ -41,6 +43,7 @@ export function SimControls(p: SimControlsProps) {
     game.bets.length === 0
       ? undefined
       : `Expected cost: ${expectedCost > 0 && expectedCost < 1 ? '<1¢' : fmtMoney(Math.round(expectedCost), { exact: true })}`;
+  const lockId = useId();
   return (
     <div class="sim-controls">
       {ui.showChipRack !== false ? (
@@ -56,11 +59,16 @@ export function SimControls(p: SimControlsProps) {
         <RollButton
           onRoll={p.onRoll}
           disabled={p.rollDisabled}
+          {...(p.lock ? { describedBy: lockId } : {})}
           rolling={p.busy}
           {...(costText ? { costText } : {})}
         />
       ) : null}
-      {p.lock && ui.showRoll !== false ? <p class="sim-lock">{p.lock}</p> : null}
+      {p.lock && ui.showRoll !== false ? (
+        <p class="sim-lock" id={lockId}>
+          {p.lock}
+        </p>
+      ) : null}
       <div class="sim-ctl-row">
         <button
           type="button"
@@ -87,6 +95,14 @@ export function SimControls(p: SimControlsProps) {
           onClick={() => p.onToggle('session')}
         >
           Session
+        </button>
+        <button
+          type="button"
+          class="sim-tab"
+          aria-expanded={p.panels.log}
+          onClick={() => p.onToggle('log')}
+        >
+          Log
         </button>
         {p.showMenu ? (
           <button

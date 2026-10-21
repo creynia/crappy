@@ -12,6 +12,7 @@ import {
   normalizeTier,
   regionAriaLabel,
   swingCopy,
+  typeEdgeLabel,
 } from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
@@ -62,7 +63,7 @@ describe('describeRoll', () => {
       },
     ];
     expect(describeRoll(events)).toBe(
-      '6, the hard way. Point made! Pass line wins $10, Pass odds wins $60. Net +$70.',
+      '6, the hard way. Point made! Pass line wins $10, pass odds wins $60. Net +$70.',
     );
   });
   it('summarizes a seven-out with losses', () => {
@@ -73,7 +74,7 @@ describe('describeRoll', () => {
       { type: 'bet-lost', betId: 'b3', betType: 'field', amount: 500 },
     ];
     expect(describeRoll(events)).toBe(
-      '7. Seven out. Pass line loses $10, Field loses $5. Net -$15.',
+      '7. Seven out. Pass line loses $10, field loses $5. Net -$15.',
     );
   });
   it('subtracts vig from a win and names pushes', () => {
@@ -256,5 +257,18 @@ describe('typical swing', () => {
     )!;
     expect(Math.round(o.swingCents!)).toBe(4243);
     expect(swingCopy(o.swingCents!, 0, 0)).toBe('No edge, but it adds ±$42.43 of swing.');
+  });
+});
+
+describe('typeEdgeLabel', () => {
+  const state = createGame({ bankroll: 100000 });
+  it('box-4 options show their house edge at the sheet amount', () => {
+    expect(typeEdgeLabel('place-4', 1000, state)).toMatchObject({ edgeText: '6.67%' });
+    expect(typeEdgeLabel('buy-4', 2000, state)).toMatchObject({ edgeText: '1.67%' });
+    expect(typeEdgeLabel('buy-4', 1000, state)).toMatchObject({ edgeText: '3.33%' });
+  });
+  it('gives a tier and no label for odds bets, which need a parent', () => {
+    expect(typeEdgeLabel('pass-odds', 1000, state)).toBeNull();
+    expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
   });
 });

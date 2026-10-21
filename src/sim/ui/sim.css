@@ -916,3 +916,123 @@
   gap: 4px 16px;
   font-size: 0.85em;
 }
+
+/* Roll log */
+.sim-roll-log h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.sim-log-filter {
+  min-height: 36px;
+}
+.sim-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.sim-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.sim-log-entry {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 4px 6px 8px;
+  border-bottom: 1px solid var(--sim-border);
+  border-left: 4px solid transparent;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.sim-log-entry.is-win {
+  border-left-color: #2b8a4b;
+}
+.sim-log-entry.is-loss {
+  border-left-color: #b3261e;
+}
+.sim-log-entry.is-focus {
+  background: rgb(255 214 64 / 0.25);
+}
+.sim-log-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sim-log-dice {
+  display: inline-flex;
+  gap: 2px;
+}
+.sim-log-bank {
+  grid-column: 1 / -1;
+  color: var(--sim-muted);
+  font-size: 0.8125rem;
+}
+.sim-log-more {
+  margin-top: 6px;
+}
+.sim-log-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.5rem;
+}
+
+/* Luck band */
+.sim-luck-text {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+.sim-luck-text.is-lucky,
+.sim-luck-text.is-unlucky {
+  font-weight: 700;
+}
+.sim-luck-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  border: 1px solid var(--sim-border);
+  background: linear-gradient(
+    to right,
+    rgb(200 60 60 / 0.35) 0 10%,
+    rgb(80 160 100 / 0.3) 10% 90%,
+    rgb(60 120 200 / 0.35) 90% 100%
+  );
+  margin-bottom: 0.5rem;
+}
+.sim-luck-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--sim-muted);
+}
+.sim-luck-marker {
+  position: absolute;
+  top: -3px;
+  width: 6px;
+  height: 14px;
+  margin-left: -3px;
+  border-radius: 2px;
+  background: var(--sim-text, currentColor);
+}
+
+.sim-luck-scale {
+  margin-bottom: 0.5rem;
+}
+.sim-luck-scale .sim-luck-bar {
+  margin-bottom: 2px;
+}
+.sim-luck-ticks {
+  position: relative;
+  height: 1rem;
+  font-size: 0.7rem;
+  color: var(--sim-muted);
+}
+.sim-luck-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}

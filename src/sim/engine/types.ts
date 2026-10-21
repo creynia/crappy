@@ -107,6 +107,8 @@ export interface SessionStats {
   totalVig: Cents;
   /** Sum over rolls of tableExpectedLossPerRoll(stateBeforeRoll), in cents (float) */
   expectedLoss: number;
+  /** EXTENSION: sum over rolls of varianceFn(stateBeforeRoll), cents^2 (float); 0 when no varianceFn is injected, NaN for a save made before it existed. */
+  variance: number;
   /** EXTENSION: per bet type breakdown (only types that have appeared). */
   byType: Partial<Record<BetTypeId, BetTypeStats>>;
 }

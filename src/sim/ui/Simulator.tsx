@@ -13,6 +13,7 @@ import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
@@ -256,6 +257,14 @@ export function Simulator(props: SimulatorInternalProps) {
       rt={rt}
       hintVisible={hintVisible}
       onNext={() => feedInput({ kind: 'acknowledged' })}
+      onAnswer={(choice) => {
+        const ask = step?.ask;
+        if (!step || !ask) return;
+        const correct = choice === ask.answer;
+        emit({ type: 'step-answered', stepId: step.id, index: rt.stepIndex, choice, correct });
+        announce(askFeedback(ask, choice));
+        feedInput({ kind: 'answered', correct });
+      }}
       onRestart={() => resetGame()}
     />
   );

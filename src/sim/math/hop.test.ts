@@ -3,7 +3,7 @@ import { ALL_HOPS, BET_TYPES } from '../engine/bets';
 import { applyAction, createGame } from '../engine/game';
 import { DEFAULT_RULES } from '../engine/rules';
 import type { Bet, Dice, Die } from '../engine/types';
-import { betEdge, betEV, betOutcomes, tableExpectedLossPerRoll } from './ev';
+import { betEdge, betEV, betOutcomes, betVariance, tableExpectedLossPerRoll } from './ev';
 import { frac, toNumber } from './fraction';
 import { previewAction } from './preview';
 import { edgeTier } from './tiers';
@@ -34,6 +34,12 @@ describe('hop edges are exact (curriculum: easy 11.11%, hard 13.89%)', () => {
     expect(betEV({ type: 'hop', amount: 100, point: null, hop: D(3, 3) }, comeOut)).toEqual(
       frac(-125, 9),
     );
+  });
+  it('variance is exact: $1 easy hop 1088/81 dollars^2, $1 hard hop 33635/1296', () => {
+    // easy: +15 w.p. 1/18, -1 otherwise -> E[X^2] = 121/9, mean -1/9; hard: +30 w.p. 1/36 -> E[X^2] = 935/36, mean -5/36
+    const v = (d: Dice) => betVariance({ type: 'hop', amount: 100, point: null, hop: d }, comeOut);
+    expect(v(D(2, 4))).toEqual(frac(1088 * 10_000, 81));
+    expect(v(D(3, 3))).toEqual(frac(33635 * 10_000, 1296));
   });
   it('order does not matter (4-2 is the 2-4 hop)', () => {
     expect(betEdge('hop', 500, comeOut, D(4, 2))).toEqual(betEdge('hop', 500, comeOut, D(2, 4)));

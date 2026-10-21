@@ -69,6 +69,21 @@ export function houseEdge(id: BetTypeId): number | null {
   });
 }
 
+/** The House edge fact on a bet's page; a hop gives both kinds (easy 11.11%, hard 13.89%). */
+export function edgeFact(id: BetTypeId): string {
+  if (id !== 'hop') return formatEdge(houseEdge(id));
+  const hard = safe(() => {
+    const f = betEdge(
+      'hop',
+      sampleAmount('hop'),
+      { phase: 'come-out', point: null, rules: DEFAULT_RULES },
+      [3, 3],
+    ).perResolved;
+    return Number(f.n) / Number(f.d);
+  });
+  return `easy ${formatEdge(houseEdge(id))}, hard ${formatEdge(hard)}`;
+}
+
 export function formatEdge(e: number | null): string {
   if (e === null) return '--';
   if (e === 0) return '0%';

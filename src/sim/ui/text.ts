@@ -359,15 +359,19 @@ function vigFacts(
   const edges = grid.map((a) => edgeAt(a));
   const constant = edges.every((e) => e === edges[0]);
   if (exact || constant) return { vigCliff: null, vigFlat: edgeAt(amount), vigFootnote: false };
-  // runs of equal edge along the grid; show the current amount and the start of the two runs either side
-  const runStart: Cents[] = [];
-  edges.forEach((e, i) => {
-    if (i === 0 || e !== edges[i - 1]) runStart.push(grid[i]!);
-  });
-  const curRun = runStart.filter((r) => r <= amount).length - 1;
+  // the cliffs: where the edge jumps by at least half a point between neighbouring dollars (the vig steps).
+  // Show the current amount, and the step either side of it (the amount before and after each jump).
+  const cliffAt: number[] = [];
+  for (let i = 1; i < edges.length; i++)
+    if (Math.abs(edges[i]! - edges[i - 1]!) >= 0.005) cliffAt.push(i);
+  const above = cliffAt.find((i) => grid[i]! > amount);
+  const below = [...cliffAt].reverse().find((i) => grid[i]! <= amount);
   const pick = new Set<Cents>([amount]);
-  for (const k of [curRun - 1, curRun - 2]) if (k >= 0) pick.add(runStart[k]!);
-  for (const k of [curRun + 1, curRun + 2]) if (k < runStart.length) pick.add(runStart[k]!);
+  for (const i of [below, above]) {
+    if (i === undefined) continue;
+    pick.add(grid[i - 1]!);
+    pick.add(grid[i]!);
+  }
   const rows = [...pick]
     .sort((x, y) => x - y)
     .slice(0, 5)

@@ -476,12 +476,12 @@ export function EvLines({ facts: f }: { facts: EvFacts }) {
         </li>
       ) : null}
       {f.vigFlat !== null && f.vigFlat !== undefined ? (
-        <li data-line="vig-cliff">
+        <li data-line="vig-flat">
           The edge is the same at every amount: <b>{fmtPct(f.vigFlat)}</b>.
         </li>
       ) : null}
       {f.vigCliff && f.vigCliff.length > 1 ? (
-        <li data-line="vig-cliff">
+        <li data-line="vig-strip">
           Edge at nearby amounts:
           <ul class="sim-vig-list">
             {f.vigCliff.map((r) => (

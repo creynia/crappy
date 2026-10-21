@@ -7,6 +7,7 @@ import {
   listStrategies,
   simulateCompare,
   simulateMany,
+  simulateSweep,
   simulateManyCompare,
   simulateSession,
   strategyMetrics,
@@ -280,5 +281,30 @@ describe('edge on action is per decision', () => {
     expect(e({ id: 'pass-max-odds', unit: 1000 })).toBeCloseTo(0.374, 2);
     expect(e({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 })).toBeCloseTo(1.414, 2);
     expect(e({ id: 'dont-pass-max-lay', unit: 1000 })).toBeCloseTo(0.273, 2);
+  });
+});
+
+describe('simulateSweep', () => {
+  const cfg = {
+    strategy: 'pass-max-odds' as const,
+    unit: 1000,
+    oddsMultiples: [0, 1, 2, 'max', 10, 100] as (number | 'max')[],
+    rolls: 100,
+    seed: 1,
+    bankroll: 10_000_000,
+  };
+  it('edge falls with odds, expected loss is constant, variance and P(ahead) rise; 6x100x100 under 2s', async () => {
+    const t = performance.now();
+    const rows = await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    expect(performance.now() - t).toBeLessThan(2000);
+    const edges = rows.map((r) => +(r.edgeOnAction * 100).toFixed(3));
+    expect(edges).toEqual([1.414, 0.848, 0.606, 0.374, 0.184, 0.021]);
+    for (const r of rows)
+      expect(Math.abs(r.expectedLossCents - rows[0]!.expectedLossCents)).toBeLessThan(1);
+    for (let i = 1; i < rows.length; i++)
+      expect(rows[i]!.sdFinal).toBeGreaterThan(rows[i - 1]!.sdFinal);
+    expect(rows[5]!.probAhead).toBeGreaterThan(rows[0]!.probAhead);
+    // odds turn small flat-bet wins into bigger ones: more sessions finish ahead than with flat bets only
+    for (const r of rows.slice(1)) expect(r.probAhead).toBeGreaterThan(rows[0]!.probAhead);
   });
 });

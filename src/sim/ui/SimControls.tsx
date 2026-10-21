@@ -5,7 +5,14 @@ import { toNumber } from '../math/fraction';
 import type { SceneConfig } from '../scene/types';
 import { ChipRack } from './ChipRack';
 import { RollButton } from './RollButton';
-import { COST_UNIT_LABEL, edgeOnAction, nextCostUnit, rollCostText, type CostUnit } from './text';
+import {
+  COST_UNIT_LABEL,
+  costShort,
+  edgeOnAction,
+  nextCostUnit,
+  rollCostText,
+  type CostUnit,
+} from './text';
 
 /** Open state of the panels the tab row toggles. */
 export interface Panels {
@@ -66,6 +73,7 @@ export function SimControls(p: SimControlsProps) {
       ? undefined
       : rollCostText(costUnit, expectedCost, p.rollsPerHour ?? 100, edge);
   const next = nextCostUnit(costUnit);
+  const short = costShort(costUnit, expectedCost, p.rollsPerHour ?? 100, edge);
   const lockId = useId();
   return (
     <div class="sim-controls">
@@ -79,29 +87,30 @@ export function SimControls(p: SimControlsProps) {
         />
       ) : null}
       {ui.showRoll !== false ? (
-        <>
-          <div class="sim-cost-slot">
-            {costText ? (
-              <button
-                type="button"
-                class="sim-cost-cycle"
-                aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
-                onClick={() => {
-                  setCostUnit(next);
-                  writeCostUnit(next);
-                }}
-              >
-                {costText}
-              </button>
-            ) : null}
-          </div>
+        <div class="sim-roll-row">
           <RollButton
             onRoll={p.onRoll}
             disabled={p.rollDisabled}
             {...(p.lock ? { describedBy: lockId } : {})}
             rolling={p.busy}
           />
-        </>
+          {costText && short ? (
+            <button
+              type="button"
+              class="sim-cost-cycle"
+              aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
+              onClick={() => {
+                setCostUnit(next);
+                writeCostUnit(next);
+              }}
+            >
+              <span class="sim-cost-value">{short.value}</span>
+              <span class="sim-cost-unit">{short.unit}</span>
+            </button>
+          ) : (
+            <span class="sim-cost-cycle sim-cost-cycle-empty" aria-hidden="true" />
+          )}
+        </div>
       ) : null}
       {p.lock && ui.showRoll !== false ? (
         <p class="sim-lock" id={lockId}>

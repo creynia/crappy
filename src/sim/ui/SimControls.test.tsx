@@ -62,6 +62,6 @@ describe('cost unit toggle (I043)', () => {
     render(controls(createGame({ bankroll: 100000 })));
     expect(document.querySelector('.sim-cost-cycle')).toBeNull();
     expect(screen.getByRole('button', { name: /Roll/ })).toBeTruthy();
-    expect(document.querySelector('.sim-cost-slot')).toBeTruthy();
+    expect(document.querySelector('.sim-roll-row')).toBeTruthy();
   });
 });

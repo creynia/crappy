@@ -1098,13 +1098,6 @@
   transform: translateX(-50%);
 }
 
-/* expected-cost unit toggle beside Roll; the slot keeps its height so Roll does not move */
-.sim-cost-slot {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .sim-cost-cycle {
   min-height: 44px;
   padding: 0 12px;

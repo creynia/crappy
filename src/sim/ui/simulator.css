@@ -506,3 +506,38 @@
     padding-bottom: 72px;
   }
 }
+
+/* Roll and the cost unit share one row; the cost button is a compact two-line label */
+.sim-roll-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.sim-roll-row .sim-roll {
+  flex: 1 1 auto;
+}
+.sim-cost-cycle {
+  min-width: 64px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
+  color: inherit;
+  font: inherit;
+  line-height: 1.15;
+}
+.sim-cost-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.sim-cost-unit {
+  font-size: 0.7rem;
+}
+.sim-cost-cycle-empty {
+  visibility: hidden;
+}

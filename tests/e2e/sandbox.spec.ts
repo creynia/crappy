@@ -197,7 +197,9 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
-  test('expected-cost button is visible above the tab bar in portrait phones', async ({ page }) => {
+  test('Roll and the expected-cost button are visible at first view above the tab bar in portrait', async ({
+    page,
+  }) => {
     for (const { width, height } of [
       { width: 390, height: 844 },
       { width: 360, height: 740 },
@@ -207,15 +209,27 @@ test.describe('sandbox', () => {
       await page.locator('[data-region="pass"]').click();
       const sheet = page.getByRole('dialog');
       await sheet.getByRole('button', { name: 'Confirm' }).click();
-      const cost = page.locator('.sim-cost-cycle');
-      await expect(cost).toBeVisible();
       expect(await page.evaluate<number>('window.scrollY')).toBe(0);
-      const box = await cost.boundingBox();
-      expect(box, `${width}x${height}`).not.toBeNull();
-      expect(box!.y + box!.height, `${width}x${height} in viewport`).toBeLessThanOrEqual(height);
+      const roll = await page.locator('.sim-roll').boundingBox();
+      const cost = await page.locator('.sim-cost-cycle').boundingBox();
       const bar = await page.locator('.tabbar').boundingBox();
-      if (bar)
-        expect(box!.y + box!.height, `${width}x${height} clears tabbar`).toBeLessThanOrEqual(bar.y);
+      expect(roll, `${width}x${height} roll`).not.toBeNull();
+      expect(cost, `${width}x${height} cost`).not.toBeNull();
+      expect(roll!.y + roll!.height, `${width}x${height} roll in viewport`).toBeLessThanOrEqual(
+        height,
+      );
+      if (bar) {
+        expect(roll!.y + roll!.height, `${width}x${height} roll clears tabbar`).toBeLessThanOrEqual(
+          bar.y,
+        );
+        expect(cost!.y + cost!.height, `${width}x${height} cost clears tabbar`).toBeLessThanOrEqual(
+          bar.y,
+        );
+      }
+      expect(
+        Math.abs(cost!.y - roll!.y),
+        `${width}x${height} cost on Roll's line`,
+      ).toBeLessThanOrEqual(2);
     }
   });
 

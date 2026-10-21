@@ -624,3 +624,16 @@ export function rollCostText(
   const amount = value > 0 && value < 1 ? '<1¢' : fmtMoney(Math.round(value), { exact: true });
   return `Expected cost: ${amount} ${COST_UNIT_LABEL[unit]}`;
 }
+
+/** The compact two-line cost label on the Roll row: value ("$4.19") and unit ("/hr"). */
+export function costShort(
+  unit: CostUnit,
+  perRollCents: number,
+  rollsPerHour: number,
+  edgeOnActionFraction: number | null,
+): { value: string; unit: string } | undefined {
+  const full = rollCostText(unit, perRollCents, rollsPerHour, edgeOnActionFraction);
+  if (!full) return undefined;
+  const value = full.replace(/^Expected cost: /, '').replace(` ${COST_UNIT_LABEL[unit]}`, '');
+  return { value, unit: unit === 'roll' ? '/roll' : unit === 'hour' ? '/hr' : '/$100' };
+}

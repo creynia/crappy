@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Link } from './Link';
 
 const TABS = [
@@ -14,9 +15,65 @@ const TABS = [
   },
 ];
 
+/** Pages that give the whole short landscape screen to their content (see .is-immersive in app.css). */
+const immersive = (p: string) => p.startsWith('/play');
+
 export function Shell(props: { path: string; children: ComponentChildren }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const handle = useRef<HTMLButtonElement>(null);
+  // the menu closes on navigation and on Escape
+  useEffect(() => setMenuOpen(false), [props.path]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setMenuOpen(false);
+      handle.current?.focus();
+    };
+    document.addEventListener('keydown', on);
+    return () => document.removeEventListener('keydown', on);
+  }, [menuOpen]);
   return (
-    <div class="shell">
+    <div class={`shell${immersive(props.path) ? ' is-immersive' : ''}`}>
+      {immersive(props.path) ? (
+        <>
+          {menuOpen ? (
+            <div
+              class="immersive-backdrop"
+              aria-hidden="true"
+              onClick={(e) => {
+                // an outside tap only closes the menu; it does not also hit what is underneath
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen(false);
+              }}
+            />
+          ) : null}
+          <button
+            ref={handle}
+            type="button"
+            class="immersive-menu"
+            aria-label="Pages"
+            aria-expanded={menuOpen}
+            aria-controls="immersive-nav"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <span aria-hidden="true">{menuOpen ? '×' : '≡'}</span>
+          </button>
+          <nav
+            id="immersive-nav"
+            class={`immersive-nav${menuOpen ? ' is-open' : ''}`}
+            aria-label="Pages menu"
+          >
+            {TABS.map((t) => (
+              <Link key={t.to} to={t.to} aria-current={t.match(props.path) ? 'page' : undefined}>
+                {t.label}
+              </Link>
+            ))}
+            <Link to="/challenge">Challenge</Link>
+          </nav>
+        </>
+      ) : null}
       <header class="topbar">
         <Link to="/" class="brand">
           crappy

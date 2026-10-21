@@ -128,6 +128,9 @@ test.describe('sandbox', () => {
     await form.getByRole('button', { name: /^Apply/ }).click();
     await expect(form).toHaveCount(0);
     await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    // the panel sheet sits over the table in landscape: close it before betting (I064)
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
     expect(await buy4()).toContain('4.76%');
   });
 
@@ -516,6 +519,57 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
   });
 
+  test('panel sheet: tabs switch panels, Escape restores focus, the handle drags it away', async ({
+    page,
+  }) => {
+    await page.goto(url('seed=1'));
+    const sessionTab = page.getByRole('button', { name: 'Session', exact: true });
+    await sessionTab.click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel')).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel h3').first()).toBeFocused();
+    // Tab from the heading stays in the sheet; Escape works even after focus wandered outside
+    await page.keyboard.press('Tab');
+    await expect(sheet.locator(':focus')).toHaveCount(1);
+    await page.locator('[data-region="field"]').focus();
+    await page.keyboard.press('Tab');
+    await expect(sheet.locator(':focus')).toHaveCount(1);
+    await page.locator('[data-region="field"]').focus();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await sessionTab.click();
+    await sheet.getByRole('tab', { name: 'Menu' }).click();
+    await expect(sheet.locator('.sim-menu')).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel')).toHaveCount(0);
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+    // the dice stay reachable from the sheet
+    await sheet.getByRole('button', { name: 'Throw the dice' }).click();
+    await expect(page.getByTestId('roll-announcer')).not.toHaveText('');
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(sessionTab).toBeFocused(); // back to the control that opened the sheet
+    await sessionTab.click();
+    await expect(sheet).toBeVisible();
+    const handle = sheet.getByRole('button', { name: /Close panel \(drag/ });
+    if ((await handle.count()) === 0) {
+      // landscape viewports (phone-landscape, desktop): a side panel with no drag handle
+      await expect(page.locator('.sim-sheet-panel .sim-panel-sheet')).toBeVisible();
+      await sheet.getByRole('button', { name: 'Close panel' }).click();
+      await expect(sheet).toHaveCount(0);
+      return;
+    }
+    const box = (await handle.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 60, { steps: 4 });
+    await page.mouse.move(x, y + 140, { steps: 4 });
+    await page.mouse.up();
+    await expect(sheet).toHaveCount(0);
+  });
+
   test('share link: the menu copies a link that reproduces the layout and the next rolls', async ({
     page,
   }) => {
@@ -550,7 +604,8 @@ test.describe('sandbox flows', () => {
     expect(yaml).toContain('point: 8');
     expect(yaml).toContain('type: come, amount: 500');
     // the original rolls on; the link opened elsewhere rolls the same dice
-    await menu(page).click();
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
     await roll(page);
     // the live announcer keeps the last roll's text in both orientations
     const announcer = page.getByTestId('roll-announcer');
@@ -638,17 +693,20 @@ test.describe('sandbox flows', () => {
     await clear('.sim-session-panel h3');
     await expect(session).toBeFocused();
 
-    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
-    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    // the sheet covers the tab row: switch panels with the sheet's own tabs (I064)
+    await page.getByRole('tab', { name: 'Auto-roll' }).click();
     const auto = page.locator('.sim-autoroll');
     // What the reveal guarantees is where the panel starts, not how much of it fits: a tall panel can
-    // never be half in view. Its top sits at the top edge (scroll-margin is 8px), its first control is
-    // fully visible and hit-testable, and the panel has focus.
-    await expect(auto).toBeFocused();
+    // never be half in view. Its top sits at the top edge of the sheet body it scrolls in (I064;
+    // scroll-margin is 8px) and its first control is fully visible and hit-testable. Switching with
+    // the sheet's tab strip keeps focus on the tab so the arrow keys keep working.
+    await expect(page.getByRole('tab', { name: 'Auto-roll' })).toBeFocused();
+    const body = page.locator('.sim-panel-body');
     await expect
       .poll(async () => {
         const y = (await auto.boundingBox())!.y;
-        return y >= 0 && y <= 24;
+        const top = (await body.boundingBox())!.y;
+        return y >= top - 1 && y <= top + 24;
       })
       .toBe(true);
     // the panel's first control (strategy picker, or a view toggle above it)

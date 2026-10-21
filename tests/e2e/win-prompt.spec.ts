@@ -85,6 +85,7 @@ test.describe('win prompt', () => {
   for (const vp of [
     { name: '390x844', width: 390, height: 844 },
     { name: '360x640', width: 360, height: 640 },
+    { name: '360x740', width: 360, height: 740 },
     { name: '844x390', width: 844, height: 390 },
     { name: '667x375', width: 667, height: 375 },
   ]) {
@@ -119,6 +120,19 @@ test.describe('win prompt', () => {
       ] as const) {
         if ((await loc.count()) === 0) continue;
         expect(await anyUnder(loc), `${name} is under the prompt`).toBe(false);
+      }
+      // no betting region of any kind is under the prompt (every [data-region], not just a few)
+      for (const region of await page.locator('[data-region]').all()) {
+        const r = await region.boundingBox();
+        if (!r) continue;
+        const overlap =
+          r.x < p.x + p.width - 1 &&
+          r.x + r.width > p.x + 1 &&
+          r.y < p.y + p.height - 1 &&
+          r.y + r.height > p.y + 1;
+        expect(overlap, `${await region.getAttribute('data-region')} intersects the prompt`).toBe(
+          false,
+        );
       }
       // dismissing it moves nothing
       const rollBox = await roll.boundingBox();

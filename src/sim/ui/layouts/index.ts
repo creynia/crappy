@@ -50,6 +50,10 @@ export function regionIdForBet(type: string, point: number | null): RegionId | n
     case 'hard-6':
     case 'hard-8':
     case 'hard-10':
+    case 'fire':
+    case 'all':
+    case 'tall':
+    case 'small':
       return type;
   }
   const m = /^(place|buy|lay)-(\d+)$/.exec(type);

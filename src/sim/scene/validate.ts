@@ -260,6 +260,7 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'challenge',
 ];
 const STEP_KEYS = [
   'id',
@@ -452,6 +453,26 @@ export function validateScene(
     }
   }
 
+  if (s.challenge !== undefined) {
+    if (!isObj(s.challenge)) c.err('challenge', 'must be an object');
+    else {
+      c.keys('challenge', s.challenge, ['rolls', 'scoring']);
+      if (!(isInt(s.challenge.rolls) && s.challenge.rolls >= 1))
+        c.err('challenge.rolls', 'must be a positive integer');
+      if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
+      else {
+        c.keys('challenge.scoring', s.challenge.scoring, [
+          'redBetPenalty',
+          'noOddsPenalty',
+          'minWagered',
+        ]);
+        for (const k of ['redBetPenalty', 'noOddsPenalty'])
+          if (!(typeof s.challenge.scoring[k] === 'number' && s.challenge.scoring[k] >= 0))
+            c.err(`challenge.scoring.${k}`, 'must be a number >= 0');
+        c.cents('challenge.scoring.minWagered', s.challenge.scoring.minWagered);
+      }
+    }
+  }
   if (s.steps !== undefined) {
     if (!Array.isArray(s.steps) || s.steps.length === 0)
       c.err('steps', 'must be a non-empty array');

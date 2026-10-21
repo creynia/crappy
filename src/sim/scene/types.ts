@@ -61,6 +61,11 @@ export interface SceneConfig {
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: {
+    rolls: number;
+    scoring: { redBetPenalty: number; noOddsPenalty: number; minWagered: Cents };
+  };
 }
 
 export interface SceneStep {

@@ -17,6 +17,25 @@ const bundle = (ids: string[]): ContentBundle => ({
   bets: {} as ContentBundle['bets'],
 });
 
+describe('Store challenge record', () => {
+  it('counts sessions, keeps the lowest score as best and survives a reload', () => {
+    const m = new MemoryStorage();
+    const s = new Store(m, 0);
+    expect(s.challenge).toEqual({ played: 0 });
+    s.recordChallenge({ score: null, band: 'no-action', seed: 1 }, 10);
+    expect(s.challenge).toEqual({ played: 1 });
+    s.recordChallenge({ score: 0.012, band: 'solid', seed: 2 }, 20);
+    s.recordChallenge({ score: 0.03, band: 'leaky', seed: 3 }, 30);
+    expect(s.challenge).toEqual({
+      played: 3,
+      best: { score: 0.012, band: 'solid', at: 20, seed: 2 },
+    });
+    s.flush();
+    expect(new Store(m, 0).challenge.best?.score).toBe(0.012);
+    expect(load(m).challenge?.played).toBe(3);
+  });
+});
+
 describe('Store', () => {
   it('tracks status: new -> progress -> done and back', () => {
     const s = new Store(new MemoryStorage());

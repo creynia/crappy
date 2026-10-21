@@ -44,10 +44,26 @@ describe('buildAnimationQueue', () => {
     expect(t.steps.map((s) => [s.kind, s.at, s.duration])).toEqual([
       ['dice', 0, 650],
       ['puck', 650, 100],
-      ['lose', 750, 150],
-      ['win', 900, 200],
+      ['lose', 750, 200],
+      ['win', 950, 250],
     ]);
-    expect(t.totalMs).toBe(1100);
+    expect(t.totalMs).toBe(1200);
+  });
+  it('come-bet travel plays after the puck and before sweeps and payouts', () => {
+    const withTravel: GameEvent[] = [
+      events[0]!,
+      { type: 'bet-travelled', betId: 'b3', betType: 'come', point: 6 },
+      { type: 'point-established', point: 6 },
+      events[2]!,
+      events[3]!,
+      { type: 'bet-pushed', betId: 'b4', betType: 'dont-pass', amount: 500 },
+    ];
+    const t = buildAnimationQueue(withTravel, 'normal');
+    expect(t.steps.map((s) => s.kind)).toEqual(['dice', 'puck', 'travel', 'lose', 'win', 'push']);
+    expect(t.steps[2]!.events).toEqual([withTravel[1]]);
+    expect(t.totalMs).toBeLessThanOrEqual(1600);
+    expect(buildAnimationQueue(withTravel, 'fast').totalMs).toBeLessThan(700);
+    expect(buildAnimationQueue(withTravel, 'instant').steps).toEqual([]);
   });
   it('fast is shorter', () => {
     expect(buildAnimationQueue(events, 'fast').totalMs).toBeLessThan(1000);

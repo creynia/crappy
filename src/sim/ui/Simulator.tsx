@@ -244,6 +244,8 @@ export function Simulator(props: SimulatorInternalProps) {
   const [rolling, setRolling] = useState<{ dice: DicePair; durationMs: number } | null>(null);
   const [lost, setLost] = useState<Bet[]>([]);
   const [won, setWon] = useState<{ bet: Bet; payout: Cents }[]>([]);
+  const [travelling, setTravelling] = useState<Bet[]>([]);
+  const [chipMs, setChipMs] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const player = useRef<Player | null>(null);
   const lastOneRoll = useRef<{ type: BetTypeId; amount: Cents }[]>([]);
@@ -339,6 +341,8 @@ export function Simulator(props: SimulatorInternalProps) {
       setRolling(null);
       setLost([]);
       setWon([]);
+      setTravelling([]);
+      setChipMs(undefined);
       setBusy(false);
       player.current = null;
       pushToast(text, tone);
@@ -352,6 +356,12 @@ export function Simulator(props: SimulatorInternalProps) {
     player.current = playTimeline(tl, {
       onStart: (s) => {
         if (s.kind === 'dice') setRolling({ dice: roll.roll.dice, durationMs: s.duration });
+        if (s.kind === 'travel' || s.kind === 'lose' || s.kind === 'win') setChipMs(s.duration);
+        if (s.kind === 'travel') {
+          const ids = new Set(s.events.map((e) => (e.type === 'bet-travelled' ? e.betId : '')));
+          setShown(post);
+          setTravelling(post.bets.filter((b) => ids.has(b.id)));
+        }
         if (s.kind === 'lose') {
           const ids = new Set(s.events.map((e) => (e.type === 'bet-lost' ? e.betId : '')));
           setShown(post);
@@ -373,6 +383,7 @@ export function Simulator(props: SimulatorInternalProps) {
           setRolling(null);
           setShown(post);
         }
+        if (s.kind === 'travel') setTravelling([]);
         if (s.kind === 'lose') setLost([]);
         if (s.kind === 'win') setWon([]);
       },
@@ -749,6 +760,8 @@ export function Simulator(props: SimulatorInternalProps) {
     fieldPays: game.rules.fieldPays,
     lostBets: lost,
     wonBets: won,
+    travellingBets: travelling,
+    chipMs,
     rollingDice: rolling,
     selectedRegion: sheet?.regionId ?? null,
     onRegionTap,

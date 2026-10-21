@@ -166,6 +166,47 @@ describe('Table', () => {
     expect(screen.getByLabelText(/Place 6 \$12, off/)).toBeTruthy();
   });
 
+  it('animates chip movement: travel ghosts hide the stack, lose / win ghosts carry the step duration', () => {
+    const come = bet('b3', 'come', 1000, 8);
+    const { container, rerender } = render(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        travellingBets={[come]}
+        chipMs={300}
+      />,
+    );
+    // the stack is hidden while its ghost slides from the come box to the 8
+    expect(container.querySelector('[data-stack="b3"]')).toBeNull();
+    const ghost = container.querySelector<SVGGElement>('.sim-ghost-travel')!;
+    expect(ghost.getAttribute('data-travel')).toBe('b3');
+    const style = ghost.getAttribute('style') ?? '';
+    expect(style).toMatch(/--dx: -?\d/);
+    expect(style).toMatch(/--dy: -?\d/);
+    expect(container.querySelector('.sim-chips')?.getAttribute('style')).toContain(
+      '--sim-chip-ms: 300ms',
+    );
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        lostBets={[bet('b4', 'field', 500)]}
+        wonBets={[{ bet: come, payout: 1000 }]}
+        chipMs={200}
+      />,
+    );
+    expect(container.querySelector('[data-stack="b3"]')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-travel')).toBeNull();
+    expect(container.querySelector('.sim-ghost-lose')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-win')).not.toBeNull();
+    expect(container.querySelector('[data-stack="b3"]')?.className).toContain('is-won');
+    expect(container.querySelector('.sim-chips')?.getAttribute('style')).toContain(
+      '--sim-chip-ms: 200ms',
+    );
+  });
+
   it('CenterPanel renders the proposition cells', () => {
     render(<CenterPanel bets={[bet('b1', 'hard-6', 500)]} />);
     expect(document.querySelector('[data-region="any-7"]')).toBeTruthy();

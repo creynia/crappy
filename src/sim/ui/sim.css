@@ -657,10 +657,13 @@
     animation: sim-tumble-b var(--sim-tumble, 1000ms) ease-out both;
   }
   .sim-ghost-lose {
-    animation: sim-lose 150ms ease-in forwards;
+    animation: sim-lose var(--sim-chip-ms, 200ms) ease-in forwards;
   }
   .sim-ghost-win {
-    animation: sim-win 200ms ease-out both;
+    animation: sim-win var(--sim-chip-ms, 250ms) ease-out both;
+  }
+  .sim-ghost-travel {
+    animation: sim-travel var(--sim-chip-ms, 300ms) ease-in-out both;
   }
   .sim-stack-hit.is-won {
     animation: sim-flash 600ms ease-out;
@@ -678,6 +681,9 @@
   }
   .sim-ghost-lose {
     opacity: 0;
+  }
+  .sim-ghost-travel {
+    transform: translate(var(--dx, 0), var(--dy, 0));
   }
   .sim-puck {
     transition: none;
@@ -737,6 +743,15 @@
   }
   to {
     opacity: 1;
+  }
+}
+/* come-bet travel: the box-to-number offset comes from --dx / --dy (viewBox units) */
+@keyframes sim-travel {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx, 0), var(--dy, 0));
   }
 }
 @keyframes sim-flash {

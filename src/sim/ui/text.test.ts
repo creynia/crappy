@@ -5,7 +5,14 @@ import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { Action, BetTypeId, GameState } from '../engine/types';
 import type { BetInit } from '../engine';
-import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
+import {
+  buildEvFacts,
+  describeRoll,
+  fmtMoney,
+  normalizeTier,
+  regionAriaLabel,
+  typeEdgeLabel,
+} from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
   n: 1,
@@ -224,5 +231,18 @@ describe('combined edge with two Come bets', () => {
     const refAction = { ...action, betId: byType(ref, 'come').id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
     expect(combinedOf(s, action)!.edge).toBeCloseTo(14 / 2365, 12);
+  });
+});
+
+describe('typeEdgeLabel', () => {
+  const state = createGame({ bankroll: 100000 });
+  it('box-4 options show their house edge at the sheet amount', () => {
+    expect(typeEdgeLabel('place-4', 1000, state)).toMatchObject({ edgeText: '6.67%' });
+    expect(typeEdgeLabel('buy-4', 2000, state)).toMatchObject({ edgeText: '1.67%' });
+    expect(typeEdgeLabel('buy-4', 1000, state)).toMatchObject({ edgeText: '3.33%' });
+  });
+  it('gives a tier and no label for odds bets, which need a parent', () => {
+    expect(typeEdgeLabel('pass-odds', 1000, state)).toBeNull();
+    expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
   });
 });

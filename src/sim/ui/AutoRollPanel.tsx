@@ -68,6 +68,8 @@ export interface AutoRollPanelProps {
     all?: (SessionResult | ManyResult)[],
     specs?: StrategySpec[],
   ): void;
+  /** The odds sweep finished (config.sweep); `rolls` is the length of each swept session. */
+  onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
 }
@@ -245,6 +247,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         config={config.sweep}
         rules={props.rules}
         bankroll={bankroll}
+        onCompleted={() => props.onSweepCompleted?.(100)}
         initialSeed={props.initialSeed}
         unit={config.defaultStrategy?.unit}
       />

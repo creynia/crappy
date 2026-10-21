@@ -8,6 +8,7 @@ export interface SimStepProps {
   rt: SceneRuntime;
   hintVisible: boolean;
   onNext: () => void;
+  onAnswer?: (choice: number) => void;
   onRestart: () => void;
   resolve?: TokenResolver;
 }
@@ -19,6 +20,7 @@ export function SimStep({
   rt,
   hintVisible,
   onNext,
+  onAnswer,
   onRestart,
   resolve,
 }: SimStepProps) {
@@ -39,6 +41,8 @@ export function SimStep({
           nextLabel={rt.stepIndex === lastIdx ? 'Finish' : 'Next'}
           done={false}
           onNext={onNext}
+          {...(onAnswer ? { onAnswer } : {})}
+          asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
           onRestart={onRestart}
         />
       ) : null}

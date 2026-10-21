@@ -1,5 +1,6 @@
 export * from './types';
 export { DEFAULT_RULES, RULE_PRESETS, resolveRules, pointsFor } from './rules';
+export type { RulesPatch } from './rules';
 export { seedRng, nextU32, rollDie, rollDice } from './rng';
 export {
   BET_TYPE_IDS,

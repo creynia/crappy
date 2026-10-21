@@ -67,8 +67,17 @@ export function pointsFor(rules: { variant?: RulesVariant }): readonly PointNumb
 const copyPoints = (r: Partial<PointTable>, base: PointTable): PointTable => ({ ...base, ...r });
 
 /** Merge a preset id or partial rules onto DEFAULT_RULES; returns a fresh object. */
-export function resolveRules(r?: Partial<TableRules> | RulePresetId): TableRules {
-  let partial: Partial<TableRules>;
+/**
+ * A rules override: any TableRules fields, where the odds tables may list only some points (a
+ * 6-point table from a scene); resolveRules fills the rest from the defaults.
+ */
+export type RulesPatch = Partial<Omit<TableRules, 'maxOdds' | 'maxLayOdds'>> & {
+  maxOdds?: Partial<PointTable>;
+  maxLayOdds?: Partial<PointTable>;
+};
+
+export function resolveRules(r?: RulesPatch | RulePresetId): TableRules {
+  let partial: RulesPatch;
   let presetId: RulePresetId = 'standard-vegas';
   if (r === undefined) {
     partial = {};
@@ -79,7 +88,7 @@ export function resolveRules(r?: Partial<TableRules> | RulePresetId): TableRules
     partial = r;
     presetId = r.presetId ?? 'standard-vegas';
   }
-  const m: TableRules = { ...DEFAULT_RULES, ...partial, presetId };
+  const m = { ...DEFAULT_RULES, ...partial, presetId };
   return {
     ...m,
     maxOdds: copyPoints(m.maxOdds, DEFAULT_RULES.maxOdds),

@@ -27,7 +27,8 @@ describe('custom rules: odds choices', () => {
     for (const c of ODDS_CHOICES) expect(oddsChoiceOf(resolveRules(oddsLimits(c)))).toBe(c);
   });
   it('a flat Nx table lays to win N x the flat bet', () => {
-    expect(oddsLimits('2x').maxLayOdds).toEqual({ 4: 4, 5: 3, 6: 2.4, 8: 2.4, 9: 3, 10: 4 });
+    // (the table also lists the crapless points 2/3/11/12; I036)
+    expect(oddsLimits('2x').maxLayOdds).toMatchObject({ 4: 4, 5: 3, 6: 2.4, 8: 2.4, 9: 3, 10: 4 });
   });
   it('recognises presets and nothing else', () => {
     for (const id of Object.keys(RULE_PRESETS) as RulePresetId[])
@@ -99,5 +100,28 @@ describe('custom rules reach the engine', () => {
       });
       expect(applyAction(g, put).ok).toBe(allowPutBets);
     }
+  });
+});
+
+describe('crapless rules in the editor (I036 x I033)', () => {
+  const cr = resolveRules('crapless');
+  it('odds limits cover every crapless point; crapless reads as 3-4-5x', () => {
+    const ten = oddsLimits('10x');
+    for (const p of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const) expect(ten.maxOdds[p]).toBe(10);
+    expect([ten.maxLayOdds[2], ten.maxLayOdds[3], ten.maxLayOdds[11], ten.maxLayOdds[12]]).toEqual([
+      60, 30, 30, 60,
+    ]);
+    expect(oddsChoiceOf(cr)).toBe('3-4-5x');
+    expect(oddsChoiceOf({ ...cr, ...oddsLimits('10x') })).toBe('10x');
+    expect(matchingPreset(cr)).toBe('crapless');
+    expect(matchingPreset({ ...cr, variant: 'standard', presetId: 'standard-vegas' })).toBe(
+      'standard-vegas',
+    );
+  });
+  it('pass + max odds on crapless is computed over the crapless points', () => {
+    // flat edge 373/6930, odds free; expected odds per $1 flat = (1*1 + 2*2 + 3*3 + 4*4 + 5*5) * 2/36
+    const want = 373 / 6930 / (1 + 110 / 36);
+    expect(Number(passMaxOddsEdge(cr).n) / Number(passMaxOddsEdge(cr).d)).toBeCloseTo(want, 12);
+    expect(rulesSummary(cr)[0]!.edge).toBeCloseTo(want, 12);
   });
 });

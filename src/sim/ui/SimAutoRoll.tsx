@@ -39,6 +39,7 @@ export function SimAutoRoll({
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.sweep) cfg.sweep = ar.sweep;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(
@@ -76,6 +77,9 @@ export function SimAutoRoll({
         layout={layoutBets}
         rollsPerHour={rollsPerHour}
         onCompleted={onCompleted}
+        onSweepCompleted={(rolls) =>
+          feedInput({ kind: 'auto-roll-completed', rolls, oddsMultiple: 'default' })
+        }
       />
     </section>
   );

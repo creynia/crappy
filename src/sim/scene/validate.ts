@@ -20,6 +20,7 @@ const EVENT_TYPES = [
   'bet-pushed',
   'bet-returned',
   'bet-travelled',
+  'bet-progressed',
   'natural',
   'craps',
   'point-established',
@@ -94,7 +95,16 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'hop']);
+    this.keys(path, v, [
+      'ref',
+      'type',
+      'amount',
+      'point',
+      'parentRef',
+      'working',
+      'hop',
+      'progress',
+    ]);
     this.bet(`${path}.type`, v.type);
     this.hop(path, v.type, v.hop, true);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
@@ -103,6 +113,10 @@ class Ctx {
     if (v.point !== undefined) this.point(`${path}.point`, v.point);
     if (v.working !== undefined && !['auto', 'on', 'off'].includes(v.working as string))
       this.err(`${path}.working`, 'must be auto, on or off');
+    if (v.progress !== undefined) {
+      if (!Array.isArray(v.progress) || !v.progress.every((n) => isInt(n) && n >= 2 && n <= 12))
+        this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
+    }
   }
   /** Hop pair (I035): required on a hop BetInit, optional on a hop matcher, rejected elsewhere. */
   hop(path: string, type: unknown, hop: unknown, required: boolean) {
@@ -386,6 +400,7 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -417,6 +432,24 @@ export function validateScene(
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');
         else a.compare.forEach((x, i) => c.strategySpec(`autoRoll.compare[${i}]`, x));
+      }
+      if (a.sweep !== undefined) {
+        const w = a.sweep;
+        if (!isObj(w)) c.err('autoRoll.sweep', 'must be an object');
+        else {
+          c.keys('autoRoll.sweep', w, ['strategy', 'oddsMultiples']);
+          const ids = listStrategies().map((x) => x.id as string);
+          if (!ids.includes(w.strategy as string))
+            c.err('autoRoll.sweep.strategy', `unknown strategy id ${JSON.stringify(w.strategy)}`);
+          const m = w.oddsMultiples;
+          if (!Array.isArray(m) || m.length < 2 || m.length > 8)
+            c.err('autoRoll.sweep.oddsMultiples', 'must be an array of 2-8 multiples');
+          else
+            m.forEach((x, i) => {
+              if (!(x === 'max' || (typeof x === 'number' && x >= 0 && x <= 1000)))
+                c.err(`autoRoll.sweep.oddsMultiples[${i}]`, 'must be a number 0-1000 or "max"');
+            });
+        }
       }
     }
   }

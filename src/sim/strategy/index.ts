@@ -6,7 +6,13 @@ import type { StrategyMetrics, StrategySpec } from './types';
 export * from './types';
 export { oddsMultiplePerDecision };
 export { getStrategy, listStrategies } from './presets';
-export { simulateSession, simulateMany, simulateCompare, simulateManyCompare } from './simulate';
+export {
+  simulateSession,
+  simulateMany,
+  simulateCompare,
+  simulateManyCompare,
+  simulateSweep,
+} from './simulate';
 
 export function strategyMetrics(spec: StrategySpec, rules?: TableRules): StrategyMetrics {
   return metrics(spec, rules ?? resolveRules());

@@ -28,7 +28,7 @@ this file wins.
 | Perfect strategy | Three separate chapters: pure lowest edge, practical, fun-per-dollar |
 | Default rules | Standard Vegas: 3-4-5x odds, Field 2x on 2 and 12, buy/lay 5% vig on win only, lay odds 6x flat; presets: Field 3x-12, 10x, 100x |
 | Vig rounding | Casino style: 5% rounded down to whole dollars, $1 minimum |
-| Bonus side bets (Fire, ATS) | Mentioned in the sucker-bets lesson only; not simulated in v1 |
+| Bonus side bets (Fire, ATS) | **Simulated** (I037, approved 2026-10-21; supersedes "lesson text only"): bet ids `fire`, `all`, `tall`, `small`, category `bonus`, placeable only before a new shooter's first roll, never removable, prop minimum; Fire 24/249/999 to 1, All/Tall/Small 175/34/34 to 1; exact math in `src/sim/math/bonus.ts`. Taught in the sucker-bets lesson |
 | World/Whirl | Included as bet id `world` |
 | Etiquette | One short lesson near the end + tips sprinkled through |
 | Bad bets in sandbox | Allowed; red tier warning + suggested better alternative |

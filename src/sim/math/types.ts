@@ -14,7 +14,9 @@ export interface BetCtx {
   rules: TableRules;
 }
 /** `hop` is the dice pair of a hop bet (I035); `working` is the player's ON/OFF setting, omitted means 'auto'. */
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'hop'> & { working?: Bet['working'] };
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'hop' | 'progress'> & {
+  working?: Bet['working'];
+};
 
 export interface EdgeInfo {
   perResolved: Fraction; // -EV / amount, pushes count as decisions

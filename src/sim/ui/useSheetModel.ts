@@ -97,6 +97,10 @@ export function buildSheetModel(
     if (!gate.ok) preview = { ...preview, validation: gate };
   }
   if (scene.evDetail === 'basic') preview = { ...preview, alternative: null };
+  // never suggest a bet the scene does not allow
+  const altAction = preview.alternative?.action;
+  if (altAction?.type === 'place-bet' && !betTypeAllowed(scene, rt, altAction.betType))
+    preview = { ...preview, alternative: null };
   const type = bet ? bet.type : sheet.type;
   const parent = parentFor(type, sheet.regionId, game);
   const def = BET_TYPES[type];
@@ -145,7 +149,9 @@ export function buildSheetModel(
   const contract =
     bet && removeVal && !removeVal.ok && removeVal.code === 'contract-bet'
       ? { reason: "You can't take this bet down once the point is set." }
-      : null;
+      : bet && removeVal && !removeVal.ok && removeVal.code === 'not-removable'
+        ? { reason: removeVal.message }
+        : null;
   const oddsType = bet ? ODDS_FOR[bet.type] : undefined;
   const addOdds =
     contract && bet && oddsType && betTypeAllowed(scene, rt, oddsType) && oddsRoom(game, bet) > 0

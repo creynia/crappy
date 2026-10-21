@@ -1,4 +1,4 @@
-import { BET_TYPES, normalizeHop, upfrontVig } from './bets';
+import { BET_TYPES, bonusTargets, normalizeHop, upfrontVig, type BonusBetTypeId } from './bets';
 import { resolveRules } from './rules';
 import { rollDice, seedRng } from './rng';
 import { resolveRoll } from './resolve';
@@ -34,6 +34,8 @@ export interface BetInit {
   working?: WorkingMode;
   /** EXTENSION (I035): the dice pair of a 'hop' bet (either order); required for hop, rejected otherwise. */
   hop?: Dice;
+  /** bonus bets only: numbers already collected (scenes that start mid-hand) */
+  progress?: number[];
 }
 
 export interface CreateGameOptions {
@@ -61,6 +63,7 @@ function addBet(
   parentId: string | null,
   working: WorkingMode,
   hop?: Dice,
+  progress?: readonly number[],
 ): { state: GameState; bet: Bet } {
   const bet: Bet = {
     id: `b${state.nextBetId}`,
@@ -72,6 +75,7 @@ function addBet(
     placedOnRoll: state.rollCount,
     vigPaid: upfrontVig(type, amount, state.rules),
     ...(hop ? { hop: normalizeHop(hop) } : {}),
+    ...(progress ? { progress } : {}),
   };
   return {
     bet,
@@ -115,7 +119,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     if (!def) throw new Error(`createGame: unknown bet type ${String(init.type)}`);
     // Validate against a phase in which the bet type is legal, so scenes can start mid-hand.
     const viewPhase: Phase =
-      init.type === 'pass-line' || init.type === 'dont-pass'
+      init.type === 'pass-line' || init.type === 'dont-pass' || def.category === 'bonus'
         ? 'come-out'
         : init.type === 'come' || init.type === 'dont-come'
           ? 'point'
@@ -152,6 +156,15 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     } else if (init.point !== undefined) {
       throw new Error(`createGame: ${init.type} cannot have a point`);
     }
+    let progress: number[] | undefined;
+    if (init.progress !== undefined) {
+      if (def.category !== 'bonus')
+        throw new Error(`createGame: ${init.type} cannot have progress`);
+      const targets = bonusTargets(init.type as BonusBetTypeId);
+      progress = [...new Set(init.progress)].sort((a, b) => a - b);
+      if (progress.some((n) => !targets.includes(n)) || progress.length >= targets.length)
+        throw new Error(`createGame: invalid progress for ${init.type}`);
+    }
     const merge = findMergeTarget(
       state,
       init.type,
@@ -168,6 +181,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       pid,
       init.working ?? 'auto',
       init.hop,
+      progress,
     );
     state = r.state;
     if (init.ref) refs.set(init.ref, r.bet.id);

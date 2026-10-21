@@ -1,5 +1,12 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { BET_TYPES, HOP_PAYS, hopLabel, isHardHop } from '../engine/bets';
+import {
+  BET_TYPES,
+  HOP_PAYS,
+  bonusTargets,
+  hopLabel,
+  isBonusType,
+  isHardHop,
+} from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
@@ -55,6 +62,10 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   'c-e': 'C and E',
   world: 'World',
   hop: 'Hop',
+  fire: 'Fire Bet',
+  all: 'All',
+  tall: 'Tall',
+  small: 'Small',
 };
 
 export function betLabel(type: BetTypeId): string {
@@ -246,7 +257,11 @@ export function buildEvFacts(
   if (wn > 0n) {
     const p = fracToNumber({ n: wn, d: wd }) * 100;
     const pct = wd <= 36n ? String(Math.round(p)) : p.toFixed(1).replace(/\.0$/, '');
-    chance = `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
+    // bonus side bets ride a whole hand and have unwieldy exact fractions: "about 1 in 38 hands"
+    chance =
+      def.category === 'bonus'
+        ? `about 1 in ${Math.round(100 / p).toLocaleString('en-US')} hands (${pct}%)`
+        : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
   const hop = bet?.hop ?? (a.type === 'place-bet' ? a.hop : undefined);
@@ -317,15 +332,20 @@ export function describeRoll(events: readonly GameEvent[]): string {
   const losses: string[] = [];
   const pushes: string[] = [];
   const returned: string[] = [];
+  const progressed: string[] = [];
   for (const e of events) {
-    if (e.type === 'bet-won')
+    if (e.type === 'bet-progressed')
+      progressed.push(
+        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
+      );
+    else if (e.type === 'bet-won')
       wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
     else if (e.type === 'bet-lost')
       losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
     else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
     else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
   }
-  for (const group of [wins, losses, pushes, returned]) {
+  for (const group of [wins, losses, pushes, returned, progressed]) {
     if (group.length) parts.push(group.join(', ') + '.');
   }
   if (roll) {
@@ -362,6 +382,14 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   if (bets.length) {
     const desc = bets.map((b) => {
       const working = opts.offIds?.has(b.id) ? 'off' : 'working';
+      if (isBonusType(b.type)) {
+        const have = b.progress ?? [];
+        const total = bonusTargets(b.type).length;
+        const collected = have.length
+          ? `Collected ${have.join(', ')} (${have.length} of ${total})`
+          : `Nothing collected yet (0 of ${total})`;
+        return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${collected}`;
+      }
       return `${b.hop ? hopLabel(b.hop) : betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
     });
     parts.push(`Your bet: ${desc.join('; ')}.`);

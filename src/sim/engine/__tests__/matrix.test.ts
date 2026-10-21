@@ -9,6 +9,23 @@ interface Situation {
   phase: 'come-out' | 'point';
   point: PointNumber | null;
   betPoint: PointNumber | null;
+  progress?: number[];
+}
+
+/** Progress states worth checking for a bonus bet: empty, partial, one short of complete. */
+function progressSets(type: BetTypeId): number[][] {
+  const targets =
+    type === 'fire'
+      ? [4, 5, 6, 8, 9, 10]
+      : type === 'small'
+        ? [2, 3, 4, 5, 6]
+        : type === 'tall'
+          ? [8, 9, 10, 11, 12]
+          : [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+  const out: number[][] = [[]];
+  for (let k = 1; k < targets.length; k++) out.push(targets.slice(0, k));
+  for (let k = 1; k < targets.length; k++) out.push(targets.slice(targets.length - k));
+  return out;
 }
 
 function situations(type: BetTypeId): Situation[] {
@@ -28,6 +45,10 @@ function situations(type: BetTypeId): Situation[] {
   } else if (cat === 'odds') {
     for (const [phase, point] of states)
       for (const n of POINTS) out.push({ phase, point, betPoint: n });
+  } else if (cat === 'bonus') {
+    for (const [phase, point] of states)
+      for (const progress of progressSets(type))
+        out.push({ phase, point, betPoint: null, progress });
   } else {
     for (const [phase, point] of states) out.push({ phase, point, betPoint: null });
   }
@@ -81,6 +102,7 @@ describe('resolution matrix vs independent oracle', () => {
                           point: s.betPoint,
                           vigPaid: paid ? 100 : 0,
                           ...(hop ? { hop } : {}),
+                          ...(s.progress ? { progress: s.progress } : {}),
                         } as Bet;
                         const got = normalize(
                           def.resolve(
@@ -108,6 +130,7 @@ describe('resolution matrix vs independent oracle', () => {
                           upfrontPaid: paid,
                           rules: orules,
                           ...(hop ? { hop: [hop[0], hop[1]] as [number, number] } : {}),
+                          ...(s.progress ? { progress: s.progress } : {}),
                         });
                         checked++;
                         if (JSON.stringify(got) !== JSON.stringify(want)) {

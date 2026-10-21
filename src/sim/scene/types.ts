@@ -53,6 +53,8 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
+    sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
 }

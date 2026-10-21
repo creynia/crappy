@@ -1,4 +1,5 @@
-import { BET_TYPES, hopText, isToggleable, upfrontVig } from '../engine/bets';
+import { BET_TYPES, hopText, isBonusType, isToggleable, upfrontVig } from '../engine/bets';
+import { bonusDistribution } from './bonus';
 import type {
   Bet,
   BetTypeId,
@@ -236,6 +237,7 @@ function rulesKey(rules: TableRules): string {
 }
 
 export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
+  if (isBonusType(bet.type)) return bonusDistribution(bet.type, bet.amount, bet.progress);
   if (bet.type === 'hop' && !bet.hop) throw new Error('hop needs a dice pair');
   const hop = bet.type === 'hop' ? bet.hop : undefined;
   const key = `${bet.type}|${bet.amount}|${bet.point}|${hop ? hopText(hop) : ''}|${ctx.phase}|${ctx.point}|${rulesKey(ctx.rules)}`;

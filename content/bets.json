@@ -417,5 +417,45 @@
     "summary": "A one-roll bet that the next roll is one exact pair of dice, such as 2-4.",
     "howItWorks": "Pick a pair. An easy hop (two different dice, such as 2-4) wins on 2-4 or 4-2, 2 of 36 rolls, and pays 15:1: house edge 11.11%. A hard hop (a pair, such as 3-3) wins on 1 of 36 rolls and pays 30:1: house edge 13.89%. Everything else loses.",
     "lessonId": "sucker-bets"
+  },
+  {
+    "id": "fire",
+    "name": "Fire Bet",
+    "shortName": "Fire",
+    "group": "bonus",
+    "summary": "A bonus bet that the shooter makes 4, 5 or 6 different points before sevening out.",
+    "howItWorks": "Place it before a new shooter's first come-out roll, for the prop minimum. Each distinct point the shooter makes lights a pip (making the same point twice counts once). When the shooter sevens out it pays 24 to 1 for 4 points or 249 to 1 for 5; the 6th point pays 999 to 1 at once. It cannot be taken down.",
+    "tip": "About 1 hand in 100 reaches 4 points; the house edge is 20.76%. Treat it as a lottery ticket, not a strategy.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "small",
+    "name": "Small",
+    "shortName": "Small",
+    "group": "bonus",
+    "summary": "A bonus bet that 2, 3, 4, 5 and 6 all roll before a 7.",
+    "howItWorks": "Place it before a new shooter's first come-out roll. Every 7 loses it, come-out rolls included. It pays 34 to 1 the moment the last of the five numbers rolls, then comes down.",
+    "tip": "It hits 2.64% of the time; at 34 to 1 the house edge is 7.76% (18.3% where it pays only 30 to 1).",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "tall",
+    "name": "Tall",
+    "shortName": "Tall",
+    "group": "bonus",
+    "summary": "A bonus bet that 8, 9, 10, 11 and 12 all roll before a 7.",
+    "howItWorks": "Place it before a new shooter's first come-out roll. Every 7 loses it, come-out rolls included. It pays 34 to 1 the moment the last of the five numbers rolls, then comes down.",
+    "tip": "Same odds as Small: 2.64% to hit, 7.76% house edge at 34 to 1.",
+    "lessonId": "sucker-bets"
+  },
+  {
+    "id": "all",
+    "name": "All",
+    "shortName": "All",
+    "group": "bonus",
+    "summary": "A bonus bet that every number from 2 to 12 except 7 rolls before a 7.",
+    "howItWorks": "Place it before a new shooter's first come-out roll. Every 7 loses it. It pays 175 to 1 the moment the tenth number rolls, then comes down.",
+    "tip": "It hits 0.53% of the time; at 175 to 1 the house edge is 7.46% (20.6% at 150 to 1).",
+    "lessonId": "sucker-bets"
   }
 ]

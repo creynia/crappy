@@ -77,6 +77,17 @@ describe('section 2.3 target numbers (per resolved / per roll)', () => {
     expect(edgeTier(hard.perResolved)).toBe('avoid');
   });
 
+  it('bonus side bets (I037): Fire 20.763%, Small/Tall 7.761%, All 7.464%', () => {
+    same(edge('small', 1).perResolved, frac(1687, 21736));
+    same(edge('tall', 1).perResolved, frac(1687, 21736));
+    same(edge('all', 1).perResolved, frac(10207263466n, 136745788725n));
+    expect(
+      Number(edge('fire', 1).perResolved.n) / Number(edge('fire', 1).perResolved.d),
+    ).toBeCloseTo(0.2076275, 7);
+    expect(edgeTier(edge('fire', 1).perResolved)).toBe('avoid');
+    expect(edgeTier(edge('small', 1).perResolved)).toBe('poor');
+  });
+
   it('field 3x on 12 is 1/36', () => {
     const e = edge('field', 5, comeOut(rules(RULE_PRESETS['field-3x-12'])));
     same(e.perResolved, frac(1, 36));

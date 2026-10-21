@@ -11,6 +11,13 @@ export function oddsHintText(room: OddsRoom): string {
     : `Add up to ${amount} odds behind your ${room.label} on ${room.point}. Odds have no house edge.`;
 }
 
+/** The short line shown in the banner (the full sentence goes to the announcer). */
+export function hintLine(room: OddsRoom): string {
+  const amount = fmtMoney(room.room);
+  const lay = room.type === 'dont-pass' || room.type === 'dont-come';
+  return lay ? `Lay up to ${amount}, no house edge.` : `Odds: up to ${amount}, no house edge.`;
+}
+
 export interface OddsHintProps {
   room: OddsRoom;
   onDismiss: () => void;
@@ -21,7 +28,7 @@ export interface OddsHintProps {
 export function OddsHint({ room, onDismiss, onHideForever }: OddsHintProps) {
   return (
     <div class="sim-odds-hint" data-testid="odds-hint">
-      <p>{oddsHintText(room)}</p>
+      <p>{hintLine(room)}</p>
       <div class="sim-odds-hint-actions">
         <button type="button" onClick={onDismiss}>
           Got it

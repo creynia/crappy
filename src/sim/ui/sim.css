@@ -367,9 +367,8 @@
   top: 0;
   bottom: auto;
   gap: 2px;
-  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
-  max-height: 100%;
-  overflow: hidden;
+  /* stacked toasts and the nudge stay visible (not clipped); they sit above the Roll row while shown */
+  z-index: 25;
 }
 .sim-land .sim-toast > span {
   display: -webkit-box;
@@ -969,7 +968,7 @@
 }
 
 .sim-odds-hint {
-  /* one row inside the toast layer: text (one line, clamped) and two 44px buttons */
+  /* one row in the toast layer on phones (text clamped, two 44px buttons); the rail wraps it */
   display: flex;
   align-items: center;
   gap: 6px 8px;
@@ -991,6 +990,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.sim-rail .sim-odds-hint {
+  flex-wrap: wrap;
+}
+.sim-rail .sim-odds-hint p {
+  flex: 1 1 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .sim-odds-hint-actions {
   display: flex;

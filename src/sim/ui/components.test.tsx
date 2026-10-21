@@ -730,7 +730,7 @@ describe('OddsHint', () => {
       />,
     );
     expect(document.querySelector('[data-testid="odds-hint"]')!.textContent).toContain(
-      "Lay up to $60 against your Don't pass on 6",
+      'Lay up to $60, no house edge.',
     );
     cleanup();
   });
@@ -745,7 +745,7 @@ describe('OddsHint', () => {
       />,
     );
     const text = document.querySelector('[data-testid="odds-hint"]')!.textContent;
-    expect(text).toContain('Add up to $30 odds behind your Pass line on 6');
+    expect(text).toContain('Odds: up to $30, no house edge.');
     expect(text).toContain('no house edge');
     expect(document.querySelector('[role=status]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));

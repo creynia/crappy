@@ -748,6 +748,19 @@ test('in landscape the odds nudge does not cover the felt or the controls', asyn
       if (!tb) continue;
       expect(overlaps(hb!, tb), `hint overlaps a target at ${vp.width}x${vp.height}`).toBe(false);
     }
+    // the text is not cut off in the rail (it wraps; the buttons drop to their own row)
+    const fits = await page.evaluate(() => {
+      const doc = (
+        globalThis as unknown as {
+          document: {
+            querySelector(sel: string): { scrollWidth: number; clientWidth: number } | null;
+          };
+        }
+      ).document;
+      const el = doc.querySelector('[data-testid="odds-hint"] p');
+      return el ? el.scrollWidth <= el.clientWidth : false;
+    });
+    expect(fits, `nudge text is cut off at ${vp.width}x${vp.height}`).toBe(true);
     await context.close();
   }
 });

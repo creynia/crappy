@@ -11,7 +11,7 @@ export interface StatusBarProps {
   session: Cents;
   point: PointNumber | null;
   history: readonly RollRecord[];
-  onOpenHistory?: () => void;
+  onOpenHistory?: (n?: number) => void;
   /** hide the roll history strip (compact landscape rail) */
   compact?: boolean;
 }

@@ -1,4 +1,5 @@
 import type { GameState } from '../engine/types';
+import type { RollLogEntry } from './rollLog';
 
 /** Sandbox state saved under `crappy:sim:${key}:v1`. Every access is guarded: storage may be missing or full. */
 export interface PersistedSandbox {
@@ -8,6 +9,8 @@ export interface PersistedSandbox {
   startBankroll: number;
   presetId: string;
   chip?: number;
+  /** last few roll-log entries */
+  log?: RollLogEntry[];
 }
 
 const storageKey = (key: string) => `crappy:sim:${key}:v1`;

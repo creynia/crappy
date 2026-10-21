@@ -321,6 +321,7 @@ export function describeRoll(events: readonly GameEvent[]): string {
   const losses: string[] = [];
   const pushes: string[] = [];
   const returned: string[] = [];
+  const travelled: string[] = [];
   const progressed: string[] = [];
   for (const e of events) {
     if (e.type === 'bet-progressed')
@@ -333,8 +334,10 @@ export function describeRoll(events: readonly GameEvent[]): string {
       losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
     else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
     else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
+    else if (e.type === 'bet-travelled')
+      travelled.push(`${betLabel(e.betType)} moves to the ${e.point}`);
   }
-  for (const group of [wins, losses, pushes, returned, progressed]) {
+  for (const group of [wins, losses, pushes, returned, travelled, progressed]) {
     if (group.length) parts.push(group.join(', ') + '.');
   }
   if (roll) {

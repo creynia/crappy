@@ -14,6 +14,8 @@ export interface SimAutoRollProps {
   rollsPerHour: number;
   emit: (e: SimulatorEvent) => void;
   feedInput: (input: SceneInput) => void;
+  /** a finished run, for the roll log */
+  onResult?: (result: SessionResult | ManyResult, bankrollBefore: number) => void;
 }
 
 /** The auto-roll section: config from the scene, the live layout, and step feedback on completion. */
@@ -24,6 +26,7 @@ export function SimAutoRoll({
   rollsPerHour,
   emit,
   feedInput,
+  onResult,
 }: SimAutoRollProps) {
   const ar = scene.autoRoll;
   const config = useMemo(() => {
@@ -55,6 +58,7 @@ export function SimAutoRoll({
     specs?: StrategySpec[],
   ) => {
     emit({ type: 'auto-roll-completed', result });
+    onResult?.(result, Math.max(0, equity(game)));
     const played = (r: SessionResult | ManyResult) =>
       'rollsPlayed' in r ? r.rollsPlayed : Math.max(0, r.p50.length - 1);
     // a compare scene needs every compared strategy in the run; report the shortest run

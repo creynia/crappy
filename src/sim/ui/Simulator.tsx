@@ -5,6 +5,7 @@ import type { Bet, Cents, RulePresetId } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
+import { RollLog } from './RollLog';
 import { SessionPanel } from './SessionPanel';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
@@ -19,6 +20,7 @@ import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
+import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
 import { fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
@@ -63,7 +65,15 @@ export function Simulator(props: SimulatorInternalProps) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
-  const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
+  const [panels, setPanels] = useState<Panels>({
+    auto: false,
+    session: false,
+    log: false,
+    menu: false,
+  });
+  const [log, setLog] = useState<RollLogEntry[]>(() => boot.log ?? []);
+  const [focusRoll, setFocusRoll] = useState<number | null>(null);
+  const autoSeq = useRef(boot.log?.length ?? 0);
   const togglePanel = (name: keyof Panels) => setPanels((p) => ({ ...p, [name]: !p[name] }));
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
@@ -83,7 +93,11 @@ export function Simulator(props: SimulatorInternalProps) {
       setHintVisible(true);
       pushToast(message, 'info');
     },
-    onRolled: anim.run,
+    onRolled: (pre, post, events) => {
+      const entry = summarizeRoll(post, events);
+      if (entry) setLog((l) => appendLog(l, entry));
+      anim.run(pre, post, events);
+    },
   });
 
   const { game: liveGame, rt } = core;
@@ -102,6 +116,7 @@ export function Simulator(props: SimulatorInternalProps) {
     settings,
     liveGame,
     chip,
+    log,
   );
 
   // ---------- sheet ----------
@@ -152,6 +167,8 @@ export function Simulator(props: SimulatorInternalProps) {
     startedRef.current = -1;
     startEquity.current = equity(init.game);
     setToasts([]);
+    setLog([]);
+    setFocusRoll(null);
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
   };
@@ -237,6 +254,10 @@ export function Simulator(props: SimulatorInternalProps) {
       session={session}
       point={game.point}
       history={game.history}
+      onOpenHistory={(n) => {
+        setPanels((p) => ({ ...p, log: true }));
+        setFocusRoll(n ?? null);
+      }}
     />
   );
 
@@ -310,6 +331,8 @@ export function Simulator(props: SimulatorInternalProps) {
         <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
       ) : null}
 
+      {panels.log ? <RollLog entries={log} focusRoll={focusRoll} /> : null}
+
       {autoAvailable && panels.auto ? (
         <SimAutoRoll
           scene={scene}
@@ -318,6 +341,11 @@ export function Simulator(props: SimulatorInternalProps) {
           rollsPerHour={settings.rollsPerHour}
           emit={emit}
           feedInput={feedInput}
+          onResult={(result, before) =>
+            setLog((l) =>
+              appendLog(l, autoRollEntry(result, before, coreRef.current.game, ++autoSeq.current)),
+            )
+          }
         />
       ) : null}
 

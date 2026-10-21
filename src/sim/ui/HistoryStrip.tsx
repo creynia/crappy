@@ -33,7 +33,8 @@ export interface HistoryStripProps {
   /** chronological (oldest first), as in GameState.history */
   history: readonly RollRecord[];
   limit?: number;
-  onOpenAll?: () => void;
+  /** called when the strip is tapped; `n` is the tapped roll's number, if a pill was hit */
+  onOpenAll?: (n?: number) => void;
 }
 
 /** Last N rolls as pills, newest first, horizontally scrollable. */
@@ -43,7 +44,14 @@ export function HistoryStrip({ history, limit = 20, onOpenAll }: HistoryStripPro
     <div
       class="sim-history"
       {...(recent.length ? { role: 'list', 'aria-label': 'Roll history, newest first' } : {})}
-      onClick={onOpenAll}
+      onClick={
+        onOpenAll
+          ? (e) => {
+              const pill = (e.target as HTMLElement).closest<HTMLElement>('[data-roll]');
+              onOpenAll(pill ? Number(pill.dataset.roll) : undefined);
+            }
+          : undefined
+      }
     >
       {recent.length === 0 ? <span class="sim-history-empty">No rolls yet</span> : null}
       {recent.map((r) => {
@@ -52,6 +60,7 @@ export function HistoryStrip({ history, limit = 20, onOpenAll }: HistoryStripPro
         return (
           <span
             key={r.n}
+            data-roll={r.n}
             role="listitem"
             class={`sim-pill sim-pill-${o}`}
             aria-label={text}

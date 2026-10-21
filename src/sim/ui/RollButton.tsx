@@ -6,11 +6,20 @@ export interface RollButtonProps {
   rolling?: boolean;
   /** e.g. "Expected cost: $0.42" */
   costText?: string;
+  /** id of the element that says why Roll is locked */
+  describedBy?: string;
   /** optional long press (dev mode: set dice) */
   onLongPress?: () => void;
 }
 
-export function RollButton({ onRoll, disabled, rolling, costText, onLongPress }: RollButtonProps) {
+export function RollButton({
+  onRoll,
+  disabled,
+  rolling,
+  costText,
+  describedBy,
+  onLongPress,
+}: RollButtonProps) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let fired = false;
   const down = () => {
@@ -27,6 +36,7 @@ export function RollButton({ onRoll, disabled, rolling, costText, onLongPress }:
       type="button"
       class="sim-roll"
       disabled={disabled}
+      {...(describedBy ? { 'aria-describedby': describedBy } : {})}
       onPointerDown={down}
       onPointerUp={up}
       onPointerLeave={up}

@@ -7,11 +7,20 @@ export interface SimStepProps {
   rt: SceneRuntime;
   hintVisible: boolean;
   onNext: () => void;
+  onAnswer?: (choice: number) => void;
   onRestart: () => void;
 }
 
 /** Guided-lesson step panel, or the "Done" panel once the scene is complete. */
-export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: SimStepProps) {
+export function SimStep({
+  scene,
+  step,
+  rt,
+  hintVisible,
+  onNext,
+  onAnswer,
+  onRestart,
+}: SimStepProps) {
   const guided = !!scene.steps?.length;
   const lastIdx = (scene.steps?.length ?? 1) - 1;
   const stepAck = step ? 'acknowledged' in step.completeWhen : false;
@@ -28,6 +37,8 @@ export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: Sim
           nextLabel={rt.stepIndex === lastIdx ? 'Finish' : 'Next'}
           done={false}
           onNext={onNext}
+          {...(onAnswer ? { onAnswer } : {})}
+          asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
           onRestart={onRestart}
         />
       ) : null}

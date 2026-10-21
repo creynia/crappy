@@ -88,8 +88,11 @@ export function parseQuizzes(yamlText: string, lessonId: string, startIndex: num
     const options = o.options ?? o.choices;
     if (!Array.isArray(options) || !options.every((x) => typeof x === 'string'))
       throw new Error(`quiz ${n}: options must be a list of strings`);
+    const qid = typeof o.id === 'string' && o.id ? o.id : `${lessonId}-q${n}`;
+    // scene `ask` answers are stored under "<scene>:<step>" in the same table: keep the namespaces apart
+    if (qid.includes(':')) throw new Error(`quiz ${n}: id must not contain ":"`);
     return {
-      id: typeof o.id === 'string' && o.id ? o.id : `${lessonId}-q${n}`,
+      id: qid,
       prompt: str(o.q ?? o.prompt, `quiz ${n}: q`),
       choices: options,
       answer: o.answer as number,

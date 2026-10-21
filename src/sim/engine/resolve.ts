@@ -220,6 +220,7 @@ export function resolveRoll(
     totalLost,
     totalVig,
     expectedLoss: state.stats.expectedLoss,
+    variance: state.stats.variance,
     byType,
   };
 

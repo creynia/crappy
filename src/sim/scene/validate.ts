@@ -1,6 +1,6 @@
 import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
-import { RULE_PRESETS } from '../engine/rules';
+import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import type { RulePresetId } from '../engine/types';
 import { listStrategies } from '../strategy/presets';
 import type { SceneConfig } from './types';
@@ -448,6 +448,7 @@ export function validateScene(
         'compare',
         'stopWin',
         'stopLoss',
+        'bankroll',
         'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
@@ -486,14 +487,28 @@ export function validateScene(
         c.cents(`autoRoll.${k}`, v, { min: 1 });
         if (typeof v === 'number' && !stopAmounts.includes(v))
           c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
-        if (
-          k === 'stopLoss' &&
-          typeof v === 'number' &&
-          typeof s.bankroll === 'number' &&
-          v > s.bankroll
-        )
-          c.err('autoRoll.stopLoss', 'cannot be more than the scene bankroll');
       }
+      // The panel's custom input uses the scene's own table minimum, capped at $1,000,000.
+      let tableMin = 500;
+      try {
+        tableMin = resolveRules(s.rules as Parameters<typeof resolveRules>[0]).tableMin;
+      } catch {
+        /* invalid rules are reported elsewhere; keep the default minimum */
+      }
+      const startBankroll = a.bankroll !== undefined ? a.bankroll : s.bankroll;
+      if (a.bankroll !== undefined) {
+        if (!isInt(a.bankroll) || a.bankroll < tableMin || a.bankroll > 100_000_000)
+          c.err(
+            'autoRoll.bankroll',
+            `must be integer cents from $${tableMin / 100} (the table minimum) to $1,000,000`,
+          );
+      }
+      if (
+        typeof a.stopLoss === 'number' &&
+        typeof startBankroll === 'number' &&
+        a.stopLoss > startBankroll
+      )
+        c.err('autoRoll.stopLoss', 'cannot be more than the auto-roll starting bankroll');
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

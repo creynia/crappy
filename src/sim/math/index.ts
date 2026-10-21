@@ -12,6 +12,7 @@ export {
   expectedLossByTypePerRoll,
   lossPerRoll,
 } from './ev';
+export { makeVarianceFn, luckOf, luckFrom, luckText, type Luck, type LuckVerdict } from './luck';
 export { previewAction, suggestAlternative } from './preview';
 export { explainBet } from './explain';
 export { edgeTier } from './tiers';

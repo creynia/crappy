@@ -8,7 +8,7 @@ import {
   resolveRules,
 } from '../engine';
 import type { GameState, PointTable } from '../engine';
-import { tableExpectedLossPerRoll, toNumber } from '../math';
+import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
 import type {
@@ -51,6 +51,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   const stopAtBust = cfg.stopAtBust ?? true;
   const start = cfg.bankroll;
   const expectedLossFn = makeExpectedLossFn();
+  const varianceFn = makeVarianceFn();
   let state = createGame({ rules: cfg.rules, bankroll: cfg.bankroll, seed: cfg.seed });
   const eq = new Int32Array(cfg.rolls + 1);
   const exp = new Float64Array(cfg.rolls + 1);
@@ -93,7 +94,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
       endedBy = 'bust';
       break;
     }
-    const r = applyAction(state, { type: 'roll' }, { expectedLossFn });
+    const r = applyAction(state, { type: 'roll' }, { expectedLossFn, varianceFn });
     if (!r.ok) throw new Error(`roll rejected: ${r.error.message}`);
     state = r.state;
     played = i;
@@ -138,6 +139,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     finalEquity,
     totalWagered: state.stats.totalWagered,
     expectedLoss: state.stats.expectedLoss,
+    variance: state.stats.variance,
     actualLoss: start - finalEquity,
     totals,
     endedBy,

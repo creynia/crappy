@@ -378,6 +378,9 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'stopWin',
+        'stopLoss',
+        'bankroll',
         'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
@@ -406,6 +409,29 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      // The panel offers these amounts as chips, so a scene can only pick one of them.
+      const stopAmounts = [5000, 10_000, 25_000];
+      for (const [k, v] of [
+        ['stopWin', a.stopWin],
+        ['stopLoss', a.stopLoss],
+      ] as const) {
+        if (v === undefined) continue;
+        c.cents(`autoRoll.${k}`, v, { min: 1 });
+        if (typeof v === 'number' && !stopAmounts.includes(v))
+          c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
+      }
+      // Same range as the panel's custom input: at least the default $5 table minimum, at most $1,000,000.
+      const startBankroll = a.bankroll !== undefined ? a.bankroll : s.bankroll;
+      if (a.bankroll !== undefined) {
+        if (!isInt(a.bankroll) || a.bankroll < 500 || a.bankroll > 100_000_000)
+          c.err('autoRoll.bankroll', 'must be integer cents from $5 to $1,000,000');
+      }
+      if (
+        typeof a.stopLoss === 'number' &&
+        typeof startBankroll === 'number' &&
+        a.stopLoss > startBankroll
+      )
+        c.err('autoRoll.stopLoss', 'cannot be more than the auto-roll starting bankroll');
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

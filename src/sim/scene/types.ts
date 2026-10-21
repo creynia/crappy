@@ -53,6 +53,12 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
+    stopWin?: Cents;
+    /** default "stop when behind by" amount, in cents */
+    stopLoss?: Cents;
+    /** starting bankroll for the auto-roll runs, in cents; default is the scene bankroll */
+    bankroll?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };

@@ -90,11 +90,55 @@ describe('scene runner', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('accepts autoRoll stopWin / stopLoss defaults in integer cents and rejects other values', () => {
+    const ok = validateScene({
+      id: 'x',
+      version: 1,
+      autoRoll: { enabled: true, stopWin: 5000, stopLoss: 10000 },
+    });
+    expect(ok.ok).toBe(true);
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      autoRoll: { enabled: true, stopWin: 50.5, stopLoss: 0 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      const t = bad.errors.join('\n');
+      expect(t).toContain('autoRoll.stopWin');
+      expect(t).toContain('autoRoll.stopLoss');
+    }
+  });
   it('validates autoRoll.sweep', () => {
     const mk = (sweep: unknown) =>
       validateScene({ id: 'x', version: 1, autoRoll: { enabled: true, sweep } });
     expect(mk({ strategy: 'pass-max-odds', oddsMultiples: [0, 1, 'max', 100] }).ok).toBe(true);
     const bad = mk({ strategy: 'nope', oddsMultiples: [0, 'big'] });
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('autoRoll.bankroll', () => {
+  it('accepts integer cents from $5 to $1,000,000 and rejects others', () => {
+    expect(
+      validateScene({ id: 'x', version: 1, autoRoll: { enabled: true, bankroll: 50_000 } }).ok,
+    ).toBe(true);
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      autoRoll: { enabled: true, bankroll: 499.5 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
+  it('checks stopLoss against the auto-roll bankroll, not only the scene bankroll', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      bankroll: 100_000,
+      autoRoll: { enabled: true, bankroll: 20_000, stopLoss: 25_000 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.stopLoss');
   });
 });

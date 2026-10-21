@@ -5,6 +5,8 @@ const pages: [string, string][] = [
   ['home', '/'],
   ['lesson', '/#/learn/pass-line'],
   ['sandbox', '/#/play?speed=instant'],
+  ['practice hub', '/#/practice'],
+  ['practice drill', '/#/practice/line-calls?seed=7&level=3'],
 ];
 
 for (const [name, path] of pages) {

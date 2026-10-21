@@ -2,6 +2,8 @@ import type { Cents } from '../engine/types';
 
 /** Starting-bankroll chips in the Auto-roll panel: $200, $500, $1,000, $5,000. */
 export const BANKROLL_CHIPS: Cents[] = [20_000, 50_000, 100_000, 500_000];
+/** localStorage key for the last starting-bankroll pick (sandbox only). */
+export const AUTOROLL_BANKROLL_KEY = 'crappy.autoroll.bankroll';
 /** Upper limit for a custom starting bankroll: $1,000,000. */
 export const MAX_BANKROLL: Cents = 100_000_000;
 

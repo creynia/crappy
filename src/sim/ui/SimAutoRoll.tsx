@@ -14,6 +14,8 @@ export interface SimAutoRollProps {
   rollsPerHour: number;
   emit: (e: SimulatorEvent) => void;
   feedInput: (input: SceneInput) => void;
+  /** sandbox only: remember the starting-bankroll pick for this viewer */
+  persistKey?: string;
 }
 
 /** The auto-roll section: config from the scene, the live layout, and step feedback on completion. */
@@ -24,6 +26,7 @@ export function SimAutoRoll({
   rollsPerHour,
   emit,
   feedInput,
+  persistKey,
 }: SimAutoRollProps) {
   const ar = scene.autoRoll;
   const config = useMemo(() => {
@@ -40,6 +43,9 @@ export function SimAutoRoll({
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
     if (ar.sweep) cfg.sweep = ar.sweep;
+    if (ar.stopWin !== undefined) cfg.stopWin = ar.stopWin;
+    if (ar.stopLoss !== undefined) cfg.stopLoss = ar.stopLoss;
+    if (ar.bankroll !== undefined) cfg.bankroll = ar.bankroll;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(
@@ -73,6 +79,7 @@ export function SimAutoRoll({
       <AutoRollPanel
         rules={typeof scene.rules === 'object' ? resolveRules(scene.rules) : rulesValue}
         bankroll={Math.max(0, equity(game))}
+        {...(persistKey ? { persistKey } : {})}
         {...(config ? { config } : {})}
         layout={layoutBets}
         rollsPerHour={rollsPerHour}

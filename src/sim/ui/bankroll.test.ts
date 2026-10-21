@@ -21,3 +21,10 @@ describe('parseBankroll', () => {
     });
   });
 });
+
+describe('parseBankroll edges', () => {
+  it('accepts the cap exactly and the table minimum exactly', () => {
+    expect(parseBankroll('1000000', 500)).toEqual({ ok: true, cents: 100_000_000 });
+    expect(parseBankroll('500', 500)).toEqual({ ok: true, cents: 50_000 });
+  });
+});

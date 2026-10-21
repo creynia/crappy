@@ -3,6 +3,7 @@ import { betEV } from './ev';
 import { fracText, money } from './format';
 import { neg } from './fraction';
 import { betOutcomes } from './ev';
+import { rollEffectGrid, worksNow, type RollEffect } from './outcomes';
 import type { BetCtx, BetLike, Explanation } from './types';
 
 export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
@@ -46,5 +47,16 @@ export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   }
   if (def.oneRoll) notes.push('One-roll bet: its edge is paid on every roll.');
   const note = notes.length > 0 ? notes.join(' ') : undefined;
-  return note === undefined ? { rows, evFormula } : { rows, evFormula, note };
+  const out: Explanation = { rows, evFormula };
+  // Lazy: only the Why? panel reads it, and strategy simulations build many explanations.
+  let grid: RollEffect[] | undefined;
+  Object.defineProperty(out, 'grid', {
+    enumerable: false,
+    get: () => (grid ??= rollEffectGrid(bet, ctx)),
+  });
+  if (note !== undefined) out.note = note;
+  if (!worksNow(bet, ctx)) {
+    out.gridNote = 'This bet is off on the come-out, so no roll changes it.';
+  }
+  return out;
 }

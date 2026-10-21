@@ -93,6 +93,21 @@ test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ pa
   await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
 });
 
+test('lesson 16: the streak lab runs 100k rolls and completes its step', async ({
+  page,
+  guard,
+}) => {
+  await page.goto('/#/learn/myths-and-systems');
+  const scene = await openScene(page, 1);
+  const lab = scene.getByTestId('streak-lab'); // the step opens the panel itself
+  await expect(lab).toBeVisible();
+  await lab.getByTestId('streak-run').click();
+  await expect(lab.getByTestId('streak-row')).toHaveCount(3);
+  await expect(lab.getByTestId('streak-result')).toContainText('exact chance is 16.7% (1/6)');
+  await expect(scene.locator('.sim-step-text')).toContainText('dice have no memory');
+  await guard.check('lesson-streak-lab');
+});
+
 test('lesson 7: the call-the-bet question locks Roll until answered', async ({ page }) => {
   await page.goto('/#/learn/come-bets');
   const scene = await openScene(page, 1);

@@ -18,3 +18,13 @@ export {
 export function strategyMetrics(spec: StrategySpec, rules?: TableRules): StrategyMetrics {
   return metrics(spec, rules ?? resolveRules());
 }
+export {
+  scanStreaks,
+  rollTotals,
+  exactProbability,
+  type StreakCondition,
+  type StreakConfig,
+  type StreakResult,
+  type StreakStat,
+  type StreakTarget,
+} from './streaks';

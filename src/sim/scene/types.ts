@@ -63,6 +63,8 @@ export interface SceneConfig {
     bankroll?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
+    /** show a lab tool instead of the run form: 'streaks' = the gambler's-fallacy streak lab */
+    lab?: 'streaks';
   };
   steps?: SceneStep[];
 }

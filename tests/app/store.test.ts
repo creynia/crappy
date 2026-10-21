@@ -238,3 +238,13 @@ describe('spaced review schedule', () => {
     expect(seeds[0]).toBe(3);
   });
 });
+
+describe('resetLesson keeps in-scene question answers', () => {
+  it('clears exam quizzes but not "<scene>:<step>" answers', () => {
+    const s = new Store(new MemoryStorage());
+    s.markQuiz('l', 'l-q1', true);
+    s.markQuiz('l', 'scene:step', true);
+    s.resetLesson('l');
+    expect(Object.keys(s.lesson('l')!.quizzes)).toEqual(['scene:step']);
+  });
+});

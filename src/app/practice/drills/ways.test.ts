@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { WAYS, pointWinProb } from '../../../sim/math';
 import { POINT_NUMBERS } from '../../../sim/engine';
-import { createDrillRng } from '../rng';
-import { ways, pairsFor } from './ways';
+import { WAYS, pointWinProb } from '../../../sim/math';
+import { createDrillRng, type DrillRng } from '../rng';
+import { ways, pairsFor, type WaysItem } from './ways';
 
-const gen = (level: number, n = 400) => {
-  const items = [];
-  for (let i = 0; i < n; i++) items.push(ways.generate(createDrillRng(i + 1), level));
+// defineDrill erases the item type, so the test names the generator's signature.
+const generate = (rng: DrillRng, level: number): WaysItem =>
+  (ways.generate as unknown as (r: DrillRng, l: number) => WaysItem)(rng, level);
+const gen = (level: number, n = 400): WaysItem[] => {
+  const items: WaysItem[] = [];
+  for (let i = 0; i < n; i++) items.push(generate(createDrillRng(i + 1), level));
   return items;
 };
 
@@ -26,35 +29,35 @@ describe('ways drill', () => {
   });
 
   it('answers match WAYS and pointWinProb', () => {
-    for (const it of gen(3)) {
-      if (it.kind === 'ways') {
-        expect(it.answerId).toBe(String(WAYS[it.total]));
-        expect(it.combos.length).toBe(WAYS[it.total]);
+    for (const item of gen(3)) {
+      if (item.kind === 'ways') {
+        expect(item.answerId).toBe(String(WAYS[item.total]));
+        expect(item.combos.length).toBe(WAYS[item.total]);
       }
-      if (it.kind === 'point') {
-        const p = pointWinProb(it.point!);
-        expect(it.answerId).toBe(`${p.n}/${p.d}`);
+      if (item.kind === 'point') {
+        const p = pointWinProb(item.point!);
+        expect(item.answerId).toBe(`${p.n}/${p.d}`);
       }
     }
   });
 
-  it('the correct choice is among the choices and explanations name the combinations', () => {
-    for (const it of gen(3, 200)) {
-      const ids = it.answer.kind === 'choice' ? it.answer.choices.map((c) => c.id) : [];
-      expect(ids).toContain(it.answerId);
+  it('the correct choice is offered once and explanations name the combinations', () => {
+    for (const item of gen(3, 200)) {
+      const ids = item.answer.kind === 'choice' ? item.answer.choices.map((c) => c.id) : [];
+      expect(ids).toContain(item.answerId);
       expect(new Set(ids).size).toBe(ids.length);
-      const r = ways.check(it, it.answerId);
+      const r = ways.check(item, item.answerId);
       expect(r.ok).toBe(true);
-      if (it.kind === 'ways') expect(r.explain).toContain(`${it.combos.length} ways`);
-      if (it.kind === 'hard') expect(r.explain).toContain('equal dice');
+      if (item.kind === 'ways') expect(r.explain).toContain(`${item.combos.length} ways`);
+      if (item.kind === 'hard') expect(r.explain).toContain('equal dice');
     }
   });
 
-  it('hard-way answers are equal pairs; the wrong answer fails', () => {
-    for (const it of gen(3, 200).filter((i) => i.kind === 'hard')) {
-      const [a, b] = it.answerId.split('-');
+  it('hard-way answers are equal pairs; a wrong answer fails', () => {
+    for (const item of gen(3, 200).filter((i) => i.kind === 'hard')) {
+      const [a, b] = item.answerId.split('-');
       expect(a).toBe(b);
-      expect(ways.check(it, 'nope').ok).toBe(false);
+      expect(ways.check(item, 'nope').ok).toBe(false);
     }
   });
 });

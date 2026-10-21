@@ -7,7 +7,7 @@ import {
   pointsFor,
   resolveRules,
 } from '../engine';
-import type { GameState, PointTable } from '../engine';
+import type { Action, GameState, PointTable } from '../engine';
 import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
@@ -71,15 +71,19 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   let sevenOuts = 0;
   let longest = 0;
   let hand = 0;
+  const log: NonNullable<SessionResult['log']> | undefined = cfg.record ? [] : undefined;
   const bonusHits = new Map<string, NonNullable<SessionResult['bonusHits']>[number]>();
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
     let unavailable = false;
+    const applied: Action[] = [];
     for (const a of plan.actions) {
       const r = applyAction(state, a);
-      if (r.ok) state = r.state;
-      else if (r.error.code === 'unknown-bet') {
+      if (r.ok) {
+        state = r.state;
+        if (log) applied.push(a);
+      } else if (r.error.code === 'unknown-bet') {
         // the rules do not offer this bet (e.g. Don't Pass on a crapless table): not a bust
         unavailable = true;
         break;
@@ -104,6 +108,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     played = i;
     const rec = state.history[state.history.length - 1];
     if (rec) totals[rec.total]!++;
+    if (log && rec) log.push({ actions: applied, dice: [rec.dice[0], rec.dice[1]] });
     hand++;
     for (const e of r.events) {
       if (e.type === 'bet-won' && isBonusType(e.betType)) {
@@ -138,6 +143,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   if (hand > longest) longest = hand;
   const finalEquity = equity(state);
   return {
+    ...(log ? { log } : {}),
     rollsPlayed: played,
     equity: played === cfg.rolls ? eq : eq.slice(0, played + 1),
     expected: played === cfg.rolls ? exp : exp.slice(0, played + 1),

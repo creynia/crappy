@@ -16,6 +16,8 @@ import { buildEvFacts } from './text';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { BetTypeId } from '../engine/types';
+import type { BetInit } from '../engine';
+import type { Action } from '../engine/types';
 import type { Bet, RollRecord } from '../engine/types';
 import type { EdgeTier } from '../math/types';
 
@@ -628,6 +630,31 @@ describe('BetSheet', () => {
     expect(document.querySelector('[data-line="combined"]')).toBeNull();
   });
 
+  it('contract bets show their current value instead of an expected-loss line', () => {
+    const hold = (type: 'pass-line' | 'dont-pass', point: 4 | 6) => {
+      cleanup();
+      const g = createGame({
+        point,
+        bankroll: 100000,
+        bets: [{ ref: 'b', type, amount: 1000 }],
+      });
+      const b = g.bets.find((x) => x.type === type)!;
+      const pv = previewAction(g, { type: 'set-amount', betId: b.id, amount: 1000 });
+      sheet({
+        mode: 'manage',
+        contract: { reason: 'It stays up until it wins or loses.' },
+        preview: pv,
+        facts: buildEvFacts(pv, g),
+      });
+      return document.querySelector('[data-line="hold-value"]')!.textContent;
+    };
+    expect(hold('pass-line', 4)).toContain('Pass line on 4: worth -$3.33 right now (wins 1 in 3)');
+    expect(hold('pass-line', 6)).toContain('worth -$0.91 right now');
+    expect(hold('dont-pass', 4)).toContain("Don't pass on 4: worth +$3.33 right now");
+    expect(document.querySelector('[data-line="loss"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Expected loss on this');
+  });
+
   it('buy and lay sheets list the vig strip with the current amount marked; other bets do not', () => {
     sheet({ ...real('buy-4', 3900), confirmSucker: false });
     const strip = lines('vig-strip');
@@ -707,6 +734,53 @@ describe('BetSheet', () => {
     expect(onRemove).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('checkbox'));
     expect(onToggleWorking).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('bets already on a point (I002)', () => {
+  const hold = (
+    bets: BetInit[],
+    action: (b: Bet) => Action,
+    point: 4 | 6 | null,
+    phase: 'point' | 'come-out' = 'point',
+  ) => {
+    const g = createGame({ phase, point, bankroll: 100000, bets });
+    const b = g.bets.find((x) => x.type !== 'pass-odds')!;
+    const pv = previewAction(g, action(b));
+    cleanup();
+    sheet({ mode: 'manage', preview: pv, facts: buildEvFacts(pv, g), confirmSucker: false });
+    return document.querySelector('[data-line="hold-value"]')?.textContent ?? null;
+  };
+  it("a don't pass on a point shows its value, with no sucker badge and no expected-loss line", () => {
+    const text = hold(
+      [{ ref: 'd', type: 'dont-pass', amount: 1000 }],
+      (b) => ({ type: 'set-amount', betId: b.id, amount: 1000 }),
+      4,
+    );
+    expect(text).toContain("Don't pass on 4: worth +$3.33 right now");
+    expect(document.body.textContent).not.toContain('Sucker');
+    expect(document.body.textContent).not.toContain('Expected loss on this');
+  });
+  it('a come bet with a number shows its value after the puck goes off', () => {
+    const text = hold(
+      [{ ref: 'c', type: 'come', amount: 1000, point: 6 }],
+      (b) => ({ type: 'set-amount', betId: b.id, amount: 1000 }),
+      null,
+      'come-out',
+    );
+    expect(text).toContain('Come on 6: worth -$0.91 right now');
+  });
+  it('the add-odds sentence is dropped when odds are already behind the bet', () => {
+    const text = hold(
+      [
+        { ref: 'p', type: 'pass-line', amount: 1000 },
+        { type: 'pass-odds', amount: 1000, parentRef: 'p' },
+      ],
+      (b) => ({ type: 'set-amount', betId: b.id, amount: 1000 }),
+      4,
+    );
+    expect(text).toContain('Pass line on 4: worth -$3.33 right now');
+    expect(text).not.toContain('best move is to add odds');
   });
 });
 

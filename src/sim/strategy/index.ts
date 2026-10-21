@@ -11,6 +11,7 @@ import type { StrategyMetrics, StrategySpec } from './types';
 
 export * from './types';
 export { exposureIsApproximate, exposureOf, maxExposure, oddsMultiplePerDecision };
+export { replayRoll, replayStart, replayTo } from './replay';
 export { getStrategy, listStrategies } from './presets';
 export { edgeFunnelSigma, peekEdgeFunnelSigma } from './funnel';
 export {

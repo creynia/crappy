@@ -406,8 +406,58 @@ export function typeEdgeLabel(
   try {
     const e = betEdge(type, amount, { phase: state.phase, point: state.point, rules: state.rules });
     const edge = Math.max(0, fracToNumber(e.perResolved));
-    return { edgeText: `${(edge * 100).toFixed(2)}%`, tier: tierOf(e.perResolved) };
+    return { edgeText: fmtPct(edge), tier: tierOf(e.perResolved) };
   } catch {
     return null;
   }
+}
+
+export interface WorkingCopyInput {
+  /** the bet is working now */
+  on: boolean;
+  /** cents per roll: positive = what turning it ON costs, negative = what turning it OFF saves */
+  perRollCents: number;
+  phase: 'come-out' | 'point';
+  /** the player switched this bet off (bet.working === 'off'), not the table convention */
+  playerOff: boolean;
+  type: BetTypeId;
+  /** a buy bet whose vig is already paid, so its marginal cost is about nothing */
+  vigSunk: boolean;
+}
+
+/** Copy under the Working toggle; undefined when there is no honest reason to show. */
+export function workingCopy(c: WorkingCopyInput): string | undefined {
+  const def = BET_TYPES[c.type];
+  if (def.category === 'lay' || def.category === 'big') return undefined;
+  const oddsCopy =
+    "Odds have no house edge, so ON costs nothing on average. If they're ON, a come-out 7 loses them along with the come bet; OFF, they'd be returned.";
+  const isOdds = c.type === 'come-odds' || c.type === 'dont-come-odds';
+  if (isOdds) return oddsCopy;
+  if (c.perRollCents === 0) return undefined;
+  if (c.vigSunk) {
+    return c.on
+      ? 'The vig is already paid, so keeping it working costs nothing more.'
+      : 'The vig is already paid, so turning it ON costs nothing more.';
+  }
+  const roll = c.phase === 'point' ? 'roll' : 'come-out roll';
+  const amt = fmtMoney(Math.abs(c.perRollCents), { exact: true });
+  if (c.on) {
+    const lead = c.phase === 'come-out' ? 'Working on the come-out.' : 'Working.';
+    return `${lead} Turning it OFF saves about ${amt} per ${roll}.`;
+  }
+  const why = c.playerOff
+    ? 'You turned this bet off.'
+    : c.phase === 'come-out'
+      ? 'Off on the come-out by table convention.'
+      : 'Off.';
+  const cost = `${why} Turning it ON costs about ${amt} per ${roll}`;
+  if (def.category === 'place' || def.category === 'buy') {
+    return `${cost} and risks the 7, which comes up 6 of 36 ways.`;
+  }
+  if (def.category === 'hardway') {
+    const n = Number(c.type.replace('hard-', ''));
+    const easy = n === 6 || n === 8 ? 4 : 2;
+    return `${cost}. Hard ${n} loses on ${6 + easy} of 36 rolls (6 sevens and ${easy} easy ways).`;
+  }
+  return `${cost}.`;
 }

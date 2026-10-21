@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, isToggleable } from '../engine/bets';
 import type { Action, BetTypeId, Cents, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
@@ -10,6 +10,7 @@ import type { QuickAction, TypeOption } from './BetSheet';
 import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
 import type { RegionDef, RegionId } from './layouts/types';
 import type { ResolvedSimSettings } from './settings';
+import { workingProp } from './workingProp';
 import {
   defaultAmount,
   defaultBetForRegion,
@@ -111,10 +112,14 @@ export function buildSheetModel(
         const allowed = betTypeAllowed(scene, rt, t);
         const odds = BET_TYPES[t].category === 'odds';
         const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
+        // the amount tapping this type would actually place, so the label and the tap agree
+        const tapAmount = defaultAmount(t, sheet.regionId, game, chip);
+        const edge = typeEdgeLabel(t, tapAmount, game);
+        const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
         return {
           id: t,
           label: betLabel(t),
-          ...(typeEdgeLabel(t, sheet.amount, game) ?? {}),
+          ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
           enabled: allowed && hasParent,
           ...(!allowed
             ? { reason: 'Not available in this lesson' }
@@ -160,6 +165,7 @@ export function buildSheetModel(
           parentId: bet.id,
         }
       : null;
+  const working = bet && isToggleable(bet.type) ? workingProp(game, bet, rollsPerHour) : undefined;
   return {
     bet,
     action,
@@ -172,6 +178,7 @@ export function buildSheetModel(
     removePreview,
     contract,
     addOdds,
+    working,
   };
 }
 

@@ -897,14 +897,24 @@ test('the odds nudge clears the Challenge card in portrait, and in landscape Rol
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     await page.getByRole('button', { name: /^Roll/ }).click();
     const hint = await page.getByTestId('odds-hint').boundingBox();
-    const cardLoc = page.getByRole('button', { name: /^Challenge: 300/ });
-    const card = (await cardLoc.count()) > 0 ? await cardLoc.first().boundingBox() : null;
+    // the Challenge control is a link styled as a button: hit-test that element itself
+    const cardLoc = page.getByRole('link', { name: /^Challenge: 300/ });
+    await expect(cardLoc).toHaveCount(1);
+    const card = await cardLoc.boundingBox();
     expect(hint).not.toBeNull();
-    if (card)
-      expect(
-        meets(hint!, card),
-        `nudge covers the Challenge card at ${vp.width}x${vp.height}`,
-      ).toBe(false);
+    expect(card).not.toBeNull();
+    expect(meets(hint!, card!), `nudge covers the Challenge link at ${vp.width}x${vp.height}`).toBe(
+      false,
+    );
+    // nor does the roll toast shown beside it
+    for (const t of await page.locator('.sim-toast').all()) {
+      const tb = await t.boundingBox();
+      if (tb)
+        expect(
+          meets(tb, card!),
+          `a toast covers the Challenge link at ${vp.width}x${vp.height}`,
+        ).toBe(false);
+    }
     await context.close();
   }
   for (const vp of [
@@ -919,6 +929,30 @@ test('the odds nudge clears the Challenge card in portrait, and in landscape Rol
     const roll = page.getByRole('button', { name: /^Roll/ });
     await roll.click();
     await expect(page.getByTestId('odds-hint')).toBeVisible();
+    // with the nudge and the roll toast up, no toast box or dismiss box reaches Roll
+    const rb0 = (await roll.boundingBox())!;
+    for (const sel of ['.sim-toast', '.sim-toast-x', '[data-testid="odds-hint"]'])
+      for (const t of await page.locator(sel).all()) {
+        const tb = await t.boundingBox();
+        if (tb) expect(meets(tb, rb0), `${sel} meets Roll at ${vp.width}x${vp.height}`).toBe(false);
+      }
+    // the nudge text is shown in full: nothing clipped either way
+    const fit = await page.evaluate(() => {
+      const el = (
+        globalThis as unknown as {
+          document: {
+            querySelector(s: string): {
+              scrollWidth: number;
+              clientWidth: number;
+              scrollHeight: number;
+              clientHeight: number;
+            } | null;
+          };
+        }
+      ).document.querySelector('[data-testid="odds-hint"] p');
+      return el ? el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight : false;
+    });
+    expect(fit, `nudge text clipped at ${vp.width}x${vp.height}`).toBe(true);
     // the nudge is up: Roll is what is under its centre
     const centreIsRoll = async () => {
       const b = await roll.boundingBox();

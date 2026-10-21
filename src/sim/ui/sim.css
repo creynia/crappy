@@ -361,15 +361,33 @@
 .sim-status-wrap {
   position: relative;
 }
+/* portrait: hang from the top of the status row and grow down, never up past the simulator's top */
+.sim-status-wrap > .sim-toasts {
+  top: 0;
+  bottom: auto;
+}
+/* it may reach the top of the felt: the toast text lets taps through, only its dismiss box takes them */
+.sim-status-wrap > .sim-toasts .sim-toast {
+  pointer-events: none;
+}
+.sim-status-wrap > .sim-toasts .sim-toast-x {
+  pointer-events: auto;
+}
 .sim-land .sim-toasts {
   left: 0;
   right: 0;
   top: 0;
-  bottom: auto;
+  bottom: 0;
   gap: 2px;
-  /* never taller than the status block, so the stack ends above the Roll button below it */
-  max-height: 100%;
+  /* exactly the status block, so the stack ends above the Roll button below it: an item that does
+     not fit wraps into a second column outside the rail (clipped), never half over Roll */
+  flex-flow: column wrap;
+  align-content: flex-start;
   overflow: hidden;
+}
+.sim-land .sim-toasts > * {
+  width: 100%;
+  flex: 0 0 auto;
 }
 /* a toast in front of the Roll row must not take its taps: text passes through, only the dismiss box takes them */
 .sim-land .sim-toast {
@@ -1117,6 +1135,21 @@
   display: flex;
   gap: 0;
   flex: 0 0 auto;
+}
+/* the narrow landscape rail: the text gets the full width (no clamp), the buttons their own row */
+.sim-land .sim-odds-hint {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding: 2px 2px 2px 6px;
+}
+.sim-land .sim-odds-hint p {
+  flex: 1 0 100%;
+  display: block;
+  -webkit-line-clamp: none;
+  overflow: visible;
+}
+.sim-land .sim-odds-hint-actions {
+  margin-left: auto;
 }
 .sim-odds-hint-btn {
   width: 44px;

@@ -628,7 +628,14 @@ export function Simulator(props: SimulatorInternalProps) {
 
       <div class="sim-main">
         <div class="sim-felt" {...(watching ? { inert: true } : {})}>
-          {!landscape ? status(false) : null}
+          {/* portrait: the toast layer hangs from the top of the status row, so it never reaches
+              anything above the simulator (the page's Challenge link) */}
+          {!landscape ? (
+            <div class="sim-status-wrap">
+              {status(false)}
+              {toastsEl}
+            </div>
+          ) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (
               <CenterPanel {...tableProps} />
@@ -640,7 +647,6 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
-            {landscape ? null : toastsEl}
             {landscape ? null : winPromptEl}
           </div>
         </div>

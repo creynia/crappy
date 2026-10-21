@@ -3,7 +3,35 @@ import { betEV } from './ev';
 import { fracText, money } from './format';
 import { neg } from './fraction';
 import { betOutcomes } from './ev';
-import type { BetCtx, BetLike, Explanation } from './types';
+import { add, ZERO } from './fraction';
+import type { BetCtx, BetLike, Explanation, OutcomeTree, TreeLeaf } from './types';
+import type { PointNumber } from '../engine/types';
+
+const POINT_PREFIX = /^Point (\d+), then (.*)$/;
+
+/** Group the flat rows by the point they went through; null when no row passes through a point. */
+export function buildTree(rows: ReturnType<typeof betOutcomes>): OutcomeTree | null {
+  const comeOut: TreeLeaf[] = [];
+  const byPoint = new Map<number, TreeLeaf[]>();
+  for (const r of rows) {
+    const m = POINT_PREFIX.exec(r.label);
+    const leaf = { label: m ? (m[2] as string) : r.label, probability: r.probability, net: r.net };
+    if (m) byPoint.set(Number(m[1]), [...(byPoint.get(Number(m[1])) ?? []), leaf]);
+    else comeOut.push(leaf);
+  }
+  if (byPoint.size === 0) return null;
+  const points = [...byPoint.keys()]
+    .sort((a, b) => a - b)
+    .map((n) => {
+      const leaves = byPoint.get(n) as TreeLeaf[];
+      return {
+        point: n as PointNumber,
+        probability: leaves.reduce((acc, l) => add(acc, l.probability), ZERO),
+        leaves,
+      };
+    });
+  return { comeOut, points };
+}
 
 export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   const rows = betOutcomes(bet, ctx);
@@ -46,5 +74,11 @@ export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   }
   if (def.oneRoll) notes.push('One-roll bet: its edge is paid on every roll.');
   const note = notes.length > 0 ? notes.join(' ') : undefined;
-  return note === undefined ? { rows, evFormula } : { rows, evFormula, note };
+  const tree = buildTree(rows);
+  return {
+    rows,
+    ...(tree ? { tree } : {}),
+    evFormula,
+    ...(note === undefined ? {} : { note }),
+  };
 }

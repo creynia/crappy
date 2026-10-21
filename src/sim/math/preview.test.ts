@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../engine/game';
-import { frac, toNumber } from './fraction';
+import { add, eq, frac, mul, ONE, toNumber, ZERO } from './fraction';
+import { betEV } from './ev';
+import { fracText } from './format';
 import { expectedLossByTypePerRoll, tableExpectedLossPerRoll } from './ev';
 import { previewAction, suggestAlternative } from './preview';
 import { explainBet } from './explain';
@@ -236,5 +238,47 @@ describe('"Why?" rows count deciding combinations', () => {
       ways: 1,
       outOf: 36,
     });
+  });
+});
+
+describe('explainBet tree', () => {
+  const ctx = (s: ReturnType<typeof comeOut>) => ({
+    phase: s.phase,
+    point: s.point,
+    rules: s.rules,
+  });
+  for (const type of ['pass-line', 'dont-pass', 'come', 'dont-come'] as const) {
+    it(`${type}: leaves sum to 1 and EV matches betEV exactly`, () => {
+      const s = comeOut();
+      const bet = { type, amount: 1000, point: null } as const;
+      const e = explainBet(bet, ctx(s));
+      const tree = e.tree;
+      expect(tree).toBeDefined();
+      const leaves = [...tree!.comeOut, ...tree!.points.flatMap((p) => p.leaves)];
+      const total = leaves.reduce((a, l) => add(a, l.probability), ZERO);
+      expect(eq(total, ONE)).toBe(true);
+      const ev = leaves.reduce((a, l) => add(a, mul(l.probability, l.net)), ZERO);
+      expect(eq(ev, betEV(bet, ctx(s)))).toBe(true);
+      expect(tree!.points.map((p) => p.point)).toEqual([4, 5, 6, 8, 9, 10]);
+    });
+  }
+  it('pass line wins 244/495 overall and comes out 4/36, 8/36, 24/36', () => {
+    const s = comeOut();
+    const t = explainBet({ type: 'pass-line', amount: 1000, point: null }, ctx(s)).tree!;
+    const win = [...t.comeOut, ...t.points.flatMap((p) => p.leaves)]
+      .filter((l) => l.label.startsWith('Win'))
+      .reduce((a, l) => add(a, l.probability), ZERO);
+    expect(eq(win, frac(244, 495))).toBe(true);
+    expect(t.comeOut.map((l) => fracText(l.probability))).toEqual(['1/9', '2/9']);
+    expect(
+      eq(
+        t.points.reduce((a, p) => add(a, p.probability), ZERO),
+        frac(2, 3),
+      ),
+    ).toBe(true);
+  });
+  it('has no tree for one-state bets', () => {
+    const s = comeOut();
+    expect(explainBet({ type: 'field', amount: 500, point: null }, ctx(s)).tree).toBeUndefined();
   });
 });

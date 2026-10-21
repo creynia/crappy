@@ -756,3 +756,35 @@
     opacity: 0.6;
   }
 }
+
+.sim-tree,
+.sim-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.sim-tree ul {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--sim-border);
+}
+.sim-tree-leaf,
+.sim-tree summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--sim-border);
+  overflow-wrap: anywhere;
+}
+.sim-tree summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  cursor: pointer;
+  min-height: 32px;
+  align-items: center;
+}
+.sim-tree-net {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

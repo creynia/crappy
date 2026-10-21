@@ -25,8 +25,24 @@ export interface EdgeInfo {
 /** By edge per bet resolved: free <=0, good <=2%, fair <=5%, poor <9%, avoid >=9% (only `avoid` needs a second tap). */
 export type EdgeTier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
 
+/** A final outcome in the tree; probability is absolute (from the come-out). */
+export interface TreeLeaf {
+  label: string;
+  probability: Fraction;
+  net: Fraction;
+}
+/** Two-level tree for line-like bets: come-out leaves plus one branch per point. */
+export interface OutcomeTree {
+  /** Resolved straight from the come-out roll (natural / craps). */
+  comeOut: TreeLeaf[];
+  /** P(this point is established) = sum of its leaves' probabilities. */
+  points: { point: PointNumber; probability: Fraction; leaves: TreeLeaf[] }[];
+}
+
 export interface Explanation {
   rows: Outcome[];
+  /** Present only when the bet can set a point (pass / don't pass / come / don't come). */
+  tree?: OutcomeTree;
   evFormula: string;
   note?: string;
 }

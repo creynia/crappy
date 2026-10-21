@@ -62,14 +62,25 @@ const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', '
 interface Placed {
   key: string;
   region: RegionDef;
+  /** travelled come / don't come (and their odds): the number they sit on */
+  point: number | null;
   type: BetTypeId;
   x: number;
   y: number;
   amount: Cents;
   betIds: string[];
   off: boolean;
+  /** turned on (working: 'on') on the come-out, where it would usually be off */
+  on: boolean;
   /** hop bets: the pair, drawn above the stack */
   caption?: string;
+}
+
+/** Odds stacks are drawn after (on top of) the flat bets they sit on. */
+const isOdds = (t: string) => t.endsWith('-odds');
+
+function markerFor(type: string): 'buy' | 'lay' | undefined {
+  return type.startsWith('buy-') ? 'buy' : type.startsWith('lay-') ? 'lay' : undefined;
 }
 
 /** Where a bet's chips go; each hop pair gets its own slot in the hop region (in placement order). */
@@ -84,6 +95,7 @@ function placeBets(
   bets: readonly Bet[],
   offIds: ReadonlySet<string>,
   hiddenIds: ReadonlySet<string>,
+  comeOut: boolean,
 ) {
   const byRegion = new Map<RegionId, Bet[]>();
   const stacks = new Map<string, Placed>();
@@ -98,25 +110,32 @@ function placeBets(
     const key = `${pos.x},${pos.y},${kind}`;
     const prev = stacks.get(key);
     const off = offIds.has(b.id);
+    const on = comeOut && !off && b.working === 'on';
     if (prev) {
       prev.amount += b.amount;
       prev.betIds.push(b.id);
       prev.off = prev.off && off;
+      prev.on = prev.on && on;
     } else {
       stacks.set(key, {
         key,
         region,
+        point: /^(come|dont-come)(-odds)?$/.test(b.type) ? b.point : null,
         type: b.type,
         x: pos.x,
         y: pos.y,
         amount: b.amount,
         betIds: [b.id],
         off,
+        on,
         ...(b.hop ? { caption: hopText(b.hop) } : {}),
       });
     }
   }
-  return { byRegion, stacks: [...stacks.values()] };
+  const ordered = [...stacks.values()].sort(
+    (a, b) => Number(isOdds(a.type)) - Number(isOdds(b.type)),
+  );
+  return { byRegion, stacks: ordered };
 }
 
 export function Table({
@@ -163,8 +182,8 @@ export function Table({
   const travelling = travellingBets ?? [];
   const hiddenIds = useMemo(() => new Set(travelling.map((b) => b.id)), [travellingBets]);
   const { byRegion, stacks } = useMemo(
-    () => placeBets(layout, bets, offIds, hiddenIds),
-    [layout, bets, offIds, hiddenIds],
+    () => placeBets(layout, bets, offIds, hiddenIds, point === null),
+    [layout, bets, offIds, hiddenIds, point],
   );
   const { w, h } = layout.viewBox;
   const hasPuck = layout.puckRadius > 0;
@@ -305,7 +324,7 @@ export function Table({
                 aria-label={
                   note
                     ? `${name}, ${fmtMoney(s.amount)}: ${note.spoken ?? note.text}`
-                    : `Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`
+                    : `Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet${s.point ? ` on ${s.point}` : ''}, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`
                 }
                 aria-pressed={note ? note.tone === 'selected' : undefined}
                 onClick={(e) => {
@@ -337,6 +356,8 @@ export function Table({
                   amount={s.amount}
                   r={r}
                   off={s.off}
+                  on={s.on}
+                  marker={markerFor(s.type)}
                   {...(s.caption ? { caption: s.caption } : {})}
                 />
               </g>
@@ -387,7 +408,13 @@ export function Table({
                 class={`sim-ghost sim-ghost-lose${chipPhase === 'lose' ? ' is-moving' : ''}`}
                 data-lost={b.id}
               >
-                <ChipStack x={p.x} y={p.y} amount={b.amount} r={layout.chipRadius} />
+                <ChipStack
+                  x={p.x}
+                  y={p.y}
+                  amount={b.amount}
+                  r={layout.chipRadius}
+                  marker={markerFor(b.type)}
+                />
               </g>
             ) : null;
           })}

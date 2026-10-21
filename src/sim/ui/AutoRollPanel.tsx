@@ -19,10 +19,12 @@ import type {
   SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
+import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
+import { luckFrom } from '../math/luck';
 import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
@@ -65,6 +67,8 @@ export interface AutoRollPanelProps {
     /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
     stopWin?: Cents;
     stopLoss?: Cents;
+    /** starting bankroll chosen by the scene, in cents; the learner can change it in the panel */
+    bankroll?: Cents;
     /** show the odds-multiple sweep table instead of the run form */
     sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
@@ -82,6 +86,8 @@ export interface AutoRollPanelProps {
   onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
+  /** localStorage key for the last starting-bankroll pick; set only in the sandbox */
+  persistKey?: string;
 }
 
 const LENS_LABEL = { 'lowest-edge': 'Lowest edge', practical: 'Practical', fun: 'Fun per dollar' };
@@ -148,9 +154,38 @@ function randomSeed(): number {
   }
 }
 
+/** Last starting-bankroll pick for this viewer (sandbox only). Storage can be blocked, so every access is guarded. */
+function readStoredBankroll(key: string | undefined): 'table' | Cents | null {
+  if (!key) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === 'table') return 'table';
+    const n = Number(raw);
+    return Number.isSafeInteger(n) && n > 0 && n <= MAX_BANKROLL ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBankroll(key: string | undefined, pick: 'table' | Cents): void {
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, String(pick));
+  } catch {
+    /* storage unavailable: the pick still works for this session */
+  }
+}
+
 export function AutoRollPanel(props: AutoRollPanelProps) {
   const { config, layout, rollsPerHour = 100 } = props;
-  const bankroll = props.bankroll ?? 50_000;
+  const tableBankroll = props.bankroll ?? 50_000;
+  const [bankrollPick, setBankrollPick] = useState<'table' | Cents>(
+    () => readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table',
+  );
+  const [bankrollText, setBankrollText] = useState<string>(() => {
+    const pick = readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table';
+    return pick !== 'table' && !BANKROLL_CHIPS.includes(pick) ? String(pick / 100) : '';
+  });
   const all = useMemo(() => {
     const l = listStrategies();
     return config?.strategies ? l.filter((s) => config.strategies!.includes(s.id)) : l;
@@ -187,6 +222,24 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
+  const bankrollParse =
+    bankrollText.trim() === '' ? null : parseBankroll(bankrollText, rules.tableMin);
+  const bankrollError = bankrollParse && !bankrollParse.ok ? bankrollParse.message : null;
+  const tableTooSmall = tableBankroll < rules.tableMin;
+  // Below the table minimum the Table chip is disabled and the run uses $500 instead of blocking.
+  const bankroll =
+    bankrollPick === 'table' ? (tableTooSmall ? 50_000 : tableBankroll) : bankrollPick;
+  // Below the table minimum the run starts at $500 and the $500 chip shows pressed.
+  useEffect(() => {
+    if (tableTooSmall && bankrollPick === 'table') setBankrollPick(50_000);
+  }, [tableTooSmall, bankrollPick]);
+  // A fallback to $500 is not the learner's choice, so it is not remembered.
+  useEffect(() => {
+    if (!tableTooSmall) writeStoredBankroll(props.persistKey, bankrollPick);
+  }, [bankrollPick, tableTooSmall, props.persistKey]);
+  useEffect(() => {
+    if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
+  }, [bankroll, stopLoss]);
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -208,6 +261,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
+    if (bankrollError) return;
+    if (stopLoss !== undefined && stopLoss > bankroll) {
+      setError(
+        'Stop if down is more than the starting bankroll. Pick a smaller stop or a larger bankroll.',
+      );
+      return;
+    }
     // computed once per run, with the rules this run uses
     const metricsFor = (specs: StrategySpec[]): Metrics[] =>
       specs.map((s) => strategyMetrics(s, rules));
@@ -362,7 +422,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
           )}
           {needsLayout && (
-            <p role="status" class="sim-ar-desc">
+            <p class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
             </p>
           )}
@@ -405,14 +465,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </div>
             <div class="sim-ar-group" role="group" aria-label="Stop when behind by">
               <span>Stop if down</span>
-              {STOP_OPTIONS.map((v) =>
-                button(
-                  stopLoss === v,
-                  v === undefined ? 'None' : money(v),
-                  () => setStopLoss(v),
-                  String(v),
-                ),
-              )}
+              {STOP_OPTIONS.map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  aria-pressed={stopLoss === v}
+                  disabled={running || (v !== undefined && v > bankroll)}
+                  class="sim-ar-btn"
+                  onClick={() => setStopLoss(v)}
+                >
+                  {v === undefined ? 'None' : money(v)}
+                </button>
+              ))}
             </div>
           </>
         )}
@@ -448,6 +512,70 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               }}
             />
           </label>
+        </div>
+        <div class="sim-ar-group" role="group" aria-label="Starting bankroll">
+          <span>Bankroll</span>
+          <button
+            type="button"
+            aria-pressed={bankrollPick === 'table' && bankrollText === ''}
+            disabled={running || tableTooSmall}
+            title={
+              tableTooSmall
+                ? `Table bankroll is below the ${money(rules.tableMin)} minimum`
+                : undefined
+            }
+            class="sim-ar-btn"
+            onClick={() => {
+              setBankrollText('');
+              setBankrollPick('table');
+            }}
+          >
+            Table ({money(tableBankroll)})
+          </button>
+          {BANKROLL_CHIPS.map((c) =>
+            button(
+              bankrollPick === c && bankrollText === '',
+              money(c),
+              () => {
+                setBankrollText('');
+                setBankrollPick(c);
+              },
+              c,
+            ),
+          )}
+          <label>
+            <span class="sim-sr">Custom starting bankroll in whole dollars</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Custom"
+              value={bankrollText}
+              disabled={running}
+              aria-invalid={bankrollError !== null}
+              aria-describedby={bankrollError ? 'bankroll-error' : undefined}
+              class="sim-ar-num"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setBankrollText(v);
+                if (v.trim() === '') {
+                  setBankrollPick('table');
+                  return;
+                }
+                const r = parseBankroll(v, rules.tableMin);
+                if (r.ok) setBankrollPick(r.cents);
+              }}
+            />
+          </label>
+          {tableTooSmall ? (
+            <p class="sim-ar-desc">
+              Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
+          {bankrollError ? (
+            <p id="bankroll-error" role="alert" class="sim-invalid">
+              {bankrollError}
+            </p>
+          ) : null}
         </div>
         <div class="sim-ar-group" role="group" aria-label="Sessions">
           <span>Sessions</span>
@@ -527,7 +655,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
 
   function renderOutput(o: Outcome) {
-    const start = bankroll;
+    const start = o.cfg.bankroll;
     const noBet = o.specs.length === 1 && o.specs[0]!.id === 'no-bet';
     if (noBet && o.kind === 'single') return <TotalsHistogram counts={o.results[0]!.totals} />;
     let series: ChartSeries[];
@@ -638,12 +766,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (o.kind === 'single') {
       const rs = o.results;
       const rows: Array<[string, string[]]> = [
+        ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
         ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
-        ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
+        ['Actual result', rs.map((r) => money2(r.finalEquity - o.cfg.bankroll, true))],
         ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
         [
           'Luck (actual minus expected)',
-          rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
+          rs.map((r) => money2(r.finalEquity - o.cfg.bankroll + r.expectedLoss, true)),
+        ],
+        [
+          'Luck in typical swings',
+          rs.map((r) => {
+            const l = luckFrom(r.finalEquity - bankroll, r.expectedLoss, r.variance);
+            return l.z === null ? 'n/a' : `${l.z > 0 ? '+' : ''}${l.z.toFixed(1)} (${l.verdict})`;
+          }),
         ],
         ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],
@@ -675,6 +811,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
     const rows: Array<[string, string[]]> = [
+      ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
       ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
       ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
       ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],

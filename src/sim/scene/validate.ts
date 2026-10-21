@@ -1,13 +1,15 @@
-import { isBetTypeId } from '../engine/bets';
+import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
-import { RULE_PRESETS } from '../engine/rules';
+import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
+import { answeredRequirements } from './conditions';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const isInt = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x);
 const POINTS = [4, 5, 6, 8, 9, 10];
+const BET_RESULTS = ['won', 'lost', 'pushed'];
 const ACTION_TYPES = ['place-bet', 'set-amount', 'remove-bet', 'set-working', 'roll'];
 const EVENT_TYPES = [
   'bet-placed',
@@ -95,8 +97,18 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
+    this.keys(path, v, [
+      'ref',
+      'type',
+      'amount',
+      'point',
+      'parentRef',
+      'working',
+      'hop',
+      'progress',
+    ]);
     this.bet(`${path}.type`, v.type);
+    this.hop(path, v.type, v.hop, true);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
     if (v.parentRef !== undefined) this.str(`${path}.parentRef`, v.parentRef);
@@ -108,9 +120,21 @@ class Ctx {
         this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
     }
   }
+  /** Hop pair (I035): required on a hop BetInit, optional on a hop matcher, rejected elsewhere. */
+  hop(path: string, type: unknown, hop: unknown, required: boolean) {
+    const types = Array.isArray(type) ? type : type === undefined ? [] : [type];
+    const isHop = types.length > 0 && types.every((t) => t === 'hop');
+    if (hop === undefined) {
+      if (required && isHop) this.err(`${path}.hop`, 'a hop bet needs a dice pair, e.g. [2, 4]');
+      return;
+    }
+    if (!isDicePair(hop)) this.err(`${path}.hop`, 'must be a pair of dice, each an integer 1-6');
+    else if (!isHop) this.err(`${path}.hop`, 'only applies to the "hop" bet type');
+  }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax']);
+    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax', 'hop']);
+    this.hop(path, v.betType, v.hop, false);
     if (!ACTION_TYPES.includes(v.type as string)) this.err(`${path}.type`, 'unknown action type');
     if (v.betType !== undefined) {
       if (Array.isArray(v.betType))
@@ -163,13 +187,36 @@ class Ctx {
         break;
       case 'betOnTable':
         if (!isObj(val)) return this.err(`${path}.betOnTable`, 'must be an object');
-        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount']);
+        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount', 'point']);
         this.bet(`${path}.betOnTable.type`, val.type);
         if (val.minAmount !== undefined)
           this.cents(`${path}.betOnTable.minAmount`, val.minAmount, { min: 1 });
+        if (val.point !== undefined) {
+          this.point(`${path}.betOnTable.point`, val.point);
+          const t = val.type;
+          if (typeof t === 'string' && t !== 'come' && t !== 'dont-come' && !t.endsWith('-odds'))
+            this.err(
+              `${path}.betOnTable.point`,
+              'point only applies to come, dont-come and odds bets',
+            );
+        }
+        break;
+      case 'betResolved':
+        if (!isObj(val)) return this.err(`${path}.betResolved`, 'must be an object');
+        this.keys(`${path}.betResolved`, val, ['type', 'result']);
+        this.bet(`${path}.betResolved.type`, val.type);
+        if (val.result !== undefined && !BET_RESULTS.includes(val.result as string))
+          this.err(`${path}.betResolved.result`, 'must be "won", "lost" or "pushed"');
+        break;
+      case 'not':
+        this.condition(`${path}.not`, val, autoRoll);
         break;
       case 'bankrollAtLeast':
       case 'bankrollAtMost':
+        this.cents(`${path}.${k}`, val);
+        break;
+      case 'equityAtLeast':
+      case 'equityAtMost':
         this.cents(`${path}.${k}`, val);
         break;
       case 'previewed':
@@ -188,12 +235,32 @@ class Ctx {
           this.err(`${path}.autoRollCompleted.minRolls`, 'must be a positive integer');
         if (!autoRoll) this.err(path, 'autoRollCompleted needs autoRoll.enabled on the scene');
         break;
+      case 'answered':
+        if (val !== true && val !== 'correct')
+          this.err(`${path}.answered`, 'must be true or "correct"');
+        break;
       case 'acknowledged':
         if (val !== true) this.err(`${path}.acknowledged`, 'must be true');
         break;
       default:
         this.err(path, `unknown condition "${k}"`);
     }
+  }
+  ask(path: string, v: unknown) {
+    if (!isObj(v)) return this.err(path, 'must be an object');
+    this.keys(path, v, ['q', 'options', 'answer', 'explain', 'mode']);
+    this.str(`${path}.q`, v.q);
+    this.str(`${path}.explain`, v.explain);
+    if (
+      !Array.isArray(v.options) ||
+      v.options.length < 2 ||
+      v.options.some((o) => typeof o !== 'string' || o === '')
+    )
+      this.err(`${path}.options`, 'must be an array of at least 2 non-empty strings');
+    else if (!(isInt(v.answer) && v.answer >= 0 && v.answer < v.options.length))
+      this.err(`${path}.answer`, 'must be an integer index into options');
+    if (v.mode !== undefined && v.mode !== 'before-roll' && v.mode !== 'any')
+      this.err(`${path}.mode`, 'must be before-roll or any');
   }
   strategySpec(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
@@ -275,6 +342,7 @@ const STEP_KEYS = [
   'completeWhen',
   'advance',
   'showEV',
+  'ask',
 ];
 
 /** Strict scene validation: canonical ids, integer cents, dice 1-6, shapes, and engine-backed bet checks. */
@@ -380,6 +448,7 @@ export function validateScene(
         'compare',
         'stopWin',
         'stopLoss',
+        'bankroll',
         'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
@@ -418,14 +487,28 @@ export function validateScene(
         c.cents(`autoRoll.${k}`, v, { min: 1 });
         if (typeof v === 'number' && !stopAmounts.includes(v))
           c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
-        if (
-          k === 'stopLoss' &&
-          typeof v === 'number' &&
-          typeof s.bankroll === 'number' &&
-          v > s.bankroll
-        )
-          c.err('autoRoll.stopLoss', 'cannot be more than the scene bankroll');
       }
+      // The panel's custom input uses the scene's own table minimum, capped at $1,000,000.
+      let tableMin = 500;
+      try {
+        tableMin = resolveRules(s.rules as Parameters<typeof resolveRules>[0]).tableMin;
+      } catch {
+        /* invalid rules are reported elsewhere; keep the default minimum */
+      }
+      const startBankroll = a.bankroll !== undefined ? a.bankroll : s.bankroll;
+      if (a.bankroll !== undefined) {
+        if (!isInt(a.bankroll) || a.bankroll < tableMin || a.bankroll > 100_000_000)
+          c.err(
+            'autoRoll.bankroll',
+            `must be integer cents from $${tableMin / 100} (the table minimum) to $1,000,000`,
+          );
+      }
+      if (
+        typeof a.stopLoss === 'number' &&
+        typeof startBankroll === 'number' &&
+        a.stopLoss > startBankroll
+      )
+        c.err('autoRoll.stopLoss', 'cannot be more than the auto-roll starting bankroll');
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');
@@ -482,6 +565,19 @@ export function validateScene(
             c.err(`${p}.expect`, 'must be a non-empty array');
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
+        if (st.ask !== undefined) c.ask(`${p}.ask`, st.ask);
+        const needsAnswer = answeredRequirements(st.completeWhen).length > 0;
+        if (needsAnswer && st.ask === undefined)
+          c.err(`${p}.completeWhen`, 'an answered condition needs the step to have an ask');
+        // the feedback must be seen before the step moves on: wait for Next or for something else too
+        const cw = isObj(st.completeWhen) ? st.completeWhen : {};
+        const alsoWaits =
+          Array.isArray(cw.all) && cw.all.some((x) => answeredRequirements(x).length === 0);
+        if (st.ask !== undefined && st.advance !== 'button' && !alsoWaits)
+          c.err(
+            `${p}.advance`,
+            'a step with an ask needs advance: button, or an all condition with something besides answered',
+          );
         if (st.completeWhen === undefined) c.err(`${p}.completeWhen`, 'is required');
         else c.condition(`${p}.completeWhen`, st.completeWhen, autoOn);
         if (st.setup !== undefined) {

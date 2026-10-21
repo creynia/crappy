@@ -4,7 +4,8 @@ import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
 import { ChipStack } from './ChipStack';
 import { Dice } from './Dice';
 import type { Dice as DicePair } from '../engine/types';
-import { regionIdForBet, spotPosition } from './layouts';
+import { hopText } from '../engine/bets';
+import { hopSpot, regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
 import { Puck } from './Puck';
 import { RegionArt } from './regionArt';
@@ -25,6 +26,12 @@ export interface TableProps {
   lostBets?: readonly Bet[];
   /** bets that just won: highlight flash, plus a payout stack that slides in from the dealer */
   wonBets?: readonly { bet: Bet; payout: Cents }[];
+  /** come / don't-come bets (with their new point) whose chips are sliding from the box to the number */
+  travellingBets?: readonly Bet[];
+  /** duration of the current chip movement (lose / win / travel), ms; drives the CSS animations */
+  chipMs?: number;
+  /** which overlay is animating right now; the others sit still at their spot */
+  chipPhase?: 'travel' | 'lose' | 'win' | null;
   /** dice overlay while rolling */
   rollingDice?: { dice: DicePair | null; durationMs: number } | null;
   selectedRegion?: RegionId | null;
@@ -45,9 +52,23 @@ interface Placed {
   amount: Cents;
   betIds: string[];
   off: boolean;
+  /** hop bets: the pair, drawn above the stack */
+  caption?: string;
 }
 
-function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySet<string>) {
+/** Where a bet's chips go; each hop pair gets its own slot in the hop region (in placement order). */
+function betSpot(layout: TableLayout, region: RegionDef, b: Bet, bets: readonly Bet[]) {
+  if (b.type !== 'hop' || !b.hop) return { pos: spotPosition(region, b.type), key: b.type };
+  const slot = bets.filter((x) => x.type === 'hop').indexOf(b);
+  return { pos: hopSpot(region, slot, layout.chipRadius), key: `hop:${hopText(b.hop)}` };
+}
+
+function placeBets(
+  layout: TableLayout,
+  bets: readonly Bet[],
+  offIds: ReadonlySet<string>,
+  hiddenIds: ReadonlySet<string>,
+) {
   const byRegion = new Map<RegionId, Bet[]>();
   const stacks = new Map<string, Placed>();
   for (const b of bets) {
@@ -55,8 +76,10 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
     const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
     if (!region) continue;
     byRegion.set(region.id, [...(byRegion.get(region.id) ?? []), b]);
-    const pos = spotPosition(region, b.type);
-    const key = `${pos.x},${pos.y},${b.type}`;
+    // a travelling bet keeps its accessible name here but its chips are drawn by the ghost
+    if (hiddenIds.has(b.id)) continue;
+    const { pos, key: kind } = betSpot(layout, region, b, bets);
+    const key = `${pos.x},${pos.y},${kind}`;
     const prev = stacks.get(key);
     const off = offIds.has(b.id);
     if (prev) {
@@ -73,6 +96,7 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
         amount: b.amount,
         betIds: [b.id],
         off,
+        ...(b.hop ? { caption: hopText(b.hop) } : {}),
       });
     }
   }
@@ -89,6 +113,9 @@ export function Table({
   fieldPays = { 2: 2, 12: 2 },
   lostBets,
   wonBets,
+  travellingBets,
+  chipMs,
+  chipPhase,
   rollingDice,
   selectedRegion,
   onRegionTap,
@@ -99,9 +126,11 @@ export function Table({
   const feltId = `felt-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
+  const travelling = travellingBets ?? [];
+  const hiddenIds = useMemo(() => new Set(travelling.map((b) => b.id)), [travellingBets]);
   const { byRegion, stacks } = useMemo(
-    () => placeBets(layout, bets, offIds),
-    [layout, bets, offIds],
+    () => placeBets(layout, bets, offIds, hiddenIds),
+    [layout, bets, offIds, hiddenIds],
   );
   const { w, h } = layout.viewBox;
   const hasPuck = layout.puckRadius > 0;
@@ -136,7 +165,13 @@ export function Table({
   const ghostPos = (b: Bet) => {
     const rid = regionIdForBet(b.type, b.point);
     const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
-    return region ? spotPosition(region, b.type) : null;
+    if (!region) return null;
+    // a resolved hop is no longer in `bets`: rebuild the pre-roll hop order (bet ids are sequential)
+    if (b.type !== 'hop') return spotPosition(region, b.type);
+    const prior = [...bets, ...(lostBets ?? []), ...(wonBets ?? []).map((x) => x.bet)]
+      .filter((x) => x.type === 'hop')
+      .sort((x, y) => Number(x.id.slice(1)) - Number(y.id.slice(1)));
+    return betSpot(layout, region, b, prior).pos;
   };
 
   return (
@@ -203,7 +238,10 @@ export function Table({
         {hasPuck ? (
           <Puck x={puckPos.x} y={puckPos.y} r={layout.puckRadius} on={point !== null} />
         ) : null}
-        <g class="sim-chips">
+        <g
+          class="sim-chips"
+          style={chipMs !== undefined ? `--sim-chip-ms: ${Math.max(1, chipMs)}ms` : undefined}
+        >
           {stacks.map((s) => {
             const nums = s.betIds.length;
             return (
@@ -212,7 +250,7 @@ export function Table({
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
+                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);
@@ -227,29 +265,66 @@ export function Table({
                 data-stack={s.betIds[0]}
                 data-count={nums}
               >
-                <ChipStack x={s.x} y={s.y} amount={s.amount} r={layout.chipRadius} off={s.off} />
+                <ChipStack
+                  x={s.x}
+                  y={s.y}
+                  amount={s.amount}
+                  r={layout.chipRadius}
+                  off={s.off}
+                  {...(s.caption ? { caption: s.caption } : {})}
+                />
               </g>
             );
+          })}
+          {travelling.map((b) => {
+            // from the come / don't-come box to the number the bet now sits on
+            const from = ghostPos({ ...b, point: null });
+            const to = ghostPos(b);
+            return from && to ? (
+              <g
+                key={'travel-' + b.id}
+                class={`sim-ghost sim-ghost-travel${chipPhase === 'travel' ? ' is-moving' : ''}`}
+                data-travel={b.id}
+                style={`--dx: ${to.x - from.x}px; --dy: ${to.y - from.y}px`}
+              >
+                <ChipStack x={from.x} y={from.y} amount={b.amount} r={layout.chipRadius} />
+              </g>
+            ) : null;
           })}
           {(lostBets ?? []).map((b) => {
             const p = ghostPos(b);
             return p ? (
-              <g key={'lost-' + b.id} class="sim-ghost sim-ghost-lose">
+              <g
+                key={'lost-' + b.id}
+                class={`sim-ghost sim-ghost-lose${chipPhase === 'lose' ? ' is-moving' : ''}`}
+                data-lost={b.id}
+              >
                 <ChipStack x={p.x} y={p.y} amount={b.amount} r={layout.chipRadius} />
               </g>
             ) : null;
           })}
           {(wonBets ?? []).map(({ bet, payout }) => {
             const p = ghostPos(bet);
-            return p && payout > 0 ? (
-              <g
-                key={'won-' + bet.id}
-                class="sim-ghost sim-ghost-win"
-                transform={`translate(${layout.chipRadius * 1.9} ${-layout.chipRadius * 0.6})`}
-              >
-                <ChipStack x={p.x} y={p.y} amount={payout} r={layout.chipRadius * 0.8} />
+            if (!p) return null;
+            // a winner that comes down keeps its chips on the spot until the payout step ends
+            const gone = !bets.some((b) => b.id === bet.id);
+            return (
+              <g key={'won-' + bet.id} data-won={bet.id}>
+                {gone ? (
+                  <g class="sim-ghost sim-ghost-settled">
+                    <ChipStack x={p.x} y={p.y} amount={bet.amount} r={layout.chipRadius} />
+                  </g>
+                ) : null}
+                {payout > 0 && chipPhase === 'win' ? (
+                  <g
+                    class="sim-ghost sim-ghost-win is-moving"
+                    transform={`translate(${layout.chipRadius * 1.9} ${-layout.chipRadius * 0.6})`}
+                  >
+                    <ChipStack x={p.x} y={p.y} amount={payout} r={layout.chipRadius * 0.8} />
+                  </g>
+                ) : null}
               </g>
-            ) : null;
+            );
           })}
         </g>
       </svg>

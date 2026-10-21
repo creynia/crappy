@@ -53,6 +53,29 @@ test.describe('sandbox', () => {
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
   });
 
+  test('hop bet: pick a hard hop in the 21-pair picker, win 30 to 1', async ({ page }) => {
+    await page.goto(url('seed=1&dice=3-3'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="hop"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.locator('.sim-hop-cell')).toHaveCount(21);
+    await expect(sheet).toContainText('11.11%'); // starts on the 2-4 easy hop
+    await sheet.locator('[data-hop="3-3"]').click();
+    await expect(sheet.locator('[data-hop="3-3"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(sheet).toContainText('13.89%');
+    await expect(sheet.locator('.sim-hop-note')).toContainText('pays 30 to 1 · edge 13.89%');
+    const amount = Number(
+      (await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9.]/g, ''),
+    );
+    await sheet.getByRole('button', { name: 'Place anyway' }).click();
+    await sheet.getByRole('button', { name: /again to place anyway/i }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Edit Hop 3-3 bet/ })).toBeVisible();
+    const before = await bankroll(page);
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    await expect.poll(() => bankroll(page)).toBe(before + amount * 31);
+  });
+
   test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
     page,
   }) => {
@@ -88,6 +111,62 @@ test.describe('sandbox', () => {
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
     await guard.check('auto-roll-done');
+  });
+
+  test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
+    const noHScroll = async (label: string) => {
+      const m = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+        '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+      );
+      expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
+    };
+    for (const { width, height } of [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
+      // single-strategy auto-roll in the sandbox
+      await page.setViewportSize({ width, height });
+      await page.goto('/#/play?speed=fast');
+      const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+      if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+      const panel = page.locator('.sim-auto');
+      await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+      await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`auto-roll @${width}`);
+
+      // strategy compare run on a lesson scene (the 4-column summary table)
+      await page.goto('/#/learn/strategy-fun-per-dollar');
+      const scene = page.locator('section.scene').nth(0);
+      await scene.scrollIntoViewIfNeeded();
+      await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
+      await expect(scene.getByTestId('auto-roll-summary')).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`compare @${width}`);
+    }
+  });
+
+  test('auto-roll starting bankroll picker sets the run bankroll without page overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/play?speed=fast');
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const panel = page.locator('.sim-auto');
+    await panel
+      .getByRole('group', { name: 'Starting bankroll' })
+      .getByRole('button', { name: '$5,000' })
+      .click();
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('region', { name: 'Strategy summary' })).toContainText(
+      '$5,000.00',
+    );
+    const scroll = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+      '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+    );
+    expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
   test('sandbox state persists across reload', async ({ page, guard }) => {
@@ -310,6 +389,67 @@ test.describe('sandbox flows', () => {
     const flat = await run('Flat only');
     expect(max).not.toBe(flat);
     expect(await run('Max')).toBe(max); // same seed, same settings: identical result
+  });
+
+  test('a come bet slides from the box to its number, then sweeps on the seven-out', async ({
+    page,
+  }) => {
+    // Drive the animation timeline with a controlled clock so each step is observable.
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '2-3', '3-4'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await place(page, 'come');
+    await roll(page); // 5: the come bet travels
+    await page.clock.runFor(700); // dice 650: the travel step (no puck on a 5) is under way
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).toHaveClass(/is-moving/);
+    await expect(ghost).toHaveAttribute('style', /--dx: -?\d.*--dy: -?\d/);
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // only the pass line while the chips move
+    await page.clock.runFor(300);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await roll(page); // seven-out: both bets are swept
+    await page.clock.runFor(700); // dice settled, puck moving: the chips still sit on their spots
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(2);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(0);
+    await page.clock.runFor(100);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(2);
+    await page.clock.runFor(1000);
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
+  test('point made with a come bet in the box: the chip waits at the box until the travel step', async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '5-3'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await place(page, 'come');
+    const comeBox = await page.locator('[data-stack="b2"] .sim-stack').getAttribute('transform');
+    await roll(page); // 8: point made, pass wins, the come bet travels to the 8
+    await page.clock.runFor(700); // dice settled (650), puck step running: nothing has moved yet
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).not.toHaveClass(/is-moving/);
+    await expect(ghost.locator('.sim-stack')).toHaveAttribute('transform', comeBox!);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(0); // never drawn at the 8 early
+    await page.clock.runFor(100); // the travel step starts at 750
+    await expect(ghost).toHaveClass(/is-moving/);
+    await page.clock.runFor(250);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(1);
+    await page.clock.runFor(1000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
   });
 
   test('tapping the table skips the roll animation', async ({ page }) => {

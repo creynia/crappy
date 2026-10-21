@@ -7,11 +7,20 @@ export interface SimStepProps {
   rt: SceneRuntime;
   hintVisible: boolean;
   onNext: () => void;
+  onAnswer?: (choice: number) => void;
   onRestart: () => void;
 }
 
 /** Guided-lesson step panel, or the "Done" panel once the scene is complete. */
-export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: SimStepProps) {
+export function SimStep({
+  scene,
+  step,
+  rt,
+  hintVisible,
+  onNext,
+  onAnswer,
+  onRestart,
+}: SimStepProps) {
   const guided = !!scene.steps?.length;
   const lastIdx = (scene.steps?.length ?? 1) - 1;
   const stepAck = step ? 'acknowledged' in step.completeWhen : false;
@@ -28,12 +37,15 @@ export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: Sim
           nextLabel={rt.stepIndex === lastIdx ? 'Finish' : 'Next'}
           done={false}
           onNext={onNext}
+          {...(onAnswer ? { onAnswer } : {})}
+          asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
           onRestart={onRestart}
         />
       ) : null}
       {guided && rt.done ? (
         <section class="sim-step sim-step-done" aria-label="Lesson step">
-          <p class="sim-step-text" role="status">
+          {/* not a live region: the simulator has one announcer; see Simulator.tsx */}
+          <p class="sim-step-text">
             <strong>Done.</strong> Nice work. Keep playing here, or restart the practice.
           </p>
           <button type="button" class="sim-linkbtn" onClick={onRestart}>

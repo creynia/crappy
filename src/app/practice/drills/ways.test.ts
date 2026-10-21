@@ -48,7 +48,7 @@ describe('ways drill', () => {
       expect(new Set(ids).size).toBe(ids.length);
       const r = ways.check(item, item.answerId);
       expect(r.ok).toBe(true);
-      if (item.kind === 'ways') expect(r.explain).toContain(`${item.combos.length} ways`);
+      if (item.kind === 'ways') expect(r.explain).toContain(`${item.combos.length} way`);
       if (item.kind === 'hard') expect(r.explain).toContain('equal dice');
     }
   });
@@ -58,6 +58,55 @@ describe('ways drill', () => {
       const [a, b] = item.answerId.split('-');
       expect(a).toBe(b);
       expect(ways.check(item, 'nope').ok).toBe(false);
+    }
+  });
+
+  it('point questions always offer four choices with the right one among them', () => {
+    const points = gen(3, 800).filter((i) => i.kind === 'point');
+    expect(points.length).toBeGreaterThan(50);
+    for (const item of points) {
+      const choices = item.answer.kind === 'choice' ? item.answer.choices : [];
+      expect(choices).toHaveLength(4);
+      expect(new Set(choices.map((c) => c.label)).size).toBe(4);
+    }
+  });
+
+  it('a wrong answer reports the right answer as its label, not its id', () => {
+    for (const item of gen(3, 200)) {
+      const r = ways.check(item, 'nope');
+      expect(r.expected).toBe(item.answerLabel);
+      expect(r.correct).toBe(item.answerId);
+      const choice =
+        item.answer.kind === 'choice'
+          ? item.answer.choices.find((c) => c.id === item.answerId)
+          : undefined;
+      expect(choice?.label).toBe(item.answerLabel);
+    }
+  });
+
+  it('hard-way choices carry dice pictures', () => {
+    for (const item of gen(3, 200).filter((i) => i.kind === 'hard')) {
+      const choices = item.answer.kind === 'choice' ? item.answer.choices : [];
+      for (const c of choices) expect(c.dice).toBeDefined();
+    }
+  });
+
+  it('the same seed and level give the same item', () => {
+    for (let level = 1; level <= 3; level++)
+      for (let seed = 1; seed <= 30; seed++) {
+        expect(generate(createDrillRng(seed), level)).toEqual(
+          generate(createDrillRng(seed), level),
+        );
+      }
+  });
+
+  it('explanations use singular "way" and "out of every" wording', () => {
+    const all = gen(3, 400);
+    for (const item of all) {
+      const r = ways.check(item, item.answerId);
+      expect(r.explain).not.toMatch(/\b1 ways\b/);
+      if (item.kind === 'point') expect(r.explain).toMatch(/ out of every \d+/);
+      if (item.kind === 'hard') expect(r.explain).toMatch(/The easy way to roll \d+ is/);
     }
   });
 });

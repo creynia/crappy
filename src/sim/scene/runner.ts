@@ -15,6 +15,7 @@ import type { BetInit } from '../engine/game';
 import { answeredRequirements } from './conditions';
 import type {
   ActionMatcher,
+  Callout,
   BetResult,
   Condition,
   PlayFrame,
@@ -305,6 +306,11 @@ export function allowedBetsFor(scene: SceneConfig, step?: SceneStep): BetTypeId[
 
 export function highlightedFor(scene: SceneConfig, step?: SceneStep): BetTypeId[] {
   return step?.highlightedBets ?? scene.highlightedBets ?? [];
+}
+
+/** The callouts on screen: the step's own, else the scene's. */
+export function calloutsFor(scene: SceneConfig, step?: SceneStep): Callout[] {
+  return step?.callouts ?? scene.callouts ?? [];
 }
 
 /** Has the step's question been answered enough to unlock the roll (correctly, when the step needs that)? */

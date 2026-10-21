@@ -198,3 +198,31 @@ test('a panel a lesson step opens by itself does not scroll the page or take foc
   await expect(panel).not.toBeFocused();
   await expect(panel.locator('h1, h2, h3, legend').first()).not.toBeFocused();
 });
+
+test("lesson 2: a callout points at the Don't Pass Bar on its step", async ({ page }) => {
+  await page.goto('/#/learn/table-tour');
+  const scene = await openScene(page, 0);
+  const callout = scene.locator('.sim-callout');
+  // step 1 (Pass Line) has none, so nothing covers the next target
+  await expect(callout).toHaveCount(0);
+  await scene.locator('[data-region="pass"]').click();
+  const sheet = scene.getByRole('dialog');
+  if (await sheet.count())
+    await sheet
+      .getByRole('button', { name: /Close|Cancel/ })
+      .first()
+      .click();
+  await expect(callout).toHaveCount(1);
+  await expect(callout).toContainText('Bets against the shooter.');
+  const dp = scene.locator('[data-region="dont-pass"]');
+  const id = await dp.getAttribute('aria-describedby');
+  expect(id).toBeTruthy();
+  await expect(scene.locator(`[id="${id}"]`)).toHaveText('Bets against the shooter.');
+  // the bubble stays inside the table and clear of the next target, the Come area
+  const svg = (await scene.locator('svg.sim-table').first().boundingBox())!;
+  const box = (await callout.locator('rect').boundingBox())!;
+  const come = (await scene.locator('[data-region="come"] .sim-hit').boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(svg.y - 1);
+  expect(box.x + box.width).toBeLessThanOrEqual(svg.x + svg.width + 1);
+  expect(box.y).toBeGreaterThanOrEqual(come.y + come.height - 1);
+});

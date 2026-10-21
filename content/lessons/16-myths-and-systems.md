@@ -54,6 +54,26 @@ steps:
     completeWhen: { acknowledged: true }
 ```
 
+```scene
+id: l16-s2
+version: 1
+title: Hunt for a pattern
+rules: standard-vegas
+bankroll: 50000
+allowedBets: []
+autoRoll:
+  enabled: true
+  lab: streaks
+steps:
+  - id: hunt
+    text: "Open **Auto-roll**, pick a streak (try **3 sevens in a row**) and roll 100,000 dice. Did the next roll move away from its exact chance?"
+    completeWhen: { autoRollCompleted: {} }
+  - id: nomemory
+    text: "The results hug the exact chances: **dice have no memory**. Try another streak or press New dice. You will not find a pattern."
+    advance: button
+    completeWhen: { acknowledged: true }
+```
+
 ```quiz
 - q: The last six rolls were all 6s. The chance the next roll is a 6 is...
   options: ["Lower: it's used up", "Higher: it's hot", "Still 5/36", "Zero"]

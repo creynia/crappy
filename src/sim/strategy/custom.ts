@@ -205,6 +205,24 @@ export const PRESETS_AS_CUSTOM: Partial<Record<StrategyId, CustomSystem>> = {
       bets: POINTS.map((n) => ({ n, units: 1 })),
     },
   },
+  'buy-4-10': {
+    numbers: {
+      kind: 'buy',
+      bets: [
+        { n: 4, units: 4 },
+        { n: 10, units: 4 },
+      ],
+    },
+  },
+  'lay-4-10': {
+    numbers: {
+      kind: 'lay',
+      bets: [
+        { n: 4, units: 8 },
+        { n: 10, units: 8 },
+      ],
+    },
+  },
   'martingale-pass': {
     line: { side: 'pass', odds: 0 },
     onLoss: { kind: 'martingale', maxDoublings: 30 },

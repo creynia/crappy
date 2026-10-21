@@ -7,6 +7,7 @@ import type { ManyResult, SessionResult, StrategySpec } from '../strategy/types'
 import { decodeCustom } from '../strategy/custom';
 import { AutoRollPanel } from './AutoRollPanel';
 import { readUrlParams } from './useUrlBoot';
+import { StreakLab } from './StreakLab';
 import type { SimulatorEvent } from './types';
 
 export interface SimAutoRollProps {
@@ -53,6 +54,7 @@ export function SimAutoRoll({
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.table) cfg.table = true;
     if (ar.chart) cfg.chart = ar.chart;
     if (ar.sweep) cfg.sweep = ar.sweep;
     if (ar.stopWin !== undefined) cfg.stopWin = ar.stopWin;
@@ -87,6 +89,16 @@ export function SimAutoRoll({
       oddsMultiple: om === undefined ? 'default' : om,
     });
   };
+  if (ar?.lab === 'streaks')
+    return (
+      <section class="sim-auto" aria-label="Auto-roll">
+        <StreakLab
+          onCompleted={(rolls) =>
+            feedInput({ kind: 'auto-roll-completed', rolls, oddsMultiple: 'default' })
+          }
+        />
+      </section>
+    );
   return (
     <section class="sim-auto" aria-label="Auto-roll">
       <AutoRollPanel

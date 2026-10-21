@@ -42,6 +42,7 @@ describe('StrategyBuilder in the auto-roll panel', () => {
     expect(q(container, 'line').value).toBe('none');
     expect(q(container, 'numbersKind').value).toBe('place');
     expect((q(container, 'n5') as unknown as HTMLInputElement).checked).toBe(true);
+    expect(q(container, 'n5').getAttribute('aria-label')).toBe('Place 5');
     expect(q(container, 'u6').value).toBe('1.2');
     expect((q(container, 'field') as unknown as HTMLInputElement).checked).toBe(true);
     // the share link encodes exactly this system

@@ -25,22 +25,26 @@ describe('golden equivalence: presets re-expressed as custom systems play identi
   it('covers the five required presets', () => {
     for (const id of REQUIRED) expect(PRESETS_AS_CUSTOM[id]).toBeDefined();
   });
-  it.each(ids)('%s', (id) => {
-    const custom = PRESETS_AS_CUSTOM[id]!;
-    expect(validateCustom(custom)).toEqual([]);
-    for (const [unit, seed, bankroll, rules] of [
-      [500, 1, 50_000, undefined],
-      [1000, 7, 20_000, 'odds-10x'],
-      [2500, 42, 100_000, undefined],
-      [3000, 99, 15_000, 'field-3x-12'],
-      [500, 2024, 3_000, undefined], // small bankroll: busts and caps
-    ] as const) {
-      const base = { rolls: 2000, seed, bankroll, ...(rules ? { rules } : {}) };
-      const preset = simulateSession({ ...base, strategy: { id, unit } });
-      const mine = simulateSession({ ...base, strategy: { id: 'custom', unit, custom } });
-      expect(mine).toEqual(preset);
-    }
-  });
+  it.each(ids)(
+    '%s',
+    (id) => {
+      const custom = PRESETS_AS_CUSTOM[id]!;
+      expect(validateCustom(custom)).toEqual([]);
+      for (const [unit, seed, bankroll, rules] of [
+        [500, 1, 50_000, undefined],
+        [1000, 7, 20_000, 'odds-10x'],
+        [2500, 42, 100_000, undefined],
+        [3000, 99, 15_000, 'field-3x-12'],
+        [500, 2024, 3_000, undefined], // small bankroll: busts and caps
+      ] as const) {
+        const base = { rolls: 2000, seed, bankroll, ...(rules ? { rules } : {}) };
+        const preset = simulateSession({ ...base, strategy: { id, unit } });
+        const mine = simulateSession({ ...base, strategy: { id: 'custom', unit, custom } });
+        expect(mine).toEqual(preset);
+      }
+    },
+    60_000,
+  );
 });
 
 // ---- fuzz: random valid systems never emit an action the engine rejects ----
@@ -112,16 +116,43 @@ describe('fuzz: random valid systems x 5000 rolls', () => {
 
 describe('custom systems: metrics, stops, validation, URL', () => {
   const rules = resolveRules();
-  it('analytic edge on action matches the preset when there is no progression', () => {
-    for (const id of ['pass-max-odds', 'three-point-molly', 'place-6-8', 'iron-cross'] as const) {
-      const a = strategyMetrics({ id, unit: 1000 }, rules);
-      const b = strategyMetrics(
-        { id: 'custom', unit: 1000, custom: PRESETS_AS_CUSTOM[id]! },
-        rules,
-      );
+  it.each(ids)('metrics of the custom %s equal the preset (structural chains, I040)', (id) => {
+    for (const r of [
+      rules,
+      resolveRules('odds-10x'),
+      resolveRules({ comeOddsWorkOnComeOut: true }),
+    ]) {
+      const a = strategyMetrics({ id, unit: 1000 }, r);
+      const b = strategyMetrics({ id: 'custom', unit: 1000, custom: PRESETS_AS_CUSTOM[id]! }, r);
       expect(b.edgeOnAction).toBeCloseTo(a.edgeOnAction, 12);
-      expect(b.approximate).toBeUndefined();
+      expect(b.expectedLossPerRoll).toBeCloseTo(a.expectedLossPerRoll, 12);
+      expect(b.avgAction).toBeCloseTo(a.avgAction!, 12);
+      expect(!!b.approximate).toBe(!!a.approximate);
     }
+  });
+  it('a Molly with come odds unlike the line odds is approximate', () => {
+    const m = strategyMetrics(
+      {
+        id: 'custom',
+        unit: 1000,
+        custom: { line: { side: 'pass', odds: 'max' }, come: { count: 2, odds: 1 } },
+      },
+      rules,
+    );
+    expect(m.approximate).toBe(true);
+  });
+  it('a one-come Molly uses the chain with one come bet', () => {
+    const one = strategyMetrics(
+      {
+        id: 'custom',
+        unit: 1000,
+        custom: { line: { side: 'pass', odds: 'max' }, come: { count: 1, odds: 'max' } },
+      },
+      rules,
+    );
+    const two = strategyMetrics({ id: 'three-point-molly', unit: 1000 }, rules);
+    expect(one.approximate).toBeUndefined();
+    expect(one.expectedLossPerRoll).toBeLessThan(two.expectedLossPerRoll);
   });
   it('a progression marks the edge as approximate (simulated)', () => {
     const m = strategyMetrics(

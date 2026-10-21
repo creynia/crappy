@@ -16,6 +16,7 @@ const ODDS: readonly OddsSetting[] = [0, 1, 2, 3, 5, 10, 'max'];
 const UNITS: readonly number[] = [0.5, 1, 1.2, 2, 3, 5];
 const oddsLabel = (o: OddsSetting) => (o === 'max' ? 'Max' : o === 0 ? 'None' : `${o}x`);
 const unitsLabel = (u: number) => `${u}×`;
+const KIND_LABEL = { place: 'Place', buy: 'Buy', lay: 'Lay' } as const;
 const START_FROM = Object.keys(PRESETS_AS_CUSTOM) as StrategyId[];
 
 /** The "My system" form (I013): declarative blocks the custom strategy plays. */
@@ -187,6 +188,7 @@ export function StrategyBuilder({ value: c, onChange, disabled }: StrategyBuilde
                   <input
                     type="checkbox"
                     name={`n${n}`}
+                    aria-label={`${KIND_LABEL[nums.kind]} ${n}`}
                     checked={chosen.has(n)}
                     disabled={disabled}
                     onChange={(e) => {
@@ -286,6 +288,7 @@ export function StrategyBuilder({ value: c, onChange, disabled }: StrategyBuilde
                 <input
                   type="checkbox"
                   name={`keep${b.n}`}
+                  aria-label={`Keep ${KIND_LABEL[nums.kind].toLowerCase()} ${b.n} up`}
                   checked={(c.onWin as { keep: PointNumber[] }).keep.includes(b.n)}
                   disabled={disabled}
                   onChange={(e) => {

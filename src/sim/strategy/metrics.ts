@@ -1,5 +1,7 @@
 import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
-import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
+import { betEdge, lossPerRoll, toNumber } from '../math';
+import { POINT_PHASE_SHARE, offOnComeOut } from '../math/ev';
+import { isLineLike } from '../math/outcomes';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
@@ -10,20 +12,187 @@ const POINT_WAYS: Record<PointNumber, number> = { 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 
  * Expected odds wagered per decision, as a multiple of the flat bet, when odds are always taken at the table
  * maximum: sum over points of P(point) x max multiple. 3-4-5x gives 100/36; 6x lay gives 4.
  */
-export function oddsMultiplePerDecision(rules: TableRules, lay: boolean): number {
+export function oddsMultiplePerDecision(
+  rules: TableRules,
+  lay: boolean,
+  mult: number = Infinity,
+): number {
   let t = 0;
   for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[])
-    t += (POINT_WAYS[n] / 36) * (lay ? rules.maxLayOdds[n] : rules.maxOdds[n]);
+    t += (POINT_WAYS[n] / 36) * Math.min(mult, lay ? rules.maxLayOdds[n] : rules.maxOdds[n]);
   return t;
 }
 
+/** Odds on the table as a multiple of the flat bet once a point is set (average over the point). */
+function oddsOnTableMultiple(rules: TableRules, lay: boolean, mult: number): number {
+  return oddsMultiplePerDecision(rules, lay, mult) / (24 / 36);
+}
+
+const POINTS: PointNumber[] = [4, 5, 6, 8, 9, 10];
+const NON_POINT_ROLLS = [2, 3, 7, 11, 12];
+const WAYS: Record<number, number> = {
+  2: 1,
+  3: 2,
+  4: 3,
+  5: 4,
+  6: 5,
+  7: 6,
+  8: 5,
+  9: 4,
+  10: 3,
+  11: 2,
+  12: 1,
+};
+
+/**
+ * Long-run rates of the three-point Molly (pass plus up to two come bets, one come in the box at a time,
+ * placed only in the point phase), from the exact Markov chain over (point, come numbers, boxed come):
+ * flat bets resolved per roll, and odds resolved per roll for each number. Come odds are OFF on the
+ * come-out unless the rules say `comeOddsWorkOnComeOut`: then the engine returns them and counts no
+ * action, so they only count in the point phase (the cache is keyed on that flag). Independent of
+ * the unit and the other rules.
+ */
+interface MollyRates {
+  flatPerRoll: number;
+  oddsPerRoll: Record<PointNumber, number>;
+}
+const mollyCache = new Map<boolean, MollyRates>();
+function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
+  const cached = mollyCache.get(comeOddsOnComeOut);
+  if (cached) return cached;
+  // come bets are { number, has odds }: odds are laid at a decision in the point phase, so a come bet
+  // that travels on the roll that ends the hand has none until the next point is set
+  type C = { n: number; f: boolean };
+  type S = { p: number; cs: C[]; box: boolean };
+  const key = (x: S) =>
+    `${x.p}|${x.cs.map((c) => `${c.n}${c.f ? 'o' : ''}`).join(',')}|${x.box ? 1 : 0}`;
+  const index = new Map<string, number>();
+  const states: S[] = [];
+  const add = (x: S): number => {
+    const k = key(x);
+    let i = index.get(k);
+    if (i === undefined) {
+      i = states.length;
+      index.set(k, i);
+      states.push(x);
+    }
+    return i;
+  };
+  add({ p: 0, cs: [], box: false });
+  const edges: Array<Array<{ to: number; pr: number; flat: number; odds: number[] }>> = [];
+  for (let i = 0; i < states.length; i++) {
+    const x = states[i]!;
+    const out: (typeof edges)[number] = [];
+    for (let t = 2; t <= 12; t++) {
+      const odds = [0, 0, 0, 0, 0, 0]; // by POINTS index
+      let flat = 0;
+      const cs: C[] = [];
+      for (const c of x.cs) {
+        if (t === 7 || t === c.n) {
+          flat++;
+          if (c.f && (x.p !== 0 || comeOddsOnComeOut)) odds[POINTS.indexOf(c.n as PointNumber)]!++;
+        } else cs.push({ ...c });
+      }
+      let box = x.box;
+      if (box) {
+        if (NON_POINT_ROLLS.includes(t)) flat++;
+        else cs.push({ n: t, f: false });
+        box = false;
+      }
+      let p = x.p;
+      if (p === 0) {
+        if (NON_POINT_ROLLS.includes(t)) flat++;
+        else p = t;
+      } else if (t === 7 || t === p) {
+        flat++;
+        odds[POINTS.indexOf(x.p as PointNumber)]!++;
+        p = 0;
+      }
+      // the next decision is in the point phase: odds go behind every come bet on a number
+      if (p !== 0) for (const c of cs) c.f = true;
+      if (p !== 0 && cs.length < 2 && !box) box = true;
+      cs.sort((a, b) => a.n - b.n || Number(a.f) - Number(b.f));
+      out.push({ to: add({ p, cs, box }), pr: WAYS[t]! / 36, flat, odds });
+    }
+    edges.push(out);
+  }
+  const n = states.length;
+  let v = new Float64Array(n).fill(1 / n);
+  for (let it = 0; it < 3000; it++) {
+    const w = new Float64Array(n);
+    for (let i = 0; i < n; i++) for (const e of edges[i]!) w[e.to]! += v[i]! * e.pr;
+    v = w;
+  }
+  let flatPerRoll = 0;
+  const oddsPerRoll = { 4: 0, 5: 0, 6: 0, 8: 0, 9: 0, 10: 0 } as Record<PointNumber, number>;
+  for (let i = 0; i < n; i++)
+    for (const e of edges[i]!) {
+      flatPerRoll += v[i]! * e.pr * e.flat;
+      POINTS.forEach((pt, k) => (oddsPerRoll[pt] += v[i]! * e.pr * e.odds[k]!));
+    }
+  const out = { flatPerRoll, oddsPerRoll };
+  mollyCache.set(comeOddsOnComeOut, out);
+  return out;
+}
+
+/**
+ * Lay 4 and lay 10 resolutions per roll, each. Lay bets work on the come-out and a lay that wins on a 7
+ * stays up, but one that loses to its number comes down and is only re-placed once a point is set. Exact
+ * Markov chain over (point, which lays are up). Independent of the rules and the unit.
+ */
+let layCache: { 4: number; 10: number } | undefined;
+function layRates(): { 4: number; 10: number } {
+  if (layCache) return layCache;
+  // state: p (0 = come-out, else the point) x up mask (bit 0 = lay 4, bit 1 = lay 10)
+  const idx = (p: number, mask: number) =>
+    (p === 0 ? 0 : POINTS.indexOf(p as PointNumber) + 1) * 4 + mask;
+  const n = 7 * 4;
+  const edges: Array<Array<{ to: number; pr: number; r4: number; r10: number }>> = [];
+  for (let p = 0; p <= 10; p++) {
+    if (p !== 0 && !POINTS.includes(p as PointNumber)) continue;
+    for (let mask = 0; mask < 4; mask++) {
+      const out: (typeof edges)[number] = [];
+      for (let t = 2; t <= 12; t++) {
+        let m = mask;
+        let r4 = 0;
+        let r10 = 0;
+        // a lay that wins on a 7 stays up; one that loses to its number comes down
+        if (m & 1 && (t === 7 || t === 4)) {
+          r4++;
+          if (t === 4) m &= ~1;
+        }
+        if (m & 2 && (t === 7 || t === 10)) {
+          r10++;
+          if (t === 10) m &= ~2;
+        }
+        let np = p;
+        if (p === 0) {
+          if (!NON_POINT_ROLLS.includes(t)) np = t;
+        } else if (t === 7 || t === p) np = 0;
+        if (np !== 0) m = 3; // the next decision is in the point phase: missing lays go up
+        out.push({ to: idx(np, m), pr: WAYS[t]! / 36, r4, r10 });
+      }
+      edges[idx(p, mask)] = out;
+    }
+  }
+  let v = new Float64Array(n).fill(1 / n);
+  for (let it = 0; it < 3000; it++) {
+    const w = new Float64Array(n);
+    for (let i = 0; i < n; i++) for (const e of edges[i] ?? []) w[e.to]! += v[i]! * e.pr;
+    v = w;
+  }
+  let r4 = 0;
+  let r10 = 0;
+  for (let i = 0; i < n; i++)
+    for (const e of edges[i] ?? []) {
+      r4 += v[i]! * e.pr * e.r4;
+      r10 += v[i]! * e.pr * e.r10;
+    }
+  layCache = { 4: r4, 10: r10 };
+  return layCache;
+}
+
 const COME_NUMBERS: PointNumber[] = [8, 5, 9, 10, 4];
-const LINE_TYPES: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
-  'pass-line',
-  'dont-pass',
-  'come',
-  'dont-come',
-]);
 
 /** Apply place-bet actions without validation, to materialize the strategy's steady layout. */
 function materialize(state: GameState, actions: Action[]): GameState {
@@ -76,11 +245,22 @@ const ONE_ROLL: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
   'world',
 ]);
 
+/** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
+// NOTE: dont-come-molly is priced as a steady layout of its bets (about $12.12 an hour at $10 against
+// about $9.73 simulated, because the layout is not always full); it needs its own chain (see I091).
+// martingale-pass changes its bet size with results, so its numbers describe the starting bet.
+const APPROXIMATE: ReadonlySet<string> = new Set([
+  'place-6-8-press',
+  'inside-regress',
+  'dont-come-molly',
+  'martingale-pass',
+]);
+
 /** The strategy's steady-state layout in the point phase (point 6), built via its own `decide`. */
 function steadyState(
   spec: StrategySpec,
   rules: TableRules,
-): { state: GameState; comeOutOnly: Bet[] } {
+): { state: GameState; comeOutTypes: Set<string>; comeOutOnly: Bet[] } {
   const impl = getImpl(spec.id);
   let s = {
     version: 1,
@@ -106,6 +286,8 @@ function steadyState(
     },
   } as GameState;
   s = materialize(s, impl.decide(s, spec));
+  // bets the strategy puts up before the point is set: they are up on come-out rolls too
+  const comeOutTypes = new Set<string>(s.bets.map((b) => b.type));
   // One-roll bets placed on the come-out (an Any Craps hedge) are gone after that roll. Take them out
   // of the point-phase layout; they are costed once per decision instead (see strategyMetrics). A
   // one-roll bet the strategy re-places every roll (field, any 7) stays in the layout.
@@ -117,44 +299,84 @@ function steadyState(
     s = materialize(s, acts);
   }
   const comeOutOnly = oneRoll.filter((b) => !s.bets.some((x) => x.type === b.type));
-  return { state: s, comeOutOnly };
+  return { state: s, comeOutTypes, comeOutOnly };
 }
 
-/** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
-const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-regress']);
-
-/** Analytic cost of keeping the strategy's layout up (see simulator.md §2.4). */
+/**
+ * Analytic cost of keeping the strategy's layout up (see simulator.md 2.4). Everything is per roll OVERALL,
+ * come-outs included: bets that are off on the come-out (place, buy, hardways) work only 392/557 of rolls,
+ * and line bets are amortized over whole decisions. The edge is per dollar of action, per decision.
+ */
 export function strategyMetrics(spec: StrategySpec, rules: TableRules): StrategyMetrics {
   const r = rules;
-  const { state, comeOutOnly } = steadyState(spec, r);
-  let lossCents = toNumber(tableExpectedLossPerRoll(state));
-  // action per roll = sum of amounts / expected rolls until each resolves
-  let action = 0;
+  const { state, comeOutTypes, comeOutOnly } = steadyState(spec, r);
+  const ctx = { phase: 'point' as const, point: 6 as PointNumber, rules: r };
+  let lossCents = 0;
+  let action = 0; // dollars per roll (overall)
+  let onTable = 0; // dollars once the point is set, odds averaged over the point
+  // Odds multiple actually taken at this layout's point, as 'Infinity' when it is the table maximum.
+  const oddsMult = (b: Bet, parent: Bet, lay: boolean): number => {
+    const cap = (lay ? r.maxLayOdds : r.maxOdds)[b.point ?? 6];
+    const m = parent.amount > 0 ? b.amount / parent.amount : 0;
+    return m >= cap - 1e-9 ? Infinity : m;
+  };
+  const molly = spec.id === 'three-point-molly';
   for (const b of state.bets) {
     if (b.type.endsWith('-odds')) {
-      // Odds are measured per DECISION of their flat bet: the amount wagered on odds depends on which
-      // point is made, so use the expected odds over the point distribution (same fraction of the
-      // table maximum as this layout takes at its own point).
       const parent = state.bets.find((x) => x.id === b.parentId);
       if (!parent) continue;
       const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
-      const maxMult = (lay ? r.maxLayOdds : r.maxOdds)[b.point ?? 6];
-      const frac =
-        maxMult > 0 && parent.amount > 0 ? Math.min(1, b.amount / (parent.amount * maxMult)) : 0;
+      const mult = oddsMult(b, parent, lay);
+      onTable += (parent.amount / 100) * oddsOnTableMultiple(r, lay, mult);
+      if (molly) continue; // priced from the chain below
+      // odds are wagered once per decision of their flat bet: the amount depends on the point made
       const e = betEdge(parent.type, parent.amount, { phase: 'come-out', point: null, rules: r });
       action +=
-        (parent.amount * frac * oddsMultiplePerDecision(r, lay)) / toNumber(e.expectedRolls);
+        (parent.amount * oddsMultiplePerDecision(r, lay, mult)) / 100 / toNumber(e.expectedRolls);
       continue;
     }
-    const ctx = LINE_TYPES.has(b.type)
-      ? { phase: 'come-out' as const, point: null }
-      : { phase: 'point' as const, point: 6 as PointNumber };
-    const e = betEdge(b.type, b.amount, { ...ctx, rules: r });
-    action += b.amount / toNumber(e.expectedRolls);
+    onTable += b.amount / 100;
+    if (molly) continue;
+    // NOTE: come bets outside the Molly (my-layout, other presets) take this generic line path: each is
+    // priced as one bet amortized over a whole decision, with share 1. That is exact for one come bet in
+    // steady state but not for layouts that keep several cycling (see I091 for per-decision pricing).
+    if (spec.id === 'lay-4-10' && (b.type === 'lay-4' || b.type === 'lay-10')) {
+      // up through come-outs but re-placed only in the point phase: priced from the chain
+      const rate = layRates()[b.type === 'lay-4' ? 4 : 10];
+      const e = betEdge(b.type, b.amount, ctx);
+      lossCents += rate * b.amount * toNumber(e.perResolved);
+      action += (rate * b.amount) / 100;
+      continue;
+    }
+    const line = isLineLike(b.type);
+    const bctx = line ? { phase: 'come-out' as const, point: null, rules: r } : ctx;
+    const e = betEdge(b.type, b.amount, bctx);
+    // Bets that are off on the come-out work 392/557 of rolls, and so do one-roll bets the strategy
+    // only puts up after a point (the field in an iron cross). Bets that stay up through a come-out
+    // (lay bets) are not scaled even when the strategy only re-places them in the point phase.
+    const share =
+      !line && (offOnComeOut(b.type, r) || (ONE_ROLL.has(b.type) && !comeOutTypes.has(b.type)))
+        ? toNumber(POINT_PHASE_SHARE)
+        : 1;
+    lossCents += toNumber(lossPerRoll(b, ctx)) * share;
+    action += (b.amount / 100 / toNumber(e.expectedRolls)) * share;
+  }
+  if (molly) {
+    const pass = state.bets.find((b) => b.type === 'pass-line');
+    const passOdds = state.bets.find((b) => b.type === 'pass-odds');
+    if (pass) {
+      const rates = mollyRates(r.comeOddsWorkOnComeOut);
+      const mult = passOdds ? oddsMult(passOdds, pass, false) : 0;
+      const e = betEdge('pass-line', pass.amount, { phase: 'come-out', point: null, rules: r });
+      lossCents = rates.flatPerRoll * pass.amount * toNumber(e.perResolved);
+      action = rates.flatPerRoll * (pass.amount / 100);
+      for (const n of POINTS)
+        action += rates.oddsPerRoll[n] * (pass.amount / 100) * Math.min(mult, r.maxOdds[n]);
+    }
   }
   if (comeOutOnly.length > 0) {
-    // one come-out roll per decision: spread the bet over the rolls a decision lasts
-    const line = state.bets.find((b) => LINE_TYPES.has(b.type));
+    // one come-out roll per decision: spread the bet over the rolls a decision lasts (already per roll overall)
+    const line = state.bets.find((b) => isLineLike(b.type));
     const perDecision = line
       ? toNumber(
           betEdge(line.type, line.amount, { phase: 'come-out', point: null, rules: r })
@@ -164,14 +386,15 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     for (const b of comeOutOnly) {
       const e = betEdge(b.type, b.amount, { phase: 'come-out', point: null, rules: r });
       lossCents += (toNumber(e.perResolved) * b.amount) / perDecision;
-      action += b.amount / perDecision;
+      action += b.amount / 100 / perDecision;
     }
   }
   const expectedLossPerRoll = lossCents / 100;
   return {
-    edgeOnAction: action > 0 ? lossCents / action : 0,
+    edgeOnAction: action > 0 ? expectedLossPerRoll / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
+    avgAction: onTable,
     ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
   };
 }
@@ -186,13 +409,9 @@ export function lineOddsEdge(
   multiple: number | 'max',
   lay = false,
 ): number {
-  if (multiple === 'max') return flatEdge / (1 + oddsMultiplePerDecision(rules, lay));
-  let t = 0;
-  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[]) {
-    const cap = (lay ? rules.maxLayOdds : rules.maxOdds)[n];
-    t += (POINT_WAYS[n] / 36) * Math.min(multiple, cap);
-  }
-  return flatEdge / (1 + t);
+  return (
+    flatEdge / (1 + oddsMultiplePerDecision(rules, lay, multiple === 'max' ? Infinity : multiple))
+  );
 }
 
 /**

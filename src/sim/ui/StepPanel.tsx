@@ -14,6 +14,8 @@ export interface StepPanelProps {
   nextLabel?: string;
   done: boolean;
   onNext: () => void;
+  /** accessible name of the panel (default "Lesson step") */
+  label?: string;
   /** the learner picked an option of the step's `ask` */
   onAnswer?: (choice: number) => void;
   /** answers given to the current step's ask so far, and whether one was correct */
@@ -119,7 +121,12 @@ export function StepPanel(p: StepPanelProps) {
   const [mathOpen, setMathOpen] = useState(false);
   useEffect(() => setMathOpen(false), [p.step.id]);
   return (
-    <section class="sim-step" aria-label="Lesson step" data-step={p.step.id} tabIndex={-1}>
+    <section
+      class="sim-step"
+      aria-label={p.label ?? 'Lesson step'}
+      data-step={p.step.id}
+      tabIndex={-1}
+    >
       <div class="sim-step-count">
         {p.done ? 'Done' : `Step ${p.index + 1} of ${p.total}`}
         {p.onReplay ? (

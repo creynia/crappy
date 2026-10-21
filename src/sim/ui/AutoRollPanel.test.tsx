@@ -3,6 +3,14 @@ import { act } from 'preact/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { AutoRollPanel } from './AutoRollPanel';
 
+const spies = vi.hoisted(() => ({ simulateSession: null as null | ReturnType<typeof vi.fn> }));
+vi.mock('../strategy', async (orig) => {
+  const actual = await orig<typeof import('../strategy')>();
+  const simulateSession = vi.fn(actual.simulateSession);
+  spies.simulateSession = simulateSession;
+  return { ...actual, simulateSession };
+});
+
 async function click(el: HTMLElement, selector: string) {
   await act(async () => {
     (el.querySelector(selector) as HTMLElement).click();
@@ -89,5 +97,43 @@ describe('AutoRollPanel', () => {
     expect(cost).toBeGreaterThan(26);
     expect(cost).toBeLessThan(28);
     expect(row.querySelector('td')!.textContent).toMatch(/\.\d\d$/);
+  });
+
+  it('stop-win $50 passes stopWin 5000 to the simulator and shows the ended-by row', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} />, el);
+    const group = el.querySelector('[aria-label="Stop when ahead by"]') as HTMLElement;
+    await click(group, 'button:nth-of-type(2)');
+    await click(el, '[data-testid="auto-roll-run"]');
+    expect(spies.simulateSession!.mock.calls.at(-1)![0]).toMatchObject({ stopWin: 5000 });
+    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toMatch(
+      /Stopped: up \$\d|All 100 rolls/,
+    );
+  });
+
+  it('100 sessions with stop-win $50 show the share that ended by stop-win', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={7}
+        config={{ rollOptions: [100], sessions: [100], stopWin: 5000 }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    for (let i = 0; i < 400; i++) {
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 25));
+      });
+      if (
+        el
+          .querySelector('[data-testid="auto-roll-summary"]')
+          ?.textContent?.includes('% ended by stop-win')
+      )
+        break;
+    }
+    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain(
+      '% ended by stop-win',
+    );
   });
 });

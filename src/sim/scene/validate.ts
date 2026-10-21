@@ -393,6 +393,8 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'stopWin',
+        'stopLoss',
         'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
@@ -421,6 +423,24 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      // The panel offers these amounts as chips, so a scene can only pick one of them.
+      const stopAmounts = [5000, 10_000, 25_000];
+      for (const [k, v] of [
+        ['stopWin', a.stopWin],
+        ['stopLoss', a.stopLoss],
+      ] as const) {
+        if (v === undefined) continue;
+        c.cents(`autoRoll.${k}`, v, { min: 1 });
+        if (typeof v === 'number' && !stopAmounts.includes(v))
+          c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
+        if (
+          k === 'stopLoss' &&
+          typeof v === 'number' &&
+          typeof s.bankroll === 'number' &&
+          v > s.bankroll
+        )
+          c.err('autoRoll.stopLoss', 'cannot be more than the scene bankroll');
+      }
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

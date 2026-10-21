@@ -284,6 +284,36 @@ describe('edge on action is per decision', () => {
   });
 });
 
+describe('simulateMany stops', () => {
+  const base = {
+    strategy: spec('pass-max-odds', { oddsMultiple: 2, unit: 1000 }),
+    rolls: 100,
+    seed: 7,
+    bankroll: 50_000,
+  };
+  const perRoll = (r: { meanExpectedLoss: number; meanRollsPlayed: number }) =>
+    r.meanExpectedLoss / r.meanRollsPlayed;
+
+  it('stops off: no stop endings and finals match a run without the stop keys', async () => {
+    const a = await simulateMany(base, 20, { sliceMs: 0 });
+    const b = await simulateMany({ ...base, stopWin: undefined, stopLoss: undefined }, 20, {
+      sliceMs: 0,
+    });
+    expect(a.stopWinRate).toBe(0);
+    expect(a.stopLossRate).toBe(0);
+    expect(Array.from(a.finals)).toEqual(Array.from(b.finals));
+    expect(a.meanRollsPlayed).toBeLessThanOrEqual(100);
+  });
+
+  it('a stop cuts the rolls played but leaves the expected loss per roll about the same', async () => {
+    const plain = await simulateMany(base, 200, { sliceMs: 0 });
+    const stopped = await simulateMany({ ...base, stopWin: 5000 }, 200, { sliceMs: 0 });
+    expect(stopped.stopWinRate).toBeGreaterThan(0);
+    expect(stopped.meanRollsPlayed).toBeLessThan(plain.meanRollsPlayed);
+    expect(Math.abs(perRoll(stopped) - perRoll(plain)) / perRoll(plain)).toBeLessThan(0.1);
+  });
+});
+
 describe('simulateSweep', () => {
   const cfg = {
     strategy: 'pass-max-odds' as const,

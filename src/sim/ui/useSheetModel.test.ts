@@ -28,10 +28,13 @@ const option = (opts: TypeOption[], label: string) => opts.find((o) => o.label =
 describe('box-4 type switcher labels', () => {
   it('labels each type at the amount a tap would place, and says so when that differs', () => {
     const m = sheetFor(1000);
-    const tap = defaultAmount('buy-4', 'box-4', freshGame().game, CHIP);
-    const buy = option(m.options, 'Buy 4');
-    expect(buy.edgeText).toBe(tap === 1000 ? '1.67%' : `1.67% at $${tap / 100}`);
+    expect(option(m.options, 'Buy 4').edgeText).toBe('1.67% at $20');
     expect(option(m.options, 'Place 4').tier).toBe('poor');
+  });
+
+  it('a selected type is priced at the sheet amount: Buy 4 at $10 reads 3.33% with no "at"', () => {
+    const m = sheetFor(1000, 'buy-4');
+    expect(option(m.options, 'Buy 4').edgeText).toBe('3.33%');
   });
 
   it('after tapping a type, its label equals the edge of the sheet it opens', () => {

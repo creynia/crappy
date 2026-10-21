@@ -116,7 +116,9 @@ export function buildSheetModel(
         const odds = BET_TYPES[t].category === 'odds';
         const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
         // the amount tapping this type would actually place, so the label and the tap agree
-        const tapAmount = defaultAmount(t, sheet.regionId, game, chip);
+        // the selected type is priced at the sheet's own amount; others at the amount a tap would place
+        const tapAmount =
+          t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
         const edge = typeEdgeLabel(t, tapAmount, game);
         const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
         return {

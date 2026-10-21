@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { watchPage } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
 
@@ -9,10 +10,12 @@ async function bankroll(page: Page): Promise<number> {
 
 test.describe('sandbox', () => {
   test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page }) => {
+    const guard = watchPage(page);
     await page.goto(url('seed=1&dice=3-4'));
     await page.locator('[data-region="pass"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('house edge 1.41%');
+    await guard.check('sheet-open');
     await expect(sheet).toContainText('Good bet');
     await sheet.getByRole('button', { name: 'Confirm' }).click();
     await expect(sheet).toHaveCount(0);
@@ -38,11 +41,13 @@ test.describe('sandbox', () => {
   });
 
   test('center prop needs Place anyway', async ({ page }) => {
+    const guard = watchPage(page);
     await page.goto(url());
     await page.getByRole('button', { name: 'Center' }).click();
     await page.locator('[data-region="any-7"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('Sucker bet');
+    await guard.check('center');
     await sheet.getByRole('button', { name: 'Place anyway' }).click();
     await expect(sheet.getByRole('button', { name: /again to place anyway/i })).toBeVisible();
     await sheet.getByRole('button', { name: /again to place anyway/i }).click();
@@ -52,20 +57,24 @@ test.describe('sandbox', () => {
   });
 
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
+    const guard = watchPage(page);
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
     await expect(panel).toBeVisible();
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await guard.check('auto-roll-done');
   });
 
   test('sandbox state persists across reload', async ({ page }) => {
+    const guard = watchPage(page);
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     await page.goto('/');
     await page.goto(url());
     await expect(page.locator('.sim-status-money')).toContainText('On table $5');
+    await guard.check('sandbox-reloaded');
   });
 });

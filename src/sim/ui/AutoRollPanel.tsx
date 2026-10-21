@@ -19,10 +19,12 @@ import type {
   ManyResult,
   SessionConfig,
   SessionResult,
+  CustomSystem,
   StrategyId,
   StrategySpec,
   SweepMultiple,
 } from '../strategy';
+import { validateCustom } from '../strategy/custom';
 import { BankrollChart } from './BankrollChart';
 import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
@@ -30,6 +32,7 @@ import { PlanPanel } from './PlanPanel';
 import { StrategyTable } from './StrategyTable';
 import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { StrategyBuilder } from './StrategyBuilder';
 import { matchingPreset } from './customRules';
 import { RulesEditor } from './RulesEditor';
 import { SweepPanel } from './SweepPanel';
@@ -60,6 +63,7 @@ const NO_ODDS_STRATEGIES = new Set<string>([
   'hardways-all',
   'no-bet',
   'my-layout',
+  'custom',
 ]);
 
 export interface AutoRollPanelProps {
@@ -220,6 +224,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [oddsMultiple, setOddsMultiple] = useState<number | undefined>(
     config?.defaultStrategy?.oddsMultiple,
   );
+  // I013: the "My system" blocks (custom strategy)
+  const [system, setSystem] = useState<CustomSystem>(
+    config?.defaultStrategy?.custom ?? { line: { side: 'pass', odds: 'max' } },
+  );
   const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
   const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
   const [rolls, setRolls] = useState<number>(rollOptions.includes(100) ? 100 : rollOptions[0]!);
@@ -291,6 +299,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const spec: StrategySpec = { id, unit: effUnit };
     if (oddsMultiple !== undefined) spec.oddsMultiple = oddsMultiple;
     if (id === 'my-layout') spec.layout = layout ?? [];
+    if (id === 'custom') spec.custom = system;
     return spec;
   };
 
@@ -374,6 +383,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   };
 
   const needsLayout = strategyIds.includes('my-layout') && !(layout && layout.length > 0);
+  const systemInvalid = strategyIds.includes('custom') && validateCustom(system).length > 0;
   const nameOf = (id: StrategyId): string => all.find((s) => s.id === id)?.name ?? id;
   const button = (active: boolean, label: string, onClick: () => void, key?: string | number) => (
     <button
@@ -573,6 +583,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           {!compare && (
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
           )}
+          {strategyIds.includes('custom') && !fixedSpecs ? (
+            <StrategyBuilder value={system} onChange={setSystem} disabled={running} />
+          ) : null}
           {needsLayout && (
             <p class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
@@ -595,12 +608,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         {!fixedSpecs && (
           <>
             {unitControl}
-            <div class="sim-ar-group" role="group" aria-label="Odds">
-              <span>Odds</span>
-              {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
-              {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
-              {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
-            </div>
+            {/* a custom system sets its own odds in the builder */}
+            {strategyIds.length === 1 && strategyIds[0] === 'custom' ? null : (
+              <div class="sim-ar-group" role="group" aria-label="Odds">
+                <span>Odds</span>
+                {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
+                {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
+                {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
+              </div>
+            )}
             <div class="sim-ar-group" role="group" aria-label="Stop when ahead by">
               <span>Stop if up</span>
               {STOP_OPTIONS.map((v) =>
@@ -760,7 +776,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <button
             type="button"
             data-testid="auto-roll-run"
-            disabled={running}
+            disabled={running || systemInvalid}
             onClick={() => void run()}
             class="sim-ar-run"
           >
@@ -928,9 +944,14 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
-    const edge = metrics.map((m) =>
-      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
-    );
+    // a progression has no fixed layout: a single run reports its own expected loss over what it
+    // actually wagered (I013 "simulated"); otherwise the analytic edge of the starting layout
+    const edge = metrics.map((m, i) => {
+      const r = o.kind === 'single' ? o.results[i] : undefined;
+      if (m.approximate && r && r.totalWagered > 0)
+        return `${pct(r.expectedLoss / r.totalWagered)} (simulated)`;
+      return m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction);
+    });
     if (o.kind === 'single') {
       const rs = o.results;
       const rows: Array<[string, string[]]> = [

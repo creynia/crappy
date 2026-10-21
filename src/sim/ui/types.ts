@@ -16,6 +16,8 @@ export interface SimSettings {
   skipPreview: boolean;
   rulesPreset: RulePresetId;
   sound: boolean;
+  /** ask what to do after a place or buy bet wins (sandbox default on; scenes opt in with ui.winPrompt) */
+  winPrompt: boolean;
 }
 
 export interface SimulatorProps {

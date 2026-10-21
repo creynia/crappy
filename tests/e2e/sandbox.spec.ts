@@ -1,3 +1,4 @@
+import { encodeCustom, PRESETS_AS_CUSTOM } from '../../src/sim/strategy/custom';
 import { expect, test, type Page } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
@@ -103,6 +104,30 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
+  test('my system: a shared link opens the builder and the system runs (I013)', async ({
+    page,
+    guard,
+  }) => {
+    // the narrowest phone we support: the builder must not scroll sideways
+    await page.setViewportSize({ width: 360, height: 740 });
+    const molly = encodeCustom(PRESETS_AS_CUSTOM['three-point-molly']!);
+    await page.goto(url(`system=${molly}`));
+    await page.getByRole('button', { name: 'Auto-roll', exact: true }).click();
+    const panel = page.getByTestId('auto-roll-panel');
+    await expect(panel.getByLabel('Strategy')).toHaveValue('custom');
+    const builder = panel.locator('.sim-sb');
+    await expect(builder.locator('[name="comeCount"]')).toHaveValue('2');
+    await builder.locator('[name="numbersKind"]').selectOption('place');
+    await expect(builder.getByRole('checkbox', { name: 'Place 6' })).toBeChecked();
+    const box = (await builder.locator('label:has([name="n4"])').boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    await guard.check('system-builder');
+    await panel.getByTestId('auto-roll-run').click();
+    await expect(panel.getByTestId('auto-roll-summary')).toContainText('Edge on action');
+    await expect(builder.locator('.sim-sb-link input')).toHaveValue(/^#\/play\?system=[\w-]+$/);
+  });
+
   test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
     await page.goto(url());
     const buy4 = async () => {
@@ -142,6 +167,24 @@ test.describe('sandbox', () => {
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
     await guard.check('auto-roll-done');
+  });
+
+  test('watch mode replays an auto-roll run on the table', async ({ page }) => {
+    await page.goto('/#/play?speed=fast');
+    await page.getByRole('button', { name: 'Auto-roll', exact: true }).click();
+    const panel = page.locator('.sim-auto');
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await panel.getByRole('button', { name: 'Watch on the table' }).click();
+    const watch = page.getByTestId('watch-controls');
+    await expect(watch).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Roll/ })).toBeDisabled();
+    if (process.env.SHOT)
+      await page.screenshot({ path: `${process.env.SHOT}-${test.info().project.name}.png` });
+    await watch.getByRole('button', { name: '16x' }).click();
+    await expect(watch).toContainText('Finished', { timeout: 20_000 });
+    await watch.getByRole('button', { name: 'Exit' }).click();
+    await expect(watch).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Roll/ })).toBeEnabled();
   });
 
   test('strategy table: sort, run it, no horizontal overflow', async ({ page }) => {

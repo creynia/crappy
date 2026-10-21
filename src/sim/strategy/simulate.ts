@@ -1,5 +1,5 @@
 import { applyAction, createGame, equity, isBonusType, resolveRules } from '../engine';
-import type { GameState } from '../engine';
+import type { Action, GameState } from '../engine';
 import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
@@ -31,6 +31,9 @@ function makeExpectedLossFn(): (s: GameState) => number {
 export function simulateSession(cfg: SessionConfig): SessionResult {
   const impl = getImpl(cfg.strategy.id);
   const stopAtBust = cfg.stopAtBust ?? true;
+  // a custom system's own stops apply when the run sets none (I013)
+  const stopWin = cfg.stopWin ?? cfg.strategy.custom?.stopWin;
+  const stopLoss = cfg.stopLoss ?? cfg.strategy.custom?.stopLoss;
   const start = cfg.bankroll;
   const expectedLossFn = makeExpectedLossFn();
   const varianceFn = makeVarianceFn();
@@ -50,14 +53,18 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   let sevenOuts = 0;
   let longest = 0;
   let hand = 0;
+  const log: NonNullable<SessionResult['log']> | undefined = cfg.record ? [] : undefined;
   const bonusHits = new Map<string, NonNullable<SessionResult['bonusHits']>[number]>();
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
+    const applied: Action[] = [];
     for (const a of plan.actions) {
       const r = applyAction(state, a);
-      if (r.ok) state = r.state;
-      else {
+      if (r.ok) {
+        state = r.state;
+        if (log) applied.push(a);
+      } else {
         // A strategy must only emit legal actions; treat an unexpected rejection as unaffordable.
         if (stopAtBust) plan.blocked = true;
         break;
@@ -74,6 +81,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     played = i;
     const rec = state.history[state.history.length - 1];
     if (rec) totals[rec.total]!++;
+    if (log && rec) log.push({ actions: applied, dice: [rec.dice[0], rec.dice[1]] });
     hand++;
     for (const e of r.events) {
       if (e.type === 'bet-won' && isBonusType(e.betType)) {
@@ -96,11 +104,11 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     wag[i] = state.stats.totalWagered;
     if (e > peak) peak = e;
     else if (peak - e > maxDd) maxDd = peak - e;
-    if (cfg.stopWin !== undefined && e - start >= cfg.stopWin) {
+    if (stopWin !== undefined && e - start >= stopWin) {
       endedBy = 'stop-win';
       break;
     }
-    if (cfg.stopLoss !== undefined && start - e >= cfg.stopLoss) {
+    if (stopLoss !== undefined && start - e >= stopLoss) {
       endedBy = 'stop-loss';
       break;
     }
@@ -108,6 +116,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   if (hand > longest) longest = hand;
   const finalEquity = equity(state);
   return {
+    ...(log ? { log } : {}),
     rollsPlayed: played,
     equity: played === cfg.rolls ? eq : eq.slice(0, played + 1),
     expected: played === cfg.rolls ? exp : exp.slice(0, played + 1),

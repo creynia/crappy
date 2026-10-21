@@ -8,6 +8,7 @@ import type { RollLogEntry } from './rollLog';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
 import { bootFromParams, type RngPosition } from './shareLink';
 import { randomSeed, type Core } from './simCore';
+import { loadAskAfterWin } from './winPrompt';
 import type { SimulatorProps } from './types';
 
 const PRESETS: RulePresetId[] = ['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x'];
@@ -148,7 +149,14 @@ export function useUrlBoot(
 ) {
   const sandbox = mode === 'sandbox';
   const [settings, setSettings] = useState<ResolvedSimSettings>(() => {
-    const base = resolveSettings(props.initialSettings, scene.ui?.speed);
+    const resolved = resolveSettings(props.initialSettings, scene.ui?.speed);
+    // the sandbox asks after place wins unless the player chose "Always same bet"; scenes opt in
+    const base = {
+      ...resolved,
+      winPrompt: sandbox
+        ? (props.initialSettings?.winPrompt ?? loadAskAfterWin())
+        : scene.ui?.winPrompt === true,
+    };
     const sp = sandbox ? readUrlParams().get('speed') : null;
     return sp === 'normal' || sp === 'fast' || sp === 'instant' ? { ...base, speed: sp } : base;
   });

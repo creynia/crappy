@@ -3,8 +3,10 @@ import { equity } from '../engine/game';
 import { resolveRules } from '../engine/rules';
 import type { GameState, RulePresetId } from '../engine/types';
 import type { SceneConfig, SceneInput } from '../scene/types';
-import type { ManyResult, SessionResult, StrategySpec } from '../strategy/types';
+import type { ManyResult, SessionConfig, SessionResult, StrategySpec } from '../strategy/types';
+import { decodeCustom } from '../strategy/custom';
 import { AutoRollPanel } from './AutoRollPanel';
+import { readUrlParams } from './useUrlBoot';
 import { StreakLab } from './StreakLab';
 import type { SimulatorEvent } from './types';
 
@@ -15,6 +17,8 @@ export interface SimAutoRollProps {
   rollsPerHour: number;
   emit: (e: SimulatorEvent) => void;
   feedInput: (input: SceneInput) => void;
+  /** replay a single short run on the table (Watch mode) */
+  onWatch?: (cfg: SessionConfig) => void;
   /** a finished run, for the roll log */
   onResult?: (result: SessionResult | ManyResult) => void;
   /** sandbox only: remember the starting-bankroll pick for this viewer */
@@ -29,12 +33,19 @@ export function SimAutoRoll({
   rollsPerHour,
   emit,
   feedInput,
+  onWatch,
   onResult,
   persistKey,
 }: SimAutoRollProps) {
   const ar = scene.autoRoll;
   const config = useMemo(() => {
-    if (!ar) return undefined;
+    if (!ar) {
+      // I013: a shared "My system" link (#/play?system=...) opens the builder with that system
+      const custom = decodeCustom(readUrlParams().get('system'));
+      return custom
+        ? { defaultStrategy: { id: 'custom' as const, unit: 1000, custom } }
+        : undefined;
+    }
     const cfg: NonNullable<Parameters<typeof AutoRollPanel>[0]['config']> = {};
     if (ar.compare?.length) {
       cfg.compare = ar.compare;
@@ -101,6 +112,7 @@ export function SimAutoRoll({
         layout={layoutBets}
         rollsPerHour={rollsPerHour}
         onCompleted={onCompleted}
+        {...(onWatch ? { onWatch } : {})}
         onSweepCompleted={(rolls) =>
           feedInput({ kind: 'auto-roll-completed', rolls, oddsMultiple: 'default' })
         }

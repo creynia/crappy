@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
@@ -303,6 +303,53 @@ describe('odds nudge', () => {
   });
 });
 
+describe('watch mode', () => {
+  it('replays a recorded run on the table, ends at the run result, and exit restores the table', async () => {
+    const { container } = render(<Simulator initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="auto-roll-summary"]')).not.toBeNull(),
+    );
+    const rowFinal = [...container.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')]
+      .find((r) => r.textContent?.startsWith('Final bankroll'))!
+      .querySelector('td')!.textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    const controls = () => container.querySelector('[data-testid="watch-controls"]');
+    await waitFor(() => expect(controls()).not.toBeNull());
+    // the table is locked while watching
+    expect(container.querySelector('.sim-lock')!.textContent).toContain('replay');
+    fireEvent.click(screen.getByRole('button', { name: '16x' }));
+    await waitFor(() => expect(controls()!.textContent).toContain('Finished'), { timeout: 15_000 });
+    expect(controls()!.textContent).toContain('roll 100 of 100');
+    // the status bar bankroll equals the run's final bankroll (cents-exact money string)
+    expect(controls()!.textContent.replace(/,/g, '')).toContain(
+      rowFinal.replace(/[,.]00$/, '').replace(/,/g, ''),
+    );
+    fireEvent.click(screen.getByTestId('watch-exit'));
+    await waitFor(() => expect(controls()).toBeNull());
+    expect(container.querySelector('.sim-lock')).toBeNull();
+  });
+
+  it('scrubbing jumps to a roll and pauses', async () => {
+    const { container } = render(<Simulator initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() => screen.getByRole('button', { name: 'Watch on the table' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() => screen.getByLabelText('Scrub the replay'));
+    fireEvent.input(screen.getByLabelText('Scrub the replay'), { target: { value: '40' } });
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')!.textContent).toContain(
+        'roll 40 of 100',
+      ),
+    );
+    expect(screen.getByTestId('watch-toggle').textContent).toBe('Play');
+  });
+});
+
 describe('demo steps', () => {
   const scene: SceneConfig = {
     id: 'demo',
@@ -484,6 +531,95 @@ describe('ask step announcer', () => {
     expect(events.filter((e) => e.type === 'step-answered')).toHaveLength(2);
     // focus moved on to the unlocked Roll button
     await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
+  });
+});
+
+describe('win prompt (I039)', () => {
+  const scene: SceneConfig = {
+    id: 'wp',
+    version: 1,
+    bankroll: 50000,
+    phase: 'point',
+    point: 4,
+    bets: [{ type: 'place-6', amount: 1200 }],
+    ui: { winPrompt: true },
+    forcedDice: [
+      [3, 3],
+      [1, 2],
+      [3, 3],
+    ],
+  };
+  const press = async (container: Element) => {
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    return waitFor(() => {
+      const p = container.querySelector('[data-testid="win-prompt"]');
+      expect(p).not.toBeNull();
+      return p!;
+    });
+  };
+
+  it('a place-6 win offers four choices with per-roll costs; Press makes it $24 and costs $12', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    const choices = [...prompt.querySelectorAll('[data-choice]')].map((b) =>
+      b.getAttribute('data-choice'),
+    );
+    expect(choices).toEqual(['press', 'same', 'regress', 'take-down']);
+    const label = (id: string) =>
+      prompt.querySelector(`[data-choice="${id}"]`)!.getAttribute('aria-label')!;
+    expect(label('press')).toContain('+$12 to $24');
+    expect(label('press')).toContain('+$0.06/roll');
+    expect(label('regress')).toContain('-$0.03/roll');
+    expect(label('take-down')).toContain('-$0.06/roll');
+    expect(label('same')).toContain('no change');
+    // the visible cell is compact: a short name and the short delta
+    expect(prompt.querySelector('[data-choice="press"]')!.textContent).toBe('Press+$0.06');
+    const pressBtn = prompt.querySelector('[data-choice="press"]')!;
+    const bankBefore = container.textContent.match(/Bankroll \$([\d,]+)/)![1];
+    fireEvent.click(pressBtn);
+    await waitFor(() => expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull());
+    expect(container.textContent).toContain('On table $24');
+    expect(container.textContent.match(/Bankroll \$([\d,]+)/)![1]).toBe(
+      String(Number(bankBefore!.replace(/,/g, '')) - 12),
+    );
+  });
+
+  it('announces the choices with the roll and replaces the win toast while it is up', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    await press(container);
+    const live = container.querySelector('[data-testid="roll-announcer"]')!;
+    await waitFor(() => expect(live.textContent).toContain('What now?'));
+    expect(live.textContent).toContain('Rolled');
+    expect(live.textContent).toContain('Press, +$12 to $24');
+    expect((container.querySelector('.sim-toasts') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('is dismissed by the next roll, and "Same bet" changes nothing', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    fireEvent.click(prompt.querySelector('[data-choice="same"]')!);
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+    expect(container.textContent).toContain('On table $12');
+    // a miss rolls, then another hit asks again; rolling in between dismisses
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(container.textContent).toContain('Rolled'));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+  });
+
+  it('is off in a scene unless ui.winPrompt is true', async () => {
+    const off: SceneConfig = { ...scene, ui: {} };
+    const { container } = render(<Simulator scene={off} initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(container.textContent).toContain('Rolled'));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+  });
+
+  it('"Always same bet" stops the prompt and is remembered', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    fireEvent.click(screen.getByRole('button', { name: /^Always same bet/ }));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+    expect(prompt.isConnected).toBe(false);
   });
 });
 
@@ -683,5 +819,98 @@ describe('share link RNG position across Reset and reload (I071 review)', () => 
     await waitFor(() => expect(skipOf(shared[shared.length - 1]!)).toBe('6'));
     expect(skipOf(await share())).toBe('7');
     location.hash = '';
+  });
+});
+
+describe('watch mode accessibility', () => {
+  // earlier suites leave simulators mounted (a leaked open panel sheet swallows Escape at the document
+  // level) and a share-link hash behind: start clean
+  beforeEach(() => {
+    cleanup();
+    location.hash = '';
+  });
+  const startWatch = async (initialSettings: Record<string, unknown>) => {
+    const r = render(<Simulator initialSettings={initialSettings} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(r.container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() => screen.getByRole('button', { name: 'Watch on the table' }));
+    return r;
+  };
+
+  it('announces a replay once, at the end, not once per roll', async () => {
+    const { container } = await startWatch(instant);
+    const announcer = container.querySelector('[data-testid="roll-announcer"]')!;
+    // count real text changes (a re-render can rewrite the same text without announcing anything)
+    const seen: string[] = [announcer.textContent ?? ''];
+    const mo = new MutationObserver(() => {
+      const t = announcer.textContent ?? '';
+      if (t !== seen[seen.length - 1]) seen.push(t);
+    });
+    mo.observe(announcer, { childList: true, subtree: true, characterData: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() => screen.getByTestId('watch-controls'));
+    fireEvent.click(screen.getByRole('button', { name: '16x' }));
+    await waitFor(
+      () => expect(screen.getByTestId('watch-controls').textContent).toContain('Finished'),
+      {
+        timeout: 15_000,
+      },
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    mo.disconnect();
+    expect(seen).toHaveLength(2); // '' then the one end-of-replay line
+    expect(announcer.textContent).toContain('Replay finished');
+  });
+
+  it('Escape exits watch mode', async () => {
+    const { container } = await startWatch(instant);
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')).not.toBeNull(),
+    );
+    // starting the replay hands focus to Play/Pause (the Watch button is gone)
+    expect(document.activeElement).toBe(container.querySelector('[data-testid="watch-toggle"]'));
+    // the real keyboard path: Escape pressed on the focused control bubbles up to the simulator
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')).toBeNull(),
+    );
+    // and leaving it hands focus to Roll
+    await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
+  });
+
+  it('reduced motion makes watch-mode rolls instant at any speed (no animation in flight)', async () => {
+    const real = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    const setReduced = (on: boolean) =>
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: (q: string) => ({
+          matches: on && q.includes('reduce'),
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        }),
+      });
+    try {
+      for (const reduced of [false, true]) {
+        setReduced(reduced);
+        const { unmount } = await startWatch({ speed: 'normal' });
+        fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+        await waitFor(() => screen.getByTestId('watch-controls'));
+        fireEvent.click(screen.getByRole('button', { name: '4x' }));
+        fireEvent.click(screen.getByTestId('watch-toggle')); // pause
+        const step = screen.getByTestId<HTMLButtonElement>('watch-step');
+        await waitFor(() => expect(step.disabled).toBe(false));
+        fireEvent.click(step);
+        // an animation in flight keeps Step disabled; instant rolls do not
+        expect(step.disabled).toBe(!reduced ? true : false);
+        unmount();
+        document.body.innerHTML = '';
+      }
+    } finally {
+      if (real) Object.defineProperty(window, 'matchMedia', real);
+      else delete (window as { matchMedia?: unknown }).matchMedia;
+    }
   });
 });

@@ -28,7 +28,8 @@ export type StrategyId =
   | 'lay-4-10'
   | 'place-6-8-press'
   | 'inside-regress'
-  | 'pass-hedge-any-craps';
+  | 'pass-hedge-any-craps'
+  | 'custom';
 
 /** One bet of a player layout snapshot (used by `my-layout`). */
 export interface LayoutBet {
@@ -44,6 +45,37 @@ export interface StrategySpec {
   oddsMultiple?: number;
   /** Required by `my-layout`: the bets to re-place each roll. */
   layout?: LayoutBet[];
+  /** Required by `custom`: the player's own system (I013). */
+  custom?: CustomSystem;
+}
+
+/** Odds behind a line or come bet: a multiple of the flat bet (0 = none) or the table maximum. */
+export type OddsSetting = number | 'max';
+
+/**
+ * A player's own betting system (I013), built from declarative blocks. Amounts are in units of
+ * `StrategySpec.unit` (the flat bet). Every block is optional; at least one bet block is needed.
+ */
+export interface CustomSystem {
+  /** A pass (or don't pass) bet every come-out, with odds once a point is set. */
+  line?: { side: 'pass' | 'dont'; odds: OddsSetting };
+  /** Up to `count` come (don't come, matching the line side) bets after the point, each with odds. Needs `line`. */
+  come?: { count: number; odds: OddsSetting };
+  /**
+   * Place, buy or lay bets after a point. Each number's amount is `units` x the flat bet, rounded up to
+   * the bet's proper unit ($6 on 6/8 and $5 elsewhere for place; buy/lay use the engine's suggested size).
+   */
+  numbers?: { kind: 'place' | 'buy' | 'lay'; bets: { n: PointNumber; units: number }[] };
+  /** A field bet of `units` x the flat bet on every point-phase roll, alongside the numbers. */
+  field?: { units: number };
+  /** After a number wins: press it by `units` (up to `capTimes` its starting size), or take down all but `keep`. */
+  onWin?:
+    { kind: 'press'; units: number; capTimes: number } | { kind: 'regress'; keep: PointNumber[] };
+  /** After a line loss: double the line bet (Martingale), at most `maxDoublings` times in a row. */
+  onLoss?: { kind: 'martingale'; maxDoublings: number };
+  /** Walk away when this far ahead / behind (cents); used when the run sets no stop of its own. */
+  stopWin?: Cents;
+  stopLoss?: Cents;
 }
 export interface Strategy {
   id: StrategyId;
@@ -56,7 +88,15 @@ export interface Strategy {
   decide(state: GameState, spec: StrategySpec): Action[];
 }
 
+/** One recorded roll: the actions the strategy took before it, and the dice that came up. */
+export interface SessionLogEntry {
+  actions: Action[];
+  dice: readonly [number, number];
+}
+
 export interface SessionConfig {
+  /** Record every roll's actions and dice in `SessionResult.log` (for watch/replay). Off by default. */
+  record?: boolean;
   strategy: StrategySpec;
   rolls: number;
   seed: number;
@@ -73,6 +113,8 @@ export interface SessionConfig {
   stopLoss?: Cents;
 }
 export interface SessionResult {
+  /** One entry per roll played, only when `SessionConfig.record` was set. */
+  log?: SessionLogEntry[];
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss

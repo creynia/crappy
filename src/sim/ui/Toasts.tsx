@@ -17,6 +17,8 @@ export interface ToastsProps {
   autoDismissMs?: number;
   /** a sticky one-time message (the odds nudge) shown first in the same layer */
   hint?: ComponentChild;
+  /** keep the toasts (and their timers) but do not show them, e.g. while a prompt takes their place */
+  hidden?: boolean;
 }
 
 const SWIPE_PX = 60;
@@ -85,9 +87,9 @@ function ToastView({
   );
 }
 
-export function Toasts({ toasts, onDismiss, autoDismissMs, hint }: ToastsProps) {
+export function Toasts({ toasts, onDismiss, autoDismissMs, hint, hidden }: ToastsProps) {
   return (
-    <div class="sim-toasts">
+    <div class="sim-toasts" hidden={hidden}>
       {hint}
       {toasts.map((t) => (
         <ToastView key={t.id} t={t} onDismiss={onDismiss} ms={autoDismissMs} />

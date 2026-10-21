@@ -39,12 +39,21 @@ import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
 import { OddsHint, oddsHintText } from './OddsHint';
 import { oddsRoom, type OddsRoom } from './oddsHint';
+import { WinPrompt } from './WinPrompt';
+import {
+  saveAskAfterWin,
+  winAnnouncement,
+  winChoices,
+  winPromptTarget,
+  type WinChoice,
+  type WinPromptTarget,
+} from './winPrompt';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
 import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
-import { fmtMoney } from './text';
+import { betLabel, fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
 import { useDemoPlayback } from './useDemoPlayback';
@@ -54,6 +63,9 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { useWatchReplay } from './useWatchReplay';
+import { WatchControls } from './WatchControls';
+import type { Speed } from './animation';
 import { usePanelReveal } from './usePanelReveal';
 import './sim.css';
 import './simulator.css';
@@ -124,8 +136,11 @@ export function Simulator(props: SimulatorInternalProps) {
   const closePanels = () => setPanels(CLOSED);
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
+  // the place/buy bet that just won (cleared on the next roll, a choice, or a reset)
+  const [winTarget, setWinTarget] = useState<WinPromptTarget | null>(null);
   const landscape = useLandscape(scene);
 
+  const lastRollText = useRef('');
   const pushToast = useCallback(
     (text: string, tone: ToastItem['tone'] = 'info', roll?: boolean) => {
       const id = `t${++toastN.current}`;
@@ -140,15 +155,22 @@ export function Simulator(props: SimulatorInternalProps) {
   const rollTextRef = useRef('');
   const announceRoll = useCallback((text: string) => {
     rollTextRef.current = text;
+    lastRollText.current = text;
     setRollSeq((n) => n + 1);
   }, []);
 
+  const watchSpeed = useRef<Speed | null>(null);
   const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
-    () => settingsRef.current.speed,
+    () => watchSpeed.current ?? settingsRef.current.speed,
     pushToast,
-    announceRoll,
+    // a replay would flood the live region (one message per roll): it announces only its end
+    (text) => {
+      if (watchSpeed.current === null) announceRoll(text);
+    },
     (pre, post, events) => {
+      // a replayed run is not the player's own history: keep it out of the roll log
+      if (watchSpeed.current !== null) return;
       if (demoActive.current()) return; // a demo's scripted rolls are not the learner's rolls
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
@@ -163,8 +185,29 @@ export function Simulator(props: SimulatorInternalProps) {
       pushToast(message, 'info');
       announce(message);
     },
-    onRolled: anim.run,
+    onRolled: (pre, post, events) => {
+      anim.run(pre, post, events);
+      setWinTarget(winPromptTarget(post, events));
+    },
   });
+
+  const watcher = useWatchReplay({
+    coreRef,
+    setCore,
+    startEquity,
+    anim,
+    speedRef: watchSpeed,
+    announce,
+    baseSpeed: () => settingsRef.current.speed,
+  });
+  const watching = watcher.watch !== null;
+  // leaving a replay removes the controls that had focus: hand it to Roll
+  const wasWatching = useRef(false);
+  useEffect(() => {
+    if (wasWatching.current && !watching)
+      rootRef.current?.querySelector<HTMLElement>('.sim-roll:not(:disabled)')?.focus();
+    wasWatching.current = watching;
+  }, [watching]);
 
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
@@ -226,7 +269,7 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
   useSandboxPersist(
-    sandbox && !guided ? props.persistKey : undefined,
+    sandbox && !guided && !watching ? props.persistKey : undefined,
     scene,
     settings,
     liveGame,
@@ -282,10 +325,11 @@ export function Simulator(props: SimulatorInternalProps) {
   }, [scene, rt]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
-  const lock = rollLock(scene, rt, liveGame);
+  const lock = watching ? 'Watching a replay: exit to play.' : rollLock(scene, rt, liveGame);
 
   const roll = () => {
     if (anim.busy || sheet || lock || demo.playing) return;
+    setWinTarget(null);
     doAction({ type: 'roll' });
   };
 
@@ -300,6 +344,7 @@ export function Simulator(props: SimulatorInternalProps) {
     demo.reset();
     startEquity.current = equity(init.game);
     setToasts([]);
+    setWinTarget(null);
     setLog([]);
     setLogFocus(null);
     setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
@@ -370,6 +415,42 @@ export function Simulator(props: SimulatorInternalProps) {
       },
     });
   }, []);
+
+  // ---------- win prompt ----------
+  useEffect(() => {
+    if (sandbox) saveAskAfterWin(settings.winPrompt);
+  }, [settings.winPrompt, sandbox]);
+  const winBet = winTarget ? liveGame.bets.find((b) => b.id === winTarget.betId) : undefined;
+  const winOptions = useMemo(
+    () => (winBet && settings.winPrompt ? winChoices(liveGame, winBet) : []),
+    [liveGame, winBet, settings.winPrompt],
+  );
+  const chooseWin = (c: WinChoice) => {
+    setWinTarget(null);
+    if (c.action) doAction(c.action);
+  };
+  const winShown = !!winBet && settings.winPrompt && !anim.busy && !sheet && winOptions.length > 0;
+  // the prompt joins the roll's announcement, so a screen-reader user hears the choices too
+  useEffect(() => {
+    if (winShown && winBet)
+      setLive((l) => ({
+        text: `${lastRollText.current} ${winAnnouncement(betLabel(winBet.type), winOptions)}`.trim(),
+        n: l.n + 1,
+      }));
+  }, [winShown, winBet?.id]);
+  const winPromptEl =
+    winShown && winBet ? (
+      <WinPrompt
+        bet={winBet}
+        choices={winOptions}
+        onChoose={chooseWin}
+        onAlwaysSame={() => {
+          setSettings({ ...settings, winPrompt: false });
+          setWinTarget(null);
+        }}
+        onDismiss={() => setWinTarget(null)}
+      />
+    ) : null;
 
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
@@ -463,6 +544,7 @@ export function Simulator(props: SimulatorInternalProps) {
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
       hint={oddsHintEl}
+      hidden={winShown}
     />
   );
   const status = (compact: boolean) => (
@@ -480,6 +562,18 @@ export function Simulator(props: SimulatorInternalProps) {
     />
   );
 
+  const watchEl = watcher.watch ? (
+    <WatchControls
+      watch={watcher.watch}
+      busy={anim.busy}
+      onToggle={watcher.toggle}
+      onStep={watcher.step}
+      onScrub={watcher.scrub}
+      onSpeed={watcher.setSpeed}
+      onExit={watcher.exit}
+    />
+  ) : null;
+
   return (
     <div
       ref={rootRef}
@@ -491,14 +585,17 @@ export function Simulator(props: SimulatorInternalProps) {
           e.preventDefault();
           e.stopPropagation();
           demo.skip();
-        } else if (anim.playing()) {
+        } else if (anim.playing() && !(e.target as Element | null)?.closest?.('.sim-watch')) {
           e.preventDefault();
           e.stopPropagation();
           anim.skip();
         }
       }}
       onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
+        if (e.key === 'Escape' && watching) {
+          e.preventDefault();
+          watcher.exit();
+        } else if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
           e.preventDefault();
           demo.skip();
         } else if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
@@ -508,9 +605,10 @@ export function Simulator(props: SimulatorInternalProps) {
       }}
     >
       {landscape ? null : stepEl}
+      {landscape ? null : watchEl}
 
       <div class="sim-main">
-        <div class="sim-felt">
+        <div class="sim-felt" {...(watching ? { inert: true } : {})}>
           {!landscape ? status(false) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (
@@ -524,14 +622,17 @@ export function Simulator(props: SimulatorInternalProps) {
               </button>
             ) : null}
             {landscape ? null : toastsEl}
+            {landscape ? null : winPromptEl}
           </div>
         </div>
         {landscape ? (
           <div class="sim-rail">
+            {watchEl}
             {stepEl}
             <div class="sim-status-wrap">
               {status(true)}
               {toastsEl}
+              {landscape ? winPromptEl : null}
             </div>
             {controls}
           </div>
@@ -582,6 +683,11 @@ export function Simulator(props: SimulatorInternalProps) {
                 rollsPerHour={settings.rollsPerHour}
                 emit={emit}
                 feedInput={feedInput}
+                onWatch={(cfg) => {
+                  sh.setSheet(null);
+                  setAutoOpen(false);
+                  watcher.start(cfg);
+                }}
                 onResult={(result) =>
                   setLog((l) =>
                     appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),

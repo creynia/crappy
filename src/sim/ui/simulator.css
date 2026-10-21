@@ -395,6 +395,10 @@
 .sim-ar-output {
   margin-top: 16px;
 }
+.sim-ar-summary-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
 .sim-ar-summary {
   width: 100%;
   margin-top: 12px;

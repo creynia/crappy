@@ -490,28 +490,30 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
-        <table class="sim-ar-summary" data-testid="auto-roll-summary">
-          <thead>
-            <tr>
-              <th scope="col">Summary</th>
-              {o.specs.map((s, i) => (
-                <th key={i} scope="col" style={{ color: COLORS[i] }}>
-                  {nameOf(s.id)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {summaryRows(o, metrics).map(([label, cells]) => (
-              <tr key={label}>
-                <th scope="row">{label}</th>
-                {cells.map((c, i) => (
-                  <td key={i}>{c}</td>
+        <div class="sim-ar-summary-wrap">
+          <table class="sim-ar-summary" data-testid="auto-roll-summary">
+            <thead>
+              <tr>
+                <th scope="col">Summary</th>
+                {o.specs.map((s, i) => (
+                  <th key={i} scope="col" style={{ color: COLORS[i] }}>
+                    {nameOf(s.id)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {summaryRows(o, metrics).map(([label, cells]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  {cells.map((c, i) => (
+                    <td key={i}>{c}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>
     );
   }

@@ -359,11 +359,10 @@ function vigFacts(
   const edges = grid.map((a) => edgeAt(a));
   const constant = edges.every((e) => e === edges[0]);
   if (exact || constant) return { vigCliff: null, vigFlat: edgeAt(amount), vigFootnote: false };
-  // the cliffs: where the edge jumps by at least half a point between neighbouring dollars (the vig steps).
+  // the cliffs: where the edge RISES by at least half a point between neighbouring dollars (the vig steps).
   // Show the current amount, and the step either side of it (the amount before and after each jump).
   const cliffAt: number[] = [];
-  for (let i = 1; i < edges.length; i++)
-    if (Math.abs(edges[i]! - edges[i - 1]!) >= 0.005) cliffAt.push(i);
+  for (let i = 1; i < edges.length; i++) if (edges[i]! - edges[i - 1]! >= 0.005) cliffAt.push(i);
   const above = cliffAt.find((i) => grid[i]! > amount);
   const below = [...cliffAt].reverse().find((i) => grid[i]! <= amount);
   const pick = new Set<Cents>([amount]);

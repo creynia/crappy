@@ -263,6 +263,13 @@ describe('buy/lay vig strip facts', () => {
     expect(amounts).toContain(4000);
     expect(v.length).toBeLessThanOrEqual(5);
   });
+  it('lay 4 at $10 shows the $79 to $80 cliff and no row below $12 except the bet itself', () => {
+    const v = f({ type: 'place-bet', betType: 'lay-4', amount: 1000 }).vigCliff!;
+    const amounts = v.map((r) => r.amount);
+    expect(amounts).toContain(7900);
+    expect(amounts).toContain(8000);
+    for (const r of v) if (r.amount < 1200) expect(r.current).toBe(true);
+  });
   it('buy 5 and 9 and buy 6 and 8 give a strip with the current amount', () => {
     for (const t of ['buy-5', 'buy-9', 'buy-6', 'buy-8'] as const) {
       const v = buy(t, 2000).vigCliff!;

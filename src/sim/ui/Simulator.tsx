@@ -6,6 +6,7 @@ import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { SessionPanel } from './SessionPanel';
+import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
@@ -196,6 +197,9 @@ export function Simulator(props: SimulatorInternalProps) {
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,
     wonBets: anim.won,
+    travellingBets: anim.travelling,
+    chipMs: anim.chipMs,
+    chipPhase: anim.chipPhase,
     rollingDice: anim.rolling,
     selectedRegion: sheet?.regionId ?? null,
     onRegionTap: sh.onRegionTap,
@@ -326,6 +330,7 @@ export function Simulator(props: SimulatorInternalProps) {
           rollsPerHour={settings.rollsPerHour}
           emit={emit}
           feedInput={feedInput}
+          persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
         />
       ) : null}
 

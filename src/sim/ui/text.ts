@@ -1,7 +1,15 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { BET_TYPES, bonusTargets, isBonusType } from '../engine/bets';
+import {
+  BET_TYPES,
+  HOP_PAYS,
+  bonusTargets,
+  hopLabel,
+  isBonusType,
+  isHardHop,
+} from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge } from '../math';
+import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
@@ -54,6 +62,7 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   horn: 'Horn',
   'c-e': 'C and E',
   world: 'World',
+  hop: 'Hop',
   fire: 'Fire Bet',
   all: 'All',
   tall: 'Tall',
@@ -256,8 +265,11 @@ export function buildEvFacts(
         : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
+  const hop = bet?.hop ?? (a.type === 'place-bet' ? a.hop : undefined);
   try {
-    pays = def.describePayout(state.rules, bet?.point ?? state.point);
+    pays = hop
+      ? `${isHardHop(hop) ? HOP_PAYS.hard : HOP_PAYS.easy} to 1`
+      : def.describePayout(state.rules, bet?.point ?? state.point);
   } catch {
     pays = '';
   }
@@ -285,6 +297,59 @@ const NICKNAME: Record<number, string> = {
   11: 'yo',
   12: 'boxcars',
 };
+
+/** Bet results of a roll as sentences: "Pass line wins $5.", "Field loses $1.", ... */
+function betResultGroups(events: readonly GameEvent[]): string[] {
+  const wins: string[] = [];
+  const losses: string[] = [];
+  const pushes: string[] = [];
+  const returned: string[] = [];
+  const progressed: string[] = [];
+  for (const e of events) {
+    if (e.type === 'bet-progressed')
+      progressed.push(
+        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
+      );
+    else if (e.type === 'bet-won')
+      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
+    else if (e.type === 'bet-lost')
+      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
+    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
+    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
+  }
+  return [wins, losses, pushes, returned, progressed]
+    .filter((g) => g.length)
+    .map((g) => g.join(', ') + '.');
+}
+
+/**
+ * The one live announcement per roll: dice, total, bet results with amounts, bankroll after the roll,
+ * and the point state. Built from the roll's events and the state after it.
+ */
+export function rollAnnouncement(events: readonly GameEvent[], post: GameState): string {
+  const roll = events.find(
+    (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
+  );
+  if (!roll) return describeRoll(events);
+  const [a, b] = roll.roll.dice;
+  const r = roll.roll;
+  let total = String(r.total);
+  if (r.hard && r.total >= 4 && r.total <= 10 && r.total % 2 === 0) total += ', the hard way';
+  else if (NICKNAME[r.total]) total += `, ${NICKNAME[r.total]}`;
+  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events)];
+  sentences.push(`Bankroll ${fmtMoney(equity(post))}.`);
+  const ended = events.find((e) => e.type === 'point-made' || e.type === 'seven-out');
+  if (post.point === null)
+    sentences.push(
+      ended?.type === 'point-made'
+        ? 'Point made. Point is off.'
+        : ended?.type === 'seven-out'
+          ? 'Seven out. Point is off.'
+          : 'Point is off.',
+    );
+  else sentences.push(`Point is ${post.point}.`);
+  return sentences.join(' ');
+}
 
 export function describeRoll(events: readonly GameEvent[]): string {
   const roll = events.find(
@@ -317,26 +382,7 @@ export function describeRoll(events: readonly GameEvent[]): string {
         break;
     }
   }
-  const wins: string[] = [];
-  const losses: string[] = [];
-  const pushes: string[] = [];
-  const returned: string[] = [];
-  const progressed: string[] = [];
-  for (const e of events) {
-    if (e.type === 'bet-progressed')
-      progressed.push(
-        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
-      );
-    else if (e.type === 'bet-won')
-      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
-    else if (e.type === 'bet-lost')
-      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
-    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
-    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
-  }
-  for (const group of [wins, losses, pushes, returned, progressed]) {
-    if (group.length) parts.push(group.join(', ') + '.');
-  }
+  parts.push(...betResultGroups(events));
   if (roll) {
     const net = roll.roll.net;
     parts.push(net === 0 ? 'Net $0.' : `Net ${fmtMoney(net, { sign: true })}.`);
@@ -379,7 +425,7 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
           : `Nothing collected yet (0 of ${total})`;
         return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${collected}`;
       }
-      return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
+      return `${b.hop ? hopLabel(b.hop) : betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
     });
     parts.push(`Your bet: ${desc.join('; ')}.`);
   } else {

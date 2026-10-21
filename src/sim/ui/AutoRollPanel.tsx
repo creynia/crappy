@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
+  edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   listStrategies,
   simulateCompare,
   simulateMany,
@@ -21,6 +23,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
 import { matchingPreset } from './customRules';
 import { RulesEditor } from './RulesEditor';
@@ -64,6 +67,8 @@ export interface AutoRollPanelProps {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** which chart a single session opens with (default 'bankroll') */
+    chart?: 'bankroll' | 'edge';
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
     /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
@@ -114,6 +119,8 @@ type Outcome =
       specs: StrategySpec[];
       cfg: SessionConfig;
       metrics: Metrics[];
+      /** spread of result per dollar wagered, only for a lone single-session run */
+      sigma?: number;
     }
   | {
       kind: 'many';
@@ -217,10 +224,23 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [seed, setSeed] = useState<number>(props.initialSeed ?? 1);
   const [progress, setProgress] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
+  // paint, and never twice for the same strategy and rules (it is cached).
+  useEffect(() => {
+    if (chartKind !== 'edge' || outcome?.kind !== 'single' || outcome.sigma !== undefined) return;
+    if (outcome.specs.length !== 1) return;
+    const o = outcome;
+    const h = setTimeout(() => {
+      const sigma = edgeFunnelSigma(o.specs[0]!, o.cfg.rules);
+      setOutcome((cur) => (cur === o ? { ...o, sigma } : cur));
+    }, 30);
+    return () => clearTimeout(h);
+  }, [chartKind, outcome]);
 
   // I033: "Custom…" in the Rules select edits a rules object for the runs in this panel
   const [customRules, setCustomRules] = useState<TableRules | null>(null);
@@ -291,7 +311,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
+        const sigma = specs.length === 1 ? peekEdgeFunnelSigma(specs[0]!, cfg.rules) : undefined;
+        setOutcome({
+          kind: 'single',
+          results,
+          specs,
+          cfg,
+          metrics: metricsFor(specs),
+          ...(sigma !== undefined ? { sigma } : {}),
+        });
         props.onCompleted?.(results[0]!, results, specs);
       } else {
         const ac = new AbortController();
@@ -724,20 +752,44 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       }));
     }
     const metrics = o.metrics;
+    const canEdge = o.kind === 'single' && o.specs.length === 1 && o.results[0]!.rollsPlayed >= 2;
+    const edgeView = canEdge && chartKind === 'edge';
     return (
       <>
+        {canEdge && (
+          <div class="sim-ar-group" role="group" aria-label="Chart units">
+            {button(chartKind === 'bankroll', 'Bankroll', () => setChartKind('bankroll'))}
+            {button(chartKind === 'edge', 'Show as % of money bet', () => setChartKind('edge'))}
+          </div>
+        )}
         {o.kind === 'many' && (
           <div class="sim-ar-group" role="group" aria-label="Chart">
             {button(chartTab === 'results', 'Session results', () => setChartTab('results'))}
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
         )}
-        <BankrollChart
-          mode={mode}
-          series={series}
-          start={start}
-          sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
-        />
+        {edgeView && o.kind === 'single' && o.sigma === undefined ? (
+          <p class="sim-ar-note" role="status">
+            Working out the funnel…
+          </p>
+        ) : edgeView && o.kind === 'single' ? (
+          <EdgeChart
+            label={nameOf(o.specs[0]!.id)}
+            ratio={edgeSeries(o.results[0]!.equity, o.results[0]!.wagered)}
+            edge={o.metrics[0]!.edgeOnAction}
+            sigma={o.sigma!}
+            // bet sizes that grow with losses break the funnel's assumptions
+            funnel={all.find((x) => x.id === o.specs[0]!.id)?.escalating !== true}
+            approximate={o.metrics[0]!.approximate === true}
+          />
+        ) : (
+          <BankrollChart
+            mode={mode}
+            series={series}
+            start={start}
+            sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
+          />
+        )}
         {o.kind === 'many' && chartTab === 'results' && (
           <ResultsHistogram
             start={start}

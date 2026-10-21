@@ -7,6 +7,7 @@ export * from './types';
 export { oddsMultiplePerDecision };
 export { replayRoll, replayStart, replayTo } from './replay';
 export { getStrategy, listStrategies } from './presets';
+export { edgeFunnelSigma, peekEdgeFunnelSigma } from './funnel';
 export {
   simulateSession,
   simulateMany,

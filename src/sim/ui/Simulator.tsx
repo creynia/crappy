@@ -5,6 +5,7 @@ import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
+import { RollLog, type RollLogFocus } from './RollLog';
 import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
@@ -12,6 +13,7 @@ import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { resolverFor } from './stepTokens';
 import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
@@ -21,6 +23,7 @@ import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
+import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
 import { fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
@@ -75,7 +78,16 @@ export function Simulator(props: SimulatorInternalProps) {
   const [live, setLive] = useState({ text: '', n: 0 });
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
-  const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
+  const [panels, setPanels] = useState<Panels>({
+    auto: false,
+    session: false,
+    log: false,
+    menu: false,
+  });
+  const [log, setLog] = useState<RollLogEntry[]>(() => boot.log ?? []);
+  const [logFocus, setLogFocus] = useState<RollLogFocus | null>(null);
+  const focusNonce = useRef(0);
+  const autoSeq = useRef(boot.log?.length ?? 0);
   const rootRef = useRef<HTMLDivElement>(null);
   const requestReveal = usePanelReveal(panels, rootRef);
   const togglePanel = (name: keyof Panels) => {
@@ -97,6 +109,12 @@ export function Simulator(props: SimulatorInternalProps) {
     () => watchSpeed.current ?? settingsRef.current.speed,
     pushToast,
     announce,
+    (pre, post, events) => {
+      // a replayed run is not the player's own history: keep it out of the roll log
+      if (watchSpeed.current !== null) return;
+      const entry = summarizeRoll(pre, post, events);
+      if (entry) setLog((l) => appendLog(l, entry));
+    },
   );
   const { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction } = useGameCore({
     boot,
@@ -136,6 +154,7 @@ export function Simulator(props: SimulatorInternalProps) {
     settings,
     liveGame,
     chip,
+    log,
   );
 
   // ---------- sheet ----------
@@ -187,6 +206,8 @@ export function Simulator(props: SimulatorInternalProps) {
     startedRef.current = -1;
     startEquity.current = equity(init.game);
     setToasts([]);
+    setLog([]);
+    setLogFocus(null);
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
   };
@@ -274,9 +295,19 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
+      resolve={resolverFor(game)}
     />
   );
 
+  // Toasts overlay the status block (above the felt in portrait, the rail's status in landscape):
+  // text nothing taps, never a betting region or the lesson step card.
+  const toastsEl = (
+    <Toasts
+      toasts={toasts}
+      onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+      autoDismissMs={toastDurationMs(settings.speed)}
+    />
+  );
   const status = (compact: boolean) => (
     <StatusBar
       {...(compact ? { compact } : {})}
@@ -285,6 +316,10 @@ export function Simulator(props: SimulatorInternalProps) {
       session={session}
       point={game.point}
       history={game.history}
+      onOpenHistory={(n) => {
+        setPanels((p) => ({ ...p, log: true }));
+        setLogFocus(n === undefined ? null : { n, nonce: ++focusNonce.current });
+      }}
     />
   );
 
@@ -335,12 +370,16 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            {landscape ? null : toastsEl}
           </div>
         </div>
         {landscape ? (
           <div class="sim-rail">
             {stepEl}
-            {status(true)}
+            <div class="sim-status-wrap">
+              {status(true)}
+              {toastsEl}
+            </div>
             {controls}
           </div>
         ) : (
@@ -351,11 +390,6 @@ export function Simulator(props: SimulatorInternalProps) {
       <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
         <span key={live.n}>{live.text}</span>
       </div>
-      <Toasts
-        toasts={toasts}
-        onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
-        autoDismissMs={toastDurationMs(settings.speed)}
-      />
 
       {panels.menu ? (
         <SimMenu
@@ -374,6 +408,8 @@ export function Simulator(props: SimulatorInternalProps) {
         <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
       ) : null}
 
+      {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}
+
       {autoAvailable && panels.auto ? (
         <SimAutoRoll
           scene={scene}
@@ -387,6 +423,11 @@ export function Simulator(props: SimulatorInternalProps) {
             setAutoOpen(false);
             watcher.start(cfg);
           }}
+          onResult={(result) =>
+            setLog((l) =>
+              appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),
+            )
+          }
           persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
         />
       ) : null}

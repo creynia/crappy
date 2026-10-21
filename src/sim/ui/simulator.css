@@ -143,6 +143,7 @@
 }
 .sim-menu,
 .sim-session-panel,
+.sim-roll-log,
 .sim-auto {
   background: var(--sim-surface);
   border: 1px solid var(--sim-border);

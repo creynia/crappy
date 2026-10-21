@@ -609,60 +609,16 @@
   min-height: 1.2em;
 }
 
-/* portrait phones: the fixed tab bar covers the bottom ~64px, so keep the controls clear of it */
-@media (max-width: 600px) and (orientation: portrait) {
-  .sim-controls {
-    padding-bottom: 72px;
-  }
-}
-
-/* Roll and the cost unit share one row; the cost button is a compact two-line label */
-.sim-roll-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-.sim-roll-row .sim-roll {
-  flex: 1 1 auto;
-}
-.sim-cost-cycle {
-  min-width: 64px;
+/* expected-cost toggle on the status line above the felt; 44px tall, compact */
+.sim-cost-toggle {
   min-height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 8px;
+  padding: 0 12px;
   border-radius: 10px;
   border: 1px solid var(--sim-border);
   background: var(--sim-surface);
   color: inherit;
   font: inherit;
-  line-height: 1.15;
-}
-.sim-cost-value {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
-}
-.sim-cost-unit {
-  font-size: 0.7rem;
-}
-.sim-cost-cycle-empty {
-  visibility: hidden;
-}
-
-/* narrow portrait phones: the cost button sits directly above Roll, so Roll keeps its full width */
-@media (max-width: 600px) and (orientation: portrait) {
-  .sim-roll-row {
-    flex-direction: column-reverse;
-  }
-  .sim-roll-row .sim-roll {
-    flex: 0 0 auto;
-    width: 100%;
-  }
-  .sim-roll-row .sim-cost-cycle {
-    flex-direction: row;
-    width: 100%;
-    gap: 6px;
-  }
+  white-space: nowrap;
 }

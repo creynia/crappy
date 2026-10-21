@@ -216,43 +216,31 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
-  test('Roll and the expected-cost button are visible at first view above the tab bar in portrait', async ({
-    page,
-  }) => {
+  test('cost toggle is on the status line at first view; Roll does not move', async ({ page }) => {
     for (const { width, height } of [
       { width: 390, height: 844 },
       { width: 360, height: 740 },
+      { width: 844, height: 390 },
     ]) {
       await page.setViewportSize({ width, height });
       await page.goto(url('seed=1&dice=3-4'));
+      const rollBefore = await page.locator('.sim-roll').boundingBox();
       await page.locator('[data-region="pass"]').click();
-      const sheet = page.getByRole('dialog');
-      await sheet.getByRole('button', { name: 'Confirm' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
       expect(await page.evaluate<number>('window.scrollY')).toBe(0);
+      const cost = await page.locator('.sim-cost-toggle').boundingBox();
       const roll = await page.locator('.sim-roll').boundingBox();
-      const cost = await page.locator('.sim-cost-cycle').boundingBox();
       const bar = await page.locator('.tabbar').boundingBox();
-      expect(roll, `${width}x${height} roll`).not.toBeNull();
       expect(cost, `${width}x${height} cost`).not.toBeNull();
-      expect(roll!.y + roll!.height, `${width}x${height} roll in viewport`).toBeLessThanOrEqual(
+      expect(cost!.height, `${width}x${height} cost 44px`).toBeGreaterThanOrEqual(44);
+      expect(cost!.y + cost!.height, `${width}x${height} cost in viewport`).toBeLessThanOrEqual(
         height,
       );
-      // at 390x844 both also clear the tab bar; at 360x740 Roll itself sits under it (pre-existing)
-      if (bar && width === 390) {
-        expect(roll!.y + roll!.height, `${width}x${height} roll clears tabbar`).toBeLessThanOrEqual(
-          bar.y,
-        );
+      if (bar)
         expect(cost!.y + cost!.height, `${width}x${height} cost clears tabbar`).toBeLessThanOrEqual(
           bar.y,
         );
-      }
-      expect(cost!.y, `${width}x${height} cost not lower than Roll`).toBeLessThanOrEqual(
-        roll!.y + 2,
-      );
-      expect(
-        Math.abs(cost!.y - roll!.y),
-        `${width}x${height} cost on Roll's line`,
-      ).toBeLessThanOrEqual(2);
+      expect(roll, `${width}x${height} roll box unchanged by a bet`).toEqual(rollBefore);
     }
   });
 

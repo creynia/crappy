@@ -11,6 +11,7 @@ import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
+import { CostToggle } from './CostToggle';
 import { SimMenu } from './SimMenu';
 import {
   buildShareUrl,
@@ -330,7 +331,6 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const controls = (
     <SimControls
-      rollsPerHour={settings.rollsPerHour}
       ui={ui}
       chips={chips}
       chip={chip}
@@ -436,7 +436,12 @@ export function Simulator(props: SimulatorInternalProps) {
 
       <div class="sim-main">
         <div class="sim-felt">
-          {!landscape ? status(false) : null}
+          {!landscape ? (
+            <>
+              {status(false)}
+              <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
+            </>
+          ) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (
               <CenterPanel {...tableProps} />
@@ -456,6 +461,7 @@ export function Simulator(props: SimulatorInternalProps) {
             {stepEl}
             <div class="sim-status-wrap">
               {status(true)}
+              <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
               {toastsEl}
             </div>
             {controls}

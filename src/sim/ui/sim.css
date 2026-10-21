@@ -1130,3 +1130,8 @@
 .sim-call.is-wrong text {
   fill: #fff;
 }
+
+.sim-vig-list {
+  margin: 4px 0 0;
+  padding-left: 1.2em;
+}

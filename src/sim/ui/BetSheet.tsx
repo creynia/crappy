@@ -477,27 +477,23 @@ export function EvLines({ facts: f }: { facts: EvFacts }) {
       ) : null}
       {f.vigFlat !== null && f.vigFlat !== undefined ? (
         <li data-line="vig-cliff">
-          Vig is paid upfront, so the edge is the same at every amount: <b>{fmtPct(f.vigFlat)}</b>.
+          The edge is the same at every amount: <b>{fmtPct(f.vigFlat)}</b>.
         </li>
       ) : null}
       {f.vigCliff && f.vigCliff.length > 1 ? (
         <li data-line="vig-cliff">
-          Edge at nearby amounts:{' '}
-          {f.vigCliff.map((r, i) => (
-            <span key={r.amount}>
-              {i > 0 ? ' · ' : null}
-              {r.current ? (
-                <b aria-current="true">
-                  {fmtMoney(r.amount)} {fmtPct(r.edge)} (this bet)
-                </b>
-              ) : (
-                <>
-                  {fmtMoney(r.amount)} {fmtPct(r.edge)}
-                </>
-              )}
-            </span>
-          ))}
-          . Buy and lay vig is rounded to whole dollars, so the edge jumps around.
+          Edge at nearby amounts:
+          <ul class="sim-vig-list">
+            {f.vigCliff.map((r) => (
+              <li key={r.amount}>
+                {fmtMoney(r.amount)} {fmtPct(r.edge)}
+                {r.current ? ' (this bet)' : ''}
+              </li>
+            ))}
+          </ul>
+          {f.vigFootnote ? (
+            <span>Buy and lay vig is rounded to whole dollars, so the edge jumps.</span>
+          ) : null}
         </li>
       ) : null}
     </ul>

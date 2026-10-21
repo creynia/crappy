@@ -8,7 +8,7 @@ import {
   isHardHop,
 } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
-import { betEdge, betStdDev, edgeTier as tierOf, vigCliff } from '../math';
+import { betEdge, betStdDev, edgeTier as tierOf } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -130,6 +130,8 @@ export interface EvFacts {
   vigCliff?: Array<{ amount: Cents; edge: number; current: boolean }> | null;
   /** Buy/lay with upfront vig: the flat edge applies at every amount, so one line instead of a strip. */
   vigFlat?: number | null;
+  /** the strip is rounded to whole dollars, so say so */
+  vigFootnote?: boolean;
   /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
   swingCents?: number | null;
 }
@@ -338,23 +340,39 @@ function vigFacts(
   type: BetTypeId,
   amount: Cents,
   rules: GameState['rules'],
-): Pick<EvFacts, 'vigCliff' | 'vigFlat'> {
+): Pick<EvFacts, 'vigCliff' | 'vigFlat' | 'vigFootnote'> {
   const cat = BET_TYPES[type].category;
   if (cat !== 'buy' && cat !== 'lay') return {};
   const ctx = { phase: 'come-out' as const, point: null, rules };
-  if (rules.vig.timing === 'upfront') {
-    const e = betEdge(type, amount, ctx).perResolved;
-    return { vigCliff: null, vigFlat: Number(e.n) / Number(e.d) };
-  }
-  const amounts = [...new Set([amount - 1000, amount - 500, amount, amount + 500, amount + 1000])]
-    .filter((a) => a >= 100)
-    .sort((x, y) => x - y);
-  const rows = vigCliff(type, amounts, ctx).map((r) => ({
-    amount: r.amount,
-    edge: Number(r.edge.n) / Number(r.edge.d),
-    current: r.amount === amount,
-  }));
-  return { vigCliff: rows, vigFlat: null };
+  const edgeAt = (a: Cents): number => {
+    const e = betEdge(type, a, ctx).perResolved;
+    return Number(e.n) / Number(e.d);
+  };
+  const exact = rules.vig.rounding === 'exact-cents';
+  // scan the whole-dollar amounts within $100 of this one that the table allows
+  const lo = Math.max(rules.tableMin, amount - 10000);
+  const hi = Math.min(rules.tableMax, amount + 10000);
+  const grid: Cents[] = [];
+  for (let a = Math.ceil(lo / 100) * 100; a <= hi; a += 100) grid.push(a);
+  if (!grid.includes(amount)) grid.push(amount);
+  grid.sort((x, y) => x - y);
+  const edges = grid.map((a) => edgeAt(a));
+  const constant = edges.every((e) => e === edges[0]);
+  if (exact || constant) return { vigCliff: null, vigFlat: edgeAt(amount), vigFootnote: false };
+  // runs of equal edge along the grid; show the current amount and the start of the two runs either side
+  const runStart: Cents[] = [];
+  edges.forEach((e, i) => {
+    if (i === 0 || e !== edges[i - 1]) runStart.push(grid[i]!);
+  });
+  const curRun = runStart.filter((r) => r <= amount).length - 1;
+  const pick = new Set<Cents>([amount]);
+  for (const k of [curRun - 1, curRun - 2]) if (k >= 0) pick.add(runStart[k]!);
+  for (const k of [curRun + 1, curRun + 2]) if (k < runStart.length) pick.add(runStart[k]!);
+  const rows = [...pick]
+    .sort((x, y) => x - y)
+    .slice(0, 5)
+    .map((a) => ({ amount: a, edge: edgeAt(a), current: a === amount }));
+  return { vigCliff: rows, vigFlat: null, vigFootnote: true };
 }
 
 // ---------- roll descriptions ----------

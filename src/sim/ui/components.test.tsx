@@ -561,7 +561,7 @@ describe('BetSheet', () => {
     sheet({ ...real('buy-4', 3900), confirmSucker: false });
     const strip = lines('vig-cliff');
     expect(strip.textContent).toContain('$39 0.85% (this bet)');
-    expect(strip.querySelector('[aria-current="true"]')).toBeTruthy();
+    expect(strip.querySelectorAll('li').length).toBeGreaterThan(0);
     cleanup();
     sheet({ ...real('place-6', 600), confirmSucker: false });
     expect(document.querySelector('[data-line="vig-cliff"]')).toBeNull();

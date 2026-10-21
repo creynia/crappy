@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bet, GameEvent, RollRecord } from '../engine/types';
 import { portraitLayout } from './layouts';
-import { createGame } from '../engine';
+import { createGame, DEFAULT_RULES } from '../engine';
 import { previewAction } from '../math';
 import type { Action, BetTypeId, GameState } from '../engine/types';
 import type { BetInit } from '../engine';
@@ -236,13 +236,57 @@ describe('combined edge with two Come bets', () => {
 });
 
 describe('buy/lay vig strip facts', () => {
-  const state = () => createGame({ phase: 'come-out', bankroll: 100000 });
-  const f = (action: Action) => buildEvFacts(previewAction(state(), action), state())!;
-  it('buy-4 $39 lists the nearby amounts and marks the current one', () => {
-    const v = f({ type: 'place-bet', betType: 'buy-4', amount: 3900 }).vigCliff!;
-    expect(v.map((r) => r.amount)).toEqual([2900, 3400, 3900, 4400, 4900]);
+  const rulesWith = (
+    vig: Partial<GameState['rules']['vig']>,
+    extra: Partial<GameState['rules']> = {},
+  ) => ({ ...DEFAULT_RULES, ...extra, vig: { ...DEFAULT_RULES.vig, ...vig } });
+  const f = (action: Action, rules?: GameState['rules']) => {
+    const st = () =>
+      createGame({ phase: 'come-out', bankroll: 100000, ...(rules ? { rules } : {}) });
+    return buildEvFacts(previewAction(st(), action), st())!;
+  };
+  const buy = (betType: BetTypeId, amount: number, rules?: GameState['rules']) =>
+    f({ type: 'place-bet', betType, amount }, rules);
+
+  it('buy-4 $39 jumps at $40: the strip shows both and marks the current one', () => {
+    const v = buy('buy-4', 3900).vigCliff!;
     expect(v.find((r) => r.current)!.amount).toBe(3900);
     expect(v.find((r) => r.current)!.edge).toBeCloseTo(1 / 117, 12);
+    expect(v.find((r) => r.amount === 4000)!.edge).toBeCloseTo(1 / 60, 12);
+    expect(buy('buy-4', 3900).vigFootnote).toBe(true);
+  });
+  it('buy 5 and 9 and buy 6 and 8 give a strip with the current amount', () => {
+    for (const t of ['buy-5', 'buy-9', 'buy-6', 'buy-8'] as const) {
+      const v = buy(t, 2000).vigCliff!;
+      expect(v.length).toBeGreaterThan(1);
+      expect(v.some((r) => r.current && r.amount === 2000)).toBe(true);
+    }
+  });
+  it('lay 5 and 6 give a strip too', () => {
+    for (const t of ['lay-5', 'lay-6'] as const) {
+      const v = f({ type: 'place-bet', betType: t, amount: 4000 }).vigCliff!;
+      expect(v.length).toBeGreaterThan(1);
+    }
+  });
+  it('amounts stay within the table limits', () => {
+    const v = buy('buy-4', 1000).vigCliff!;
+    for (const r of v) {
+      expect(r.amount).toBeGreaterThanOrEqual(DEFAULT_RULES.tableMin);
+      expect(r.amount).toBeLessThanOrEqual(DEFAULT_RULES.tableMax);
+    }
+  });
+  it('upfront vig at floor-dollar rounding is not flat: the strip shows', () => {
+    const up = rulesWith({ timing: 'upfront' });
+    const v = buy('buy-4', 1000, up);
+    expect(v.vigFlat).toBeNull();
+    expect(v.vigCliff!.length).toBeGreaterThan(1);
+  });
+  it('exact-cents rounding collapses to one flat line with no footnote', () => {
+    const ex = rulesWith({ rounding: 'exact-cents' });
+    const v = buy('buy-4', 3900, ex);
+    expect(v.vigCliff).toBeNull();
+    expect(v.vigFlat).toBeCloseTo(0.0167, 3);
+    expect(v.vigFootnote).toBe(false);
   });
   it('the strip is only for buy and lay bets', () => {
     expect(f({ type: 'place-bet', betType: 'place-6', amount: 600 }).vigCliff).toBeUndefined();

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { validateScene } from '../scene';
 import { calloutBox, placeCallouts, wrapText } from './Callouts';
 import { centerLayout, landscapeLayout, portraitLayout } from './layouts';
-import { REGION_IDS } from './layouts/types';
+import { BET_TYPES_WITHOUT_REGION, REGION_IDS } from './layouts/types';
+import { regionIdForBet } from './layouts';
+import { BET_TYPE_IDS } from '../engine/bets';
 import { Table } from './Table';
 
 const LAYOUTS = [portraitLayout, landscapeLayout, centerLayout];
@@ -43,6 +45,18 @@ describe('callout geometry', () => {
     const box4 = portraitLayout.regions.find((r) => r.id === 'box-4')!;
     const below = calloutBox(box4.rect, portraitLayout.viewBox, 'Here.', 'below');
     expect(below.box.y).toBeGreaterThanOrEqual(box4.rect.y + box4.rect.h);
+  });
+  it('every bet type has a callout region except the listed ones (which validation rejects)', () => {
+    for (const t of [...BET_TYPE_IDS])
+      expect(regionIdForBet(t, null) === null, t).toBe(BET_TYPES_WITHOUT_REGION.includes(t));
+    const r = validateScene({
+      id: 's',
+      version: 1,
+      callouts: [{ target: { betType: 'come-odds' }, text: 'x' }],
+    });
+    expect(r.ok ? [] : r.errors).toEqual([
+      'callouts[0].target.betType: come-odds has no fixed table region; target a number box instead, e.g. "box-6"',
+    ]);
   });
   it('wraps words without splitting them', () => {
     expect(wrapText('one two three four', 9)).toEqual(['one two', 'three', 'four']);

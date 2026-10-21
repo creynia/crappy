@@ -30,6 +30,12 @@ export type RegionId =
   | 'all'
   | 'tall'
   | 'small';
+/**
+ * Bet types with no fixed region (they sit in whichever number box their come bet travelled to), so
+ * a callout cannot target them by bet type; point at the number box ("box-6") instead.
+ */
+export const BET_TYPES_WITHOUT_REGION: readonly BetTypeId[] = ['come-odds', 'dont-come-odds'];
+
 /** Every region id, as a runtime list (scene validation of callout targets). */
 export const REGION_IDS: readonly RegionId[] = [
   'pass',

@@ -5,7 +5,7 @@ import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
 import { runScript, stageFor } from './runner';
 import { answeredRequirements } from './conditions';
-import { REGION_IDS } from '../ui/layouts/types';
+import { BET_TYPES_WITHOUT_REGION, REGION_IDS } from '../ui/layouts/types';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -82,6 +82,11 @@ class Ctx {
       } else if (isObj(t)) {
         this.keys(`${p}.target`, t, ['betType']);
         this.bet(`${p}.target.betType`, t.betType);
+        if ((BET_TYPES_WITHOUT_REGION as readonly unknown[]).includes(t.betType))
+          this.err(
+            `${p}.target.betType`,
+            `${String(t.betType)} has no fixed table region; target a number box instead, e.g. "box-6"`,
+          );
       } else this.err(`${p}.target`, 'must be a region id or { betType }');
       this.str(`${p}.text`, c.text);
       if (c.placement !== undefined && c.placement !== 'above' && c.placement !== 'below')

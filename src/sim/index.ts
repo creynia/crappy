@@ -14,5 +14,5 @@ export type { ChipStackProps } from './ui/ChipStack';
 export { Puck } from './ui/Puck';
 export { Table } from './ui/Table';
 export type { TableProps, StackAnnotation } from './ui/Table';
-export { centerLayout, portraitLayout } from './ui/layouts';
+export { centerLayout, landscapeLayout, portraitLayout } from './ui/layouts';
 export type { SimSettings, SimulatorProps, SimulatorEvent, SimulatorHandle } from './ui/types';

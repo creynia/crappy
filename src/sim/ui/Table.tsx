@@ -8,6 +8,7 @@ import { hopText } from '../engine/bets';
 import { hopSpot, regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
 import { Puck } from './Puck';
+import { layoutBadges } from './stackBadges';
 import { RegionArt } from './regionArt';
 import { betLabel, fmtMoney, regionAriaLabel } from './text';
 import './sim.css';
@@ -47,8 +48,13 @@ export interface TableProps {
 }
 
 export interface StackAnnotation {
+  /** the short badge text, e.g. "Wins" */
   text: string;
   tone: 'pending' | 'selected' | 'right' | 'wrong';
+  /** what a screen reader hears after the bet, e.g. "Wins, right" (default: text) */
+  spoken?: string;
+  /** the bet's name, e.g. "Come on 8" (default: the bet type's label) */
+  name?: string;
 }
 
 const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', 'tall', 'small']);
@@ -147,6 +153,20 @@ export function Table({
   const hasPuck = layout.puckRadius > 0;
   const puckPos = point ? layout.puck[point] : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
+  const badges = useMemo(
+    () =>
+      annotate
+        ? layoutBadges(
+            stacks.flatMap((s) => {
+              const note = annotate.get(s.betIds[0]!);
+              return note ? [{ key: s.key, x: s.x, y: s.y, text: note.text }] : [];
+            }),
+            layout.chipRadius,
+            layout.viewBox,
+          )
+        : null,
+    [annotate, stacks, layout],
+  );
   // bonus side bets draw their collected numbers as pips inside the cell
   const progressFor = (region: RegionDef): readonly number[] | undefined => {
     if (!BONUS_REGIONS.has(region.id)) return undefined;
@@ -257,6 +277,7 @@ export function Table({
             const nums = s.betIds.length;
             const note = annotate?.get(s.betIds[0]!);
             const r = layout.chipRadius;
+            const name = note?.name ?? `${betLabel(s.type)}${s.caption ? ` ${s.caption}` : ''}`;
             return (
               <g
                 key={s.key}
@@ -265,7 +286,7 @@ export function Table({
                 tabindex={0}
                 aria-label={
                   note
-                    ? `${betLabel(s.type)}${s.caption ? ` ${s.caption}` : ''}, ${fmtMoney(s.amount)}: ${note.text}`
+                    ? `${name}, ${fmtMoney(s.amount)}: ${note.spoken ?? note.text}`
                     : `Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`
                 }
                 aria-pressed={note ? note.tone === 'selected' : undefined}
@@ -283,6 +304,10 @@ export function Table({
                 data-stack={s.betIds[0]}
                 data-count={nums}
               >
+                {note ? (
+                  // drill stacks are the only targets: give them a 44px+ hit area
+                  <circle class="sim-stack-target" cx={s.x} cy={s.y} r={r * 1.5} />
+                ) : null}
                 <ChipStack
                   x={s.x}
                   y={s.y}
@@ -291,23 +316,31 @@ export function Table({
                   off={s.off}
                   {...(s.caption ? { caption: s.caption } : {})}
                 />
-                {note ? (
-                  <g class={`sim-call is-${note.tone}`} aria-hidden="true">
-                    <rect
-                      x={s.x - r * 1.6}
-                      y={s.y - r * 0.45}
-                      width={r * 3.2}
-                      height={r * 1.25}
-                      rx={r * 0.3}
-                    />
-                    <text x={s.x} y={s.y + r * 0.45} font-size={r * 0.85} text-anchor="middle">
-                      {note.text}
-                    </text>
-                  </g>
-                ) : null}
               </g>
             );
           })}
+          {badges ? (
+            <g class="sim-calls" aria-hidden="true">
+              {stacks.map((s) => {
+                const note = annotate!.get(s.betIds[0]!);
+                const box = badges.get(s.key);
+                if (!note || !box) return null;
+                return (
+                  <g key={s.key} class={`sim-call is-${note.tone}`} data-call={s.betIds[0]}>
+                    <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={box.h * 0.28} />
+                    <text
+                      x={box.x + box.w / 2}
+                      y={box.y + box.h / 2 + box.fontSize * 0.35}
+                      font-size={box.fontSize}
+                      text-anchor="middle"
+                    >
+                      {note.text}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          ) : null}
           {travelling.map((b) => {
             // from the come / don't-come box to the number the bet now sits on
             const from = ghostPos({ ...b, point: null });

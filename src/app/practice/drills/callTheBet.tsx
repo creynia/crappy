@@ -1,8 +1,14 @@
 // Drill: "Call the bet". A legal layout and a roll: the learner calls every chip stack Wins, Loses,
 // Pushes, Travels, Off or Stays, dealer-style. The answer key is the engine's own resolution of the
 // roll (createGame + applyAction events), never a hand-written table.
-import { useState } from 'preact/hooks';
-import { centerLayout, portraitLayout, Table, type StackAnnotation } from '../../../sim';
+import { useEffect, useState } from 'preact/hooks';
+import {
+  centerLayout,
+  landscapeLayout,
+  portraitLayout,
+  Table,
+  type StackAnnotation,
+} from '../../../sim';
 import {
   applyAction,
   BET_TYPES,
@@ -22,6 +28,7 @@ import type {
   PointNumber,
 } from '../../../sim/engine';
 import { regionIdForBet } from '../../../sim/ui/layouts';
+import type { RegionId, TableLayout } from '../../../sim/ui/layouts/types';
 import type { DrillRng } from '../rng';
 import { defineDrill, type DrillInputProps, type DrillItem } from '../types';
 
@@ -78,6 +85,7 @@ export function resolveCalls(
   const truth: Record<string, Call> = {};
   const why: Record<string, string> = {};
   const payouts: Record<string, Cents> = {};
+  const total = dice[0] + dice[1];
   for (const b of state.bets) {
     const name = betName(b);
     const e = byId.get(b.id);
@@ -86,13 +94,16 @@ export function resolveCalls(
       truth[b.id] = 'win';
       payouts[b.id] = e.profit - e.vig + (e.staysUp ? 0 : e.amount);
       why[b.id] =
-        `${name} wins ${formatMoney(e.profit - e.vig)}${e.staysUp ? ' and stays up' : ''}.`;
+        `${name} wins ${formatMoney(e.profit - e.vig)}${e.staysUp ? ' and is left up' : ''}.`;
     } else if (e?.type === 'bet-lost') {
       truth[b.id] = 'lose';
       why[b.id] = `${name} loses.`;
     } else if (e?.type === 'bet-pushed') {
       truth[b.id] = 'push';
-      why[b.id] = `${name} is barred on 12: a push, no win and no loss.`;
+      const barred = (b.type === 'dont-pass' || b.type === 'dont-come') && total === 12;
+      why[b.id] = barred
+        ? `${name} is barred on 12: a push, no win and no loss.`
+        : `${name} pushes: no win and no loss.`;
     } else if (e?.type === 'bet-travelled') {
       truth[b.id] = 'travel';
       why[b.id] = `${name} travels to the ${e.point}.`;
@@ -104,11 +115,18 @@ export function resolveCalls(
           : `${name} is off on the come-out: no action.`;
     } else {
       truth[b.id] = 'stays';
-      why[b.id] = `${name} stays: no decision on a ${dice[0] + dice[1]}.`;
+      const line = b.type === 'pass-line' || b.type === 'dont-pass';
+      why[b.id] =
+        line && state.phase === 'come-out'
+          ? `${name} stays: the ${total} becomes the point.`
+          : `${name} stays: no decision on ${article(total)} ${total}.`;
     }
   }
   return { truth, why, payouts };
 }
+
+/** "an 8", "an 11", "a 6". */
+const article = (n: number): string => (n === 8 || n === 11 ? 'an' : 'a');
 
 const PLACE_AMOUNT = (n: PointNumber): Cents => (n === 6 || n === 8 ? 1200 : 1000);
 
@@ -220,11 +238,48 @@ function onCenter(b: Bet): boolean {
   return !!rid && centerLayout.regions.some((r) => r.id === rid);
 }
 
+/** Just the regions that hold bets (e.g. two center boxes, not the whole proposition panel). */
+export function cropLayout(layout: TableLayout, ids: ReadonlySet<RegionId>): TableLayout {
+  const keep = layout.regions.filter((r) => ids.has(r.id));
+  if (!keep.length) return layout;
+  const pad = 10;
+  const x0 = Math.max(0, Math.min(...keep.map((r) => r.rect.x)) - pad);
+  const y0 = Math.max(0, Math.min(...keep.map((r) => r.rect.y)) - pad);
+  const x1 = Math.min(layout.viewBox.w, Math.max(...keep.map((r) => r.rect.x + r.rect.w)) + pad);
+  const y1 = Math.min(layout.viewBox.h, Math.max(...keep.map((r) => r.rect.y + r.rect.h)) + pad);
+  const at = (p: { x: number; y: number }) => ({ x: p.x - x0, y: p.y - y0 });
+  return {
+    ...layout,
+    viewBox: { w: x1 - x0, h: y1 - y0 },
+    regions: keep.map((r) => ({
+      ...r,
+      rect: { ...r.rect, x: r.rect.x - x0, y: r.rect.y - y0 },
+      chipSpots: Object.fromEntries(Object.entries(r.chipSpots).map(([k, p]) => [k, at(p)])),
+    })),
+  };
+}
+
+/** Wide landscape screens: the felt in its landscape layout, the call buttons beside it. */
+function useWide(): boolean {
+  const q = '(orientation: landscape) and (min-width: 700px)';
+  const get = () => typeof matchMedia === 'function' && matchMedia(q).matches;
+  const [wide, setWide] = useState(get);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const mq = matchMedia(q);
+    const on = () => setWide(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+  return wide;
+}
+
 function CallTheBetInput({
   item,
   disabled,
   onAnswer,
 }: DrillInputProps<CallTheBetItem, CallAnswer>) {
+  const wide = useWide();
   const first = item.bets[0]?.id ?? '';
   const [st, setSt] = useState<{ key: string; calls: Record<string, Call>; sel: string }>({
     key: item.key,
@@ -243,13 +298,25 @@ function CallTheBetInput({
   for (const b of item.bets) {
     const given = calls[b.id];
     const right = item.truth[b.id]!;
+    const name = betName(b);
+    const givenText = given ? CALL_LABEL[given] : '?';
     annotate.set(
       b.id,
       disabled
         ? given === right
-          ? { text: CALL_LABEL[right], tone: 'right' }
-          : { text: given ? CALL_LABEL[given] : '?', tone: 'wrong' }
-        : { text: given ? CALL_LABEL[given] : '?', tone: b.id === sel ? 'selected' : 'pending' },
+          ? { name, text: CALL_LABEL[right], tone: 'right', spoken: `${CALL_LABEL[right]}, right` }
+          : {
+              name,
+              text: givenText,
+              tone: 'wrong',
+              spoken: `${given ? CALL_LABEL[given] : 'not called'}, wrong, ${CALL_LABEL[right]}`,
+            }
+        : {
+            name,
+            text: givenText,
+            tone: b.id === sel ? 'selected' : 'pending',
+            spoken: given ? `called ${CALL_LABEL[given]}` : 'not called yet',
+          },
     );
   }
   const lost = disabled ? item.bets.filter((b) => item.truth[b.id] === 'lose') : [];
@@ -258,7 +325,7 @@ function CallTheBetInput({
         .filter((b) => item.truth[b.id] === 'win')
         .map((bet) => ({ bet, payout: item.payouts[bet.id] ?? 0 }))
     : [];
-  const table = (bets: Bet[], layout: typeof portraitLayout) =>
+  const table = (bets: Bet[], layout: TableLayout) =>
     bets.length ? (
       <Table
         layout={layout}
@@ -272,50 +339,63 @@ function CallTheBetInput({
       />
     ) : null;
   const selBet = item.bets.find((b) => b.id === sel);
+  const center = item.bets.filter(onCenter);
   return (
-    <div class="pr-call">
-      {table(
-        item.bets.filter((b) => !onCenter(b)),
-        portraitLayout,
-      )}
-      {table(item.bets.filter(onCenter), centerLayout)}
-      {disabled ? (
-        <ul class="pr-call-why">
-          {item.bets.map((b) => (
-            <li key={b.id} class={calls[b.id] === item.truth[b.id] ? 'right' : 'wrong'}>
-              {item.why[b.id]}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <p class="pr-call-sel" aria-live="polite">
-            {selBet ? `Call: ${betName(selBet)} (${formatMoney(selBet.amount)})` : ''}
-          </p>
-          <div class="pr-choices" role="group" aria-label="Calls">
-            {callsFor(item.level).map((c) => (
-              <button
-                type="button"
-                key={c}
-                class={`pr-choice${calls[sel] === c ? ' is-picked' : ''}`}
-                onClick={() => call(c)}
-              >
-                {CALL_LABEL[c]}
-              </button>
+    <div class={`pr-call${wide ? ' is-wide' : ''}`}>
+      <div class="pr-call-tables">
+        {table(
+          item.bets.filter((b) => !onCenter(b)),
+          wide ? landscapeLayout : portraitLayout,
+        )}
+        {table(
+          center,
+          cropLayout(
+            centerLayout,
+            new Set(center.map((b) => regionIdForBet(b.type, b.point)!).filter(Boolean)),
+          ),
+        )}
+      </div>
+      <div class="pr-call-side">
+        {disabled ? (
+          <ul class="pr-call-why">
+            {item.bets.map((b) => (
+              <li key={b.id} class={calls[b.id] === item.truth[b.id] ? 'right' : 'wrong'}>
+                {calls[b.id] === item.truth[b.id] ? '✓ Right: ' : '✗ Wrong: '}
+                {item.why[b.id]}
+              </li>
             ))}
-          </div>
-          <button
-            type="button"
-            class="btn pr-call-check"
-            disabled={!done}
-            onClick={() => onAnswer(calls)}
-          >
-            {done
-              ? 'Check my calls'
-              : `Call every stack (${Object.keys(calls).length}/${item.bets.length})`}
-          </button>
-        </>
-      )}
+          </ul>
+        ) : (
+          <>
+            <p class="pr-call-sel" aria-live="polite">
+              {selBet ? `Call: ${betName(selBet)} (${formatMoney(selBet.amount)})` : ''}
+            </p>
+            <div class="pr-choices" role="group" aria-label="Calls">
+              {callsFor(item.level).map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  class={`pr-choice${calls[sel] === c ? ' is-picked' : ''}`}
+                  aria-pressed={calls[sel] === c}
+                  onClick={() => call(c)}
+                >
+                  {CALL_LABEL[c]}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              class="btn pr-call-check"
+              disabled={!done}
+              onClick={() => onAnswer(calls)}
+            >
+              {done
+                ? 'Check my calls'
+                : `Call every stack (${Object.keys(calls).length}/${item.bets.length})`}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

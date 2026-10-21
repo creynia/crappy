@@ -205,31 +205,6 @@
 .pr-call .sim-stack-hit {
   cursor: pointer;
 }
-.sim-call rect {
-  fill: #fff;
-  stroke: #1d2b22;
-  stroke-width: 2;
-}
-.sim-call text {
-  fill: #1d2b22;
-  font-weight: 700;
-}
-.sim-call.is-selected rect {
-  fill: var(--gold, #f5c542);
-  stroke-width: 4;
-}
-.sim-call.is-right rect {
-  fill: var(--sim-win, #2f9e44);
-  stroke: #fff;
-}
-.sim-call.is-wrong rect {
-  fill: var(--sim-loss, #c92a2a);
-  stroke: #fff;
-}
-.sim-call.is-right text,
-.sim-call.is-wrong text {
-  fill: #fff;
-}
 .pr-call-sel {
   margin: 0;
   font-weight: 600;
@@ -249,4 +224,21 @@
 .pr-call-why li.wrong {
   color: var(--bad);
   font-weight: 600;
+}
+.pr-call-tables {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-side {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+/* wide landscape: felt on the left, the call buttons beside it */
+.pr-call.is-wide {
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr);
+  align-items: start;
+}
+.pr-call.is-wide .pr-call-table {
+  max-width: none;
 }

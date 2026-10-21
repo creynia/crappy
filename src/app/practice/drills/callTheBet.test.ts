@@ -139,3 +139,26 @@ describe('call the bet: generator', () => {
     expect(r.expected).toContain(':');
   });
 });
+
+describe('call the bet: center crop', () => {
+  it('keeps only the regions that hold bets, shifted into a tight viewBox', async () => {
+    const { cropLayout } = await import('./callTheBet');
+    const { centerLayout } = await import('../../../sim');
+    const c = cropLayout(centerLayout, new Set(['any-7', 'yo-11'] as const));
+    expect(c.regions.map((r) => r.id).sort()).toEqual(['any-7', 'yo-11']);
+    expect(c.viewBox.h).toBeLessThan(centerLayout.viewBox.h);
+    for (const r of c.regions) {
+      expect(r.rect.x).toBeGreaterThanOrEqual(0);
+      expect(r.rect.y).toBeGreaterThanOrEqual(0);
+      expect(r.rect.y + r.rect.h).toBeLessThanOrEqual(c.viewBox.h);
+    }
+  });
+  it('reasons: "an 8", and a come-out point for line bets', () => {
+    const s = game(null, [{ type: 'pass-line', amount: 1000 }]);
+    expect(resolveCalls(s, [4, 4]).why[s.bets[0]!.id]).toBe(
+      'Pass Line stays: the 8 becomes the point.',
+    );
+    const p = game(4, [{ type: 'place-6', amount: 1200 }]);
+    expect(resolveCalls(p, [5, 6]).why[p.bets[0]!.id]).toBe('Place 6 stays: no decision on an 11.');
+  });
+});

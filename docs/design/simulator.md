@@ -852,8 +852,11 @@ export type Condition =
   | { rolls: number }                                  // rolls since step start
   | { phase: Phase }
   | { point: PointNumber | null }
-  | { betOnTable: { type: BetTypeId; minAmount?: Cents } }
+  | { betOnTable: { type: BetTypeId; minAmount?: Cents; point?: PointNumber } }
+  | { betResolved: { type: BetTypeId; result?: 'won' | 'lost' | 'pushed' } }  // sugar over bet-won/lost/pushed
   | { bankrollAtLeast: Cents } | { bankrollAtMost: Cents }
+  | { equityAtLeast: Cents } | { equityAtMost: Cents }   // equity = bankroll + chips on the table
+  | { not: Condition }                                  // nests with all / any
   | { previewed: BetTypeId }                           // user opened the sheet for this bet
   | { autoRollCompleted: { minRolls?: number } }
   | { acknowledged: true };                            // user tapped "Next"

@@ -418,15 +418,26 @@ test.describe('sandbox flows', () => {
     page,
   }) => {
     await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
     await page.getByRole('button', { name: 'Session', exact: true }).click();
     const session = page.locator('.sim-session-panel h3').first();
-    await expect(session).toBeInViewport();
+    await clear('.sim-session-panel h3');
     await expect(session).toBeFocused();
 
     const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
     if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
     const auto = page.locator('.sim-autoroll');
-    await expect(auto).toBeInViewport();
+    await expect(auto).toBeInViewport({ ratio: 0.5 });
     await expect(auto).toBeFocused();
   });
 });

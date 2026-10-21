@@ -125,3 +125,17 @@ test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }
   expect(expected).toBeGreaterThan(-330);
   await expect(row('Busted')).toHaveText('No');
 });
+
+test('a panel a lesson step opens by itself does not scroll the page or take focus', async ({
+  page,
+}) => {
+  await page.goto('/#/learn/dice-and-combinations');
+  const scene = await openScene(page, 1); // scrolls the lazily mounted simulator into view
+  const panel = scene.locator('.sim-autoroll');
+  await expect(panel).toBeVisible();
+  const y0 = await page.evaluate<number>('window.scrollY');
+  await expect(panel).toBeVisible();
+  expect(await page.evaluate<number>('window.scrollY')).toBe(y0);
+  await expect(panel).not.toBeFocused();
+  await expect(panel.locator('h1, h2, h3, legend').first()).not.toBeFocused();
+});

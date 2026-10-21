@@ -35,6 +35,7 @@ test('challenge: 300 scored rolls, result screen and best score', async ({ page 
   await expect(page.getByTestId('challenge-score')).toHaveText(/^\d+\.\d\d%$/);
   await expect(result).toContainText(/Perfect strategy|Sharp/);
   await expect(result).toContainText('Points played without odds');
+  await expect(result.locator('.challenge-kv')).toContainText(/Rolls\s*300/);
   await expect(result).toContainText('does not touch the score');
   await expect(result).not.toContainText(/win money|real money/i);
   await page.getByRole('button', { name: 'Seed of the day' }).click();

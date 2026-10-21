@@ -10,7 +10,13 @@ import {
   scoreChallenge,
   RANK_BANDS,
 } from '../../sim';
-import type { ChallengeResult, ChallengeTally, SceneConfig, SimulatorEvent } from '../../sim';
+import type {
+  ChallengeResult,
+  ChallengeTally,
+  GameState,
+  SceneConfig,
+  SimulatorEvent,
+} from '../../sim';
 import { Link } from '../components/Link';
 import { useStore } from '../context';
 import { navigate } from '../router';
@@ -63,6 +69,7 @@ export function Challenge({ query }: { query: URLSearchParams }) {
 
   const start = (seed: number) => {
     tally.current = emptyTally();
+    finished.current = false;
     setRolls(0);
     setResult(null);
     setPhase({ kind: 'play', seed });
@@ -72,19 +79,30 @@ export function Challenge({ query }: { query: URLSearchParams }) {
     if (urlSeed !== null && !(phase.kind === 'play' && phase.seed === urlSeed)) start(urlSeed);
   }, [urlSeed]);
 
+  // The simulator reports `scene-completed` before the `rolled` event of the roll that ended it,
+  // so scoring waits for that last roll to be tallied.
+  const finished = useRef(false);
+  const finish = (state: GameState) => {
+    if (!scene?.challenge || phase.kind !== 'play') return;
+    const start = scene.bankroll ?? 0;
+    const r = scoreChallenge(tally.current, scene.challenge, {
+      actualNet: equity(state) - start,
+      expectedLoss: state.stats.expectedLoss,
+    });
+    setResult(r);
+    store.recordChallenge({ score: r.score, band: r.band, seed: phase.seed });
+    setPhase({ kind: 'result', seed: phase.seed });
+  };
   const onEvent = (e: SimulatorEvent) => {
     tally.current = observeChallenge(tally.current, e);
-    if (e.type === 'rolled') setRolls(tally.current.rolls);
-    if (e.type === 'scene-completed' && scene?.challenge && phase.kind === 'play') {
-      const start = scene.bankroll ?? 0;
-      const r = scoreChallenge(tally.current, scene.challenge, {
-        actualNet: equity(e.state) - start,
-        expectedLoss: e.state.stats.expectedLoss,
-      });
-      setResult(r);
-      store.recordChallenge({ score: r.score, band: r.band, seed: phase.seed });
-      setPhase({ kind: 'result', seed: phase.seed });
+    if (e.type === 'rolled') {
+      setRolls(tally.current.rolls);
+      if (finished.current) {
+        finished.current = false;
+        finish(e.state);
+      }
     }
+    if (e.type === 'scene-completed') finished.current = true;
   };
 
   if (phase.kind === 'intro') {

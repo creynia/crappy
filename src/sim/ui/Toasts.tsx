@@ -15,6 +15,7 @@ export interface ToastsProps {
 }
 
 const SWIPE_PX = 60;
+const TAP_PX = 10;
 
 function ToastView({
   t,
@@ -34,6 +35,7 @@ function ToastView({
   const [dx, setDx] = useState(0);
   const start = useRef<{ id: number; x: number } | null>(null);
   const onDown = (e: PointerEvent) => {
+    if (e.button !== 0 || !e.isPrimary) return;
     if ((e.target as HTMLElement).closest('button')) return;
     start.current = { id: e.pointerId, x: e.clientX };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -45,7 +47,8 @@ function ToastView({
     if (start.current?.id !== e.pointerId) return;
     const moved = e.clientX - start.current.x;
     start.current = null;
-    if (Math.abs(moved) > SWIPE_PX) onDismiss(t.id);
+    // a swipe, or a tap that barely moved, dismisses
+    if (Math.abs(moved) > SWIPE_PX || Math.abs(moved) < TAP_PX) onDismiss(t.id);
     else setDx(0);
   };
   return (
@@ -68,7 +71,7 @@ function ToastView({
       <button
         type="button"
         class="sim-toast-x"
-        aria-label="Dismiss"
+        aria-label={`Dismiss: ${t.text}`}
         onClick={() => onDismiss(t.id)}
       >
         ×

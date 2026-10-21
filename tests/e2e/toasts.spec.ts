@@ -41,8 +41,46 @@ test.describe('toast overlay', () => {
     });
   }
 
-  test('swipe sideways dismisses a toast; at most two are shown', async ({ page }, info) => {
-    test.skip(info.project.name !== 'mobile', 'pointer swipe on the phone project');
+  for (const vp of [
+    { name: 'portrait', width: 390, height: 844 },
+    { name: 'landscape', width: 844, height: 390 },
+    { name: 'small portrait', width: 360, height: 740 },
+  ]) {
+    test(`two toasts never cover a betting region (${vp.name})`, async ({ page }, info) => {
+      test.skip(info.project.name !== 'mobile', 'sets its own viewports');
+      await page.setViewportSize(vp);
+      await page.goto(url);
+      await place(page);
+      const roll = page.getByRole('button', { name: /^Roll/ });
+      await roll.click();
+      await roll.click();
+      await expect(page.locator('.sim-toast')).toHaveCount(2);
+      await page.screenshot({ path: `test-results/toasts2-${vp.name}.png` });
+      for (const region of ['pass', 'come', 'place-6', 'place-8']) {
+        const loc = page.locator(`[data-region="${region}"]`);
+        if ((await loc.count()) === 0) continue;
+        const b = (await loc.first().boundingBox())!;
+        const covered = await loc.first().evaluate(
+          (_el: unknown, pt: { x: number; y: number }) =>
+            (
+              globalThis as unknown as {
+                document: {
+                  elementFromPoint(x: number, y: number): { closest(s: string): unknown } | null;
+                };
+              }
+            ).document
+              .elementFromPoint(pt.x, pt.y)
+              ?.closest('.sim-toast') != null,
+          { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+        );
+        expect(covered, `${region} is under a toast`).toBe(false);
+      }
+    });
+  }
+
+  test('swipe or tap dismisses a toast; at most two are shown', async ({ browser }) => {
+    const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
     await page.goto(url);
     await place(page);
     const roll = page.getByRole('button', { name: /^Roll/ });
@@ -50,13 +88,40 @@ test.describe('toast overlay', () => {
     await roll.click();
     await roll.click();
     await expect(page.locator('.sim-toast')).toHaveCount(2);
+    // swipe with a touch pointer
     const toast = page.locator('.sim-toast').last();
     const b = (await toast.boundingBox())!;
     const y = b.y + b.height / 2;
-    await page.mouse.move(b.x + 20, y);
-    await page.mouse.down();
-    await page.mouse.move(b.x + 120, y, { steps: 5 });
-    await page.mouse.up();
+    await toast.dispatchEvent('pointerdown', {
+      pointerId: 7,
+      isPrimary: true,
+      pointerType: 'touch',
+      button: 0,
+      clientX: b.x + 20,
+      clientY: y,
+    });
+    await toast.dispatchEvent('pointermove', {
+      pointerId: 7,
+      isPrimary: true,
+      pointerType: 'touch',
+      clientX: b.x + 140,
+      clientY: y,
+    });
+    await toast.dispatchEvent('pointerup', {
+      pointerId: 7,
+      isPrimary: true,
+      pointerType: 'touch',
+      button: 0,
+      clientX: b.x + 140,
+      clientY: y,
+    });
     await expect(page.locator('.sim-toast')).toHaveCount(1);
+    // a tap on the body dismisses too
+    await page
+      .locator('.sim-toast')
+      .first()
+      .tap({ position: { x: 20, y: 8 } });
+    await expect(page.locator('.sim-toast')).toHaveCount(0);
+    await ctx.close();
   });
 });

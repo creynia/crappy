@@ -346,7 +346,21 @@ describe('more presets (I012)', () => {
     expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
     // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of rolls; lay bets stay up through
     // come-outs, so there is no 392/557 scaling
-    expect(m('lay-4-10').expectedLossPerRoll).toBeCloseTo(2 * (2 / 3) * (9 / 36), 6);
+    // coverage is a little below 1: a lay that resolves on a come-out waits for the next point
+    const lay = m('lay-4-10').expectedLossPerRoll;
+    expect(lay).toBeLessThan(2 * (2 / 3) * (9 / 36));
+    expect(lay).toBeGreaterThan(2 * (2 / 3) * (9 / 36) * (392 / 557));
+    expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
+  });
+  it('lay 4/10 chain matches a seeded engine session to 3 decimals', () => {
+    const r = simulateSession({
+      strategy: { id: 'lay-4-10', unit: 500 },
+      rolls: 150_000,
+      seed: 5,
+      bankroll: 100_000_000,
+      stopAtBust: false,
+    });
+    expect(r.expectedLoss / r.rollsPlayed / 100).toBeCloseTo(m('lay-4-10').expectedLossPerRoll, 3);
   });
   it('point-phase-only presets are scaled once by 392/557; always-on ones are not', () => {
     const press = m('place-6-8-press');

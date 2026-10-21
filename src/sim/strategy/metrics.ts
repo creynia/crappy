@@ -135,6 +135,63 @@ function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
   return out;
 }
 
+/**
+ * Lay 4 and lay 10 resolutions per roll, each. Lay bets work on the come-out and a lay that wins on a 7
+ * stays up, but one that loses to its number comes down and is only re-placed once a point is set. Exact
+ * Markov chain over (point, which lays are up). Independent of the rules and the unit.
+ */
+let layCache: { 4: number; 10: number } | undefined;
+function layRates(): { 4: number; 10: number } {
+  if (layCache) return layCache;
+  // state: p (0 = come-out, else the point) x up mask (bit 0 = lay 4, bit 1 = lay 10)
+  const idx = (p: number, mask: number) =>
+    (p === 0 ? 0 : POINTS.indexOf(p as PointNumber) + 1) * 4 + mask;
+  const n = 7 * 4;
+  const edges: Array<Array<{ to: number; pr: number; r4: number; r10: number }>> = [];
+  for (let p = 0; p <= 10; p++) {
+    if (p !== 0 && !POINTS.includes(p as PointNumber)) continue;
+    for (let mask = 0; mask < 4; mask++) {
+      const out: (typeof edges)[number] = [];
+      for (let t = 2; t <= 12; t++) {
+        let m = mask;
+        let r4 = 0;
+        let r10 = 0;
+        // a lay that wins on a 7 stays up; one that loses to its number comes down
+        if (m & 1 && (t === 7 || t === 4)) {
+          r4++;
+          if (t === 4) m &= ~1;
+        }
+        if (m & 2 && (t === 7 || t === 10)) {
+          r10++;
+          if (t === 10) m &= ~2;
+        }
+        let np = p;
+        if (p === 0) {
+          if (!NON_POINT_ROLLS.includes(t)) np = t;
+        } else if (t === 7 || t === p) np = 0;
+        if (np !== 0) m = 3; // the next decision is in the point phase: missing lays go up
+        out.push({ to: idx(np, m), pr: WAYS[t]! / 36, r4, r10 });
+      }
+      edges[idx(p, mask)] = out;
+    }
+  }
+  let v = new Float64Array(n).fill(1 / n);
+  for (let it = 0; it < 3000; it++) {
+    const w = new Float64Array(n);
+    for (let i = 0; i < n; i++) for (const e of edges[i] ?? []) w[e.to]! += v[i]! * e.pr;
+    v = w;
+  }
+  let r4 = 0;
+  let r10 = 0;
+  for (let i = 0; i < n; i++)
+    for (const e of edges[i] ?? []) {
+      r4 += v[i]! * e.pr * e.r4;
+      r10 += v[i]! * e.pr * e.r10;
+    }
+  layCache = { 4: r4, 10: r10 };
+  return layCache;
+}
+
 const COME_NUMBERS: PointNumber[] = [8, 5, 9, 10, 4];
 
 /** Apply place-bet actions without validation, to materialize the strategy's steady layout. */
@@ -283,6 +340,14 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     // NOTE: come bets outside the Molly (my-layout, other presets) take this generic line path: each is
     // priced as one bet amortized over a whole decision, with share 1. That is exact for one come bet in
     // steady state but not for layouts that keep several cycling (see I091 for per-decision pricing).
+    if (spec.id === 'lay-4-10' && (b.type === 'lay-4' || b.type === 'lay-10')) {
+      // up through come-outs but re-placed only in the point phase: priced from the chain
+      const rate = layRates()[b.type === 'lay-4' ? 4 : 10];
+      const e = betEdge(b.type, b.amount, ctx);
+      lossCents += rate * b.amount * toNumber(e.perResolved);
+      action += (rate * b.amount) / 100;
+      continue;
+    }
     const line = isLineLike(b.type);
     const bctx = line ? { phase: 'come-out' as const, point: null, rules: r } : ctx;
     const e = betEdge(b.type, b.amount, bctx);

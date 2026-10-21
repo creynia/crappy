@@ -53,6 +53,10 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
+    stopWin?: Cents;
+    /** default "stop when behind by" amount, in cents */
+    stopLoss?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
@@ -88,6 +92,8 @@ export interface ActionMatcher {
   minAmount?: Cents;
   maxAmount?: Cents;
   oddsMax?: boolean;
+  /** EXTENSION (I035): only a hop bet on this pair matches (either order). */
+  hop?: Dice;
 }
 
 export type Condition =

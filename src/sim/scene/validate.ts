@@ -1,4 +1,4 @@
-import { isBetTypeId } from '../engine/bets';
+import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
@@ -95,8 +95,18 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
+    this.keys(path, v, [
+      'ref',
+      'type',
+      'amount',
+      'point',
+      'parentRef',
+      'working',
+      'hop',
+      'progress',
+    ]);
     this.bet(`${path}.type`, v.type);
+    this.hop(path, v.type, v.hop, true);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
     if (v.parentRef !== undefined) this.str(`${path}.parentRef`, v.parentRef);
@@ -108,9 +118,21 @@ class Ctx {
         this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
     }
   }
+  /** Hop pair (I035): required on a hop BetInit, optional on a hop matcher, rejected elsewhere. */
+  hop(path: string, type: unknown, hop: unknown, required: boolean) {
+    const types = Array.isArray(type) ? type : type === undefined ? [] : [type];
+    const isHop = types.length > 0 && types.every((t) => t === 'hop');
+    if (hop === undefined) {
+      if (required && isHop) this.err(`${path}.hop`, 'a hop bet needs a dice pair, e.g. [2, 4]');
+      return;
+    }
+    if (!isDicePair(hop)) this.err(`${path}.hop`, 'must be a pair of dice, each an integer 1-6');
+    else if (!isHop) this.err(`${path}.hop`, 'only applies to the "hop" bet type');
+  }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax']);
+    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax', 'hop']);
+    this.hop(path, v.betType, v.hop, false);
     if (!ACTION_TYPES.includes(v.type as string)) this.err(`${path}.type`, 'unknown action type');
     if (v.betType !== undefined) {
       if (Array.isArray(v.betType))
@@ -378,6 +400,8 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'stopWin',
+        'stopLoss',
         'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
@@ -406,6 +430,24 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      // The panel offers these amounts as chips, so a scene can only pick one of them.
+      const stopAmounts = [5000, 10_000, 25_000];
+      for (const [k, v] of [
+        ['stopWin', a.stopWin],
+        ['stopLoss', a.stopLoss],
+      ] as const) {
+        if (v === undefined) continue;
+        c.cents(`autoRoll.${k}`, v, { min: 1 });
+        if (typeof v === 'number' && !stopAmounts.includes(v))
+          c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
+        if (
+          k === 'stopLoss' &&
+          typeof v === 'number' &&
+          typeof s.bankroll === 'number' &&
+          v > s.bankroll
+        )
+          c.err('autoRoll.stopLoss', 'cannot be more than the scene bankroll');
+      }
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

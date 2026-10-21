@@ -43,6 +43,8 @@ export function SimAutoRoll({
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
     if (ar.sweep) cfg.sweep = ar.sweep;
+    if (ar.stopWin !== undefined) cfg.stopWin = ar.stopWin;
+    if (ar.stopLoss !== undefined) cfg.stopLoss = ar.stopLoss;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(

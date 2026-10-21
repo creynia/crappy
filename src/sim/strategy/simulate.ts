@@ -1,8 +1,16 @@
-import { applyAction, createGame, equity } from '../engine';
+import { applyAction, createGame, equity, isBonusType, resolveRules } from '../engine';
 import type { GameState } from '../engine';
 import { tableExpectedLossPerRoll, toNumber } from '../math';
+import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
-import type { ManyOptions, ManyResult, SessionConfig, SessionResult } from './types';
+import type {
+  ManyOptions,
+  ManyResult,
+  SessionConfig,
+  SessionResult,
+  SweepConfig,
+  SweepRow,
+} from './types';
 
 /** Expected loss only depends on phase, point and the bets, so repeated layouts hit a per-session cache. */
 function makeExpectedLossFn(): (s: GameState) => number {
@@ -40,6 +48,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   let sevenOuts = 0;
   let longest = 0;
   let hand = 0;
+  const bonusHits = new Map<string, NonNullable<SessionResult['bonusHits']>[number]>();
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
@@ -65,6 +74,13 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     if (rec) totals[rec.total]!++;
     hand++;
     for (const e of r.events) {
+      if (e.type === 'bet-won' && isBonusType(e.betType)) {
+        const pays = Math.round(e.profit / e.amount);
+        const k = `${e.betType}:${pays}`;
+        const cur = bonusHits.get(k);
+        if (cur) cur.count++;
+        else bonusHits.set(k, { type: e.betType, pays, count: 1 });
+      }
       if (e.type === 'point-made') pointsMade++;
       else if (e.type === 'seven-out') {
         sevenOuts++;
@@ -104,6 +120,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     pointsMade,
     sevenOuts,
     longestHand: longest,
+    ...(bonusHits.size ? { bonusHits: [...bonusHits.values()] } : {}),
   };
 }
 
@@ -241,4 +258,53 @@ export async function simulateManyCompare(
     );
   }
   return out;
+}
+
+/**
+ * Sweep the odds multiple of one line strategy over the same seeds. Numeric multiples above the table's
+ * maximum run on a table that offers them (like the 10x / 100x presets).
+ */
+export async function simulateSweep(
+  cfg: SweepConfig,
+  sessions: number,
+  opts: ManyOptions = {},
+): Promise<SweepRow[]> {
+  const base = resolveRules(cfg.rules);
+  const rows: SweepRow[] = [];
+  const n = cfg.oddsMultiples.length;
+  for (let i = 0; i < n; i++) {
+    const m = cfg.oddsMultiples[i]!;
+    let rules = base;
+    if (
+      m !== 'max' &&
+      [...Object.values(base.maxOdds), ...Object.values(base.maxLayOdds)].some((cap) => cap < m)
+    ) {
+      const uniform = { 4: m, 5: m, 6: m, 8: m, 9: m, 10: m };
+      rules = resolveRules({ ...base, maxOdds: uniform, maxLayOdds: uniform });
+    }
+    const spec =
+      m === 'max'
+        ? { id: cfg.strategy, unit: cfg.unit }
+        : { id: cfg.strategy, unit: cfg.unit, oddsMultiple: m };
+    const flat = strategyMetrics({ id: cfg.strategy, unit: cfg.unit, oddsMultiple: 0 }, rules);
+    const lay = cfg.strategy === 'dont-pass-max-lay';
+    const r = await simulateMany(
+      { strategy: spec, rolls: cfg.rolls, seed: cfg.seed, bankroll: cfg.bankroll, rules },
+      sessions,
+      { ...opts, onProgress: (p) => opts.onProgress?.((i + p) / n) },
+    );
+    let ss = 0;
+    for (let k = 0; k < r.finals.length; k++) ss += (r.finals[k]! - r.meanFinal) ** 2;
+    rows.push({
+      multiple: m,
+      edgeOnAction: lineOddsEdge(flat.edgeOnAction, rules, m, lay),
+      // odds carry no edge, so the dollars expected lost depend only on the flat bet
+      expectedLossCents: flat.expectedLossPerRoll * 100 * cfg.rolls,
+      sdFinal: Math.sqrt(ss / Math.max(1, r.finals.length - 1)),
+      probAhead: r.probAhead,
+      bustRate: r.bustRate,
+      meanFinal: r.meanFinal,
+    });
+  }
+  return rows;
 }

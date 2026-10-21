@@ -10,6 +10,19 @@ async function click(el: HTMLElement, selector: string) {
   });
 }
 
+/** Poll (inside act) until `check` returns a truthy value; the run is slow under CI load. */
+async function waitUntil<T>(check: () => T | null | undefined | false): Promise<T> {
+  let found: T | null | undefined | false = null;
+  for (let i = 0; i < 80 && !found; i++) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    found = check();
+  }
+  if (!found) throw new Error('timed out waiting for condition');
+  return found;
+}
+
 describe('AutoRollPanel', () => {
   it('runs one session and shows the chart and summary', async () => {
     const el = document.createElement('div');
@@ -27,9 +40,7 @@ describe('AutoRollPanel', () => {
     const el = document.createElement('div');
     render(<AutoRollPanel initialSeed={7} config={{ rollOptions: [10], sessions: [100] }} />, el);
     await click(el, '[data-testid="auto-roll-run"]');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 300));
-    });
+    await waitUntil(() => el.querySelector('[data-role="band"]'));
     expect(el.querySelector('[data-role="band"]')).not.toBeNull();
     expect(el.textContent).toContain('Busted sessions');
   });
@@ -69,12 +80,11 @@ describe('AutoRollPanel', () => {
       el,
     );
     await click(el, '[data-testid="auto-roll-run"]');
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 600));
-    });
-    const row = [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
-      tr.textContent?.startsWith('Expected cost per 100 rolls'),
-    )!;
+    const row = await waitUntil(() =>
+      [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
+        tr.textContent?.startsWith('Expected cost per 100 rolls'),
+      ),
+    );
     const cost = Number(row.querySelector('td')!.textContent.replace(/[^0-9.]/g, ''));
     expect(cost).toBeGreaterThan(26);
     expect(cost).toBeLessThan(28);

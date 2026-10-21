@@ -16,7 +16,8 @@ export type OracleOut =
   | { kind: 'push' }
   | { kind: 'win'; profit: number; vig: number }
   | { kind: 'travel'; point: number }
-  | { kind: 'return'; reason: string };
+  | { kind: 'return'; reason: string }
+  | { kind: 'advance'; progress: readonly number[] };
 
 export interface OracleIn {
   type: string; // bet type id
@@ -29,6 +30,8 @@ export interface OracleIn {
   upfrontPaid?: boolean; // upfront vig already paid and not yet consumed by a win
   working: boolean; // already decided by the caller (only matters for toggleable bets)
   rules: OracleRules;
+  /** bonus bets: numbers already collected */
+  progress?: number[];
 }
 
 const WIN: OracleOut = { kind: 'win', profit: 0, vig: 0 };
@@ -124,6 +127,35 @@ export function oracle(i: OracleIn): OracleOut {
     if (t === n && hard) return winAt(mult, 1);
     if (t === 7 || t === n) return L; // seven, or the easy way
     return N;
+  }
+
+  // Bonus side bets (rules as plain data): Fire counts distinct points made this hand, paid when the
+  // shooter sevens out with 4 or 5 of them (24/249 to 1) or at once on the 6th (999 to 1). Small/Tall/All
+  // need every number of their set before any 7 (34/34/175 to 1) and lose on any 7, come-out included.
+  if (i.type === 'fire') {
+    const have = i.progress ?? [];
+    if (i.phase !== 'point') return N;
+    if (t === i.point) {
+      if (have.includes(t)) return N;
+      const next = [...have, t].sort((x, y) => x - y);
+      return next.length === 6 ? winAt(999, 1) : { kind: 'advance', progress: next };
+    }
+    if (t === 7) return have.length === 4 ? winAt(24, 1) : have.length === 5 ? winAt(249, 1) : L;
+    return N;
+  }
+  if (i.type === 'small' || i.type === 'tall' || i.type === 'all') {
+    const set =
+      i.type === 'small'
+        ? [2, 3, 4, 5, 6]
+        : i.type === 'tall'
+          ? [8, 9, 10, 11, 12]
+          : [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+    const pays = i.type === 'all' ? 175 : 34;
+    const have = i.progress ?? [];
+    if (t === 7) return L;
+    if (!set.includes(t) || have.includes(t)) return N;
+    const next = [...have, t].sort((x, y) => x - y);
+    return next.length === set.length ? winAt(pays, 1) : { kind: 'advance', progress: next };
   }
 
   switch (i.type) {

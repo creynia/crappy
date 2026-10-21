@@ -16,9 +16,12 @@ import type {
   SessionResult,
   StrategyId,
   StrategySpec,
+  SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { ResultsHistogram } from './ResultsHistogram';
+import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
@@ -37,6 +40,7 @@ const NO_ODDS_STRATEGIES = new Set<string>([
   'lay-4-10',
   'place-6-8-press',
   'inside-regress',
+  'pass-hedge-any-craps',
   'iron-cross',
   'across',
   'field-every-roll',
@@ -58,6 +62,8 @@ export interface AutoRollPanelProps {
     compareMode?: boolean;
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** show the odds-multiple sweep table instead of the run form */
+    sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
   /** the player's current layout, for the `my-layout` strategy */
   layout?: LayoutBet[];
@@ -69,6 +75,8 @@ export interface AutoRollPanelProps {
     all?: (SessionResult | ManyResult)[],
     specs?: StrategySpec[],
   ): void;
+  /** The odds sweep finished (config.sweep); `rolls` is the length of each swept session. */
+  onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
 }
@@ -239,6 +247,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       {label}
     </button>
   );
+
+  if (config?.sweep)
+    return (
+      <SweepPanel
+        config={config.sweep}
+        rules={props.rules}
+        bankroll={bankroll}
+        onCompleted={() => props.onSweepCompleted?.(100)}
+        initialSeed={props.initialSeed}
+        unit={config.defaultStrategy?.unit}
+      />
+    );
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
@@ -495,28 +515,42 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
-        <table class="sim-ar-summary" data-testid="auto-roll-summary">
-          <thead>
-            <tr>
-              <th scope="col">Summary</th>
-              {o.specs.map((s, i) => (
-                <th key={i} scope="col" style={{ color: COLORS[i] }}>
-                  {nameOf(s.id)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {summaryRows(o, metrics).map(([label, cells]) => (
-              <tr key={label}>
-                <th scope="row">{label}</th>
-                {cells.map((c, i) => (
-                  <td key={i}>{c}</td>
+        {o.kind === 'many' && chartTab === 'results' && (
+          <ResultsHistogram
+            start={start}
+            series={o.results.map((r, i) => ({
+              label: nameOf(o.specs[i]!.id),
+              color: COLORS[i]!,
+              finals: r.finals,
+              busted: Math.round(r.bustRate * r.sessions),
+              expected: r.expected[r.expected.length - 1]! - start,
+            }))}
+          />
+        )}
+        <div class="sim-ar-summary-wrap" tabindex={0} role="region" aria-label="Strategy summary">
+          <table class="sim-ar-summary" data-testid="auto-roll-summary">
+            <thead>
+              <tr>
+                <th scope="col">Summary</th>
+                {o.specs.map((s, i) => (
+                  <th key={i} scope="col" style={{ color: COLORS[i] }}>
+                    {nameOf(s.id)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {summaryRows(o, metrics).map(([label, cells]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  {cells.map((c, i) => (
+                    <td key={i}>{c}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>
     );
   }
@@ -538,7 +572,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
-    const edge = metrics.map((m) => pct(m.edgeOnAction));
+    const edge = metrics.map((m) =>
+      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
+    );
     if (o.kind === 'single') {
       const rs = o.results;
       return [

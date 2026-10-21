@@ -544,14 +544,14 @@ export const STRATEGIES: Impl[] = [
     'buy-4-10',
     'Buy the 4 and 10',
     'practical',
-    'Buy the 4 and 10 after a point ($20 at a $5 unit), paying the 5% vig only when they win.',
+    'Buy the 4 and 10 after a point ($20 at a $5 unit), paying the vig (5% under the standard rules) only when they win.',
     (s, spec) => buyLay4And10(s, spec, 'buy'),
   ),
   make(
     'lay-4-10',
     'Lay the 4 and 10',
     'practical',
-    'Lay against the 4 and 10 after a point ($40 at a $5 unit): wins often, pays small, vig on wins.',
+    'Lay against the 4 and 10 after a point ($40 at a $5 unit): wins often, pays small, vig per the table rules.',
     (s, spec) => buyLay4And10(s, spec, 'lay'),
   ),
   make(
@@ -572,7 +572,7 @@ export const STRATEGIES: Impl[] = [
     'pass-hedge-any-craps',
     'Pass line with an Any Craps hedge',
     'fun',
-    'Pass line, plus a small Any Craps on each come-out to "cover" a loss. It adds an expensive bet, not safety.',
+    'Pass line, plus a small Any Craps on each come-out to "cover" a loss. About 3.0% vs 1.41% for pass alone: an expensive bet, not safety.',
     passHedge,
   ),
 ];

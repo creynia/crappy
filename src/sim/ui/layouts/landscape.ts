@@ -14,6 +14,8 @@ const fieldRect: Rect = { x: 220, y: 410, w: 1255, h: 140 };
 const dpRect: Rect = { x: 20, y: 560, w: 1455, h: 105 };
 const passRect: Rect = { x: 20, y: 675, w: 1455, h: 110 };
 
+const CHIP_R = 30;
+
 const regions: RegionDef[] = [
   {
     id: 'dont-come',
@@ -23,7 +25,7 @@ const regions: RegionDef[] = [
     betTypes: ['dont-come'],
     chipSpots: { main: { x: dcRect.x + dcRect.w / 2, y: dcRect.y + dcRect.h * 0.52 } },
   },
-  ...boxes.map(([n, r]) => numberBox(n, r)),
+  ...boxes.map(([n, r]) => numberBox(n, r, CHIP_R)),
   {
     id: 'big-6',
     rect: big6Rect,
@@ -64,7 +66,7 @@ const regions: RegionDef[] = [
     betTypes: ['dont-pass', 'dont-pass-odds'],
     chipSpots: {
       main: { x: dpRect.x + 420, y: dpRect.y + 54 },
-      odds: { x: dpRect.x + 490, y: dpRect.y + 38 },
+      odds: { x: dpRect.x + 520, y: dpRect.y + 54 },
     },
   },
   {
@@ -76,7 +78,7 @@ const regions: RegionDef[] = [
     shape: 'pass-arc',
     chipSpots: {
       main: { x: passRect.x + 420, y: passRect.y + 58 },
-      odds: { x: passRect.x + 490, y: passRect.y + 40 },
+      odds: { x: passRect.x + 520, y: passRect.y + 58 },
     },
   },
 ];
@@ -91,6 +93,6 @@ export const landscapeLayout: TableLayout = {
   regions,
   puck,
   puckRadius: 34,
-  chipRadius: 30,
+  chipRadius: CHIP_R,
   minTapUnits: 99,
 };

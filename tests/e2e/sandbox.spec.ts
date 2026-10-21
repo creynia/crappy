@@ -699,16 +699,13 @@ test('the odds nudge never moves or covers Roll, the chips, the betting regions 
     }
     // Roll's own change (the point going on) moves it; the hint must not. Compare with and without it.
     // page coordinates, so a scroll that Got it triggers does not count as Roll moving
-    const pageBox = () =>
-      roll.evaluate((el) => {
-        const r = el.getBoundingClientRect();
-        return {
-          x: r.x,
-          y: r.y + (globalThis as unknown as { scrollY: number }).scrollY,
-          width: r.width,
-          height: r.height,
-        };
-      });
+    const pageBox = async () => {
+      const b = box(await roll.boundingBox());
+      const scrollY = await page.evaluate(
+        () => (globalThis as unknown as { scrollY: number }).scrollY,
+      );
+      return { x: b.x, y: b.y + scrollY, width: b.width, height: b.height };
+    };
     const rollWithHint = await pageBox();
     await page.getByRole('button', { name: 'Got it' }).click();
     await expect(hint).toHaveCount(0);

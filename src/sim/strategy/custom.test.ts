@@ -126,7 +126,7 @@ describe('custom systems: metrics, stops, validation, URL', () => {
       const b = strategyMetrics({ id: 'custom', unit: 1000, custom: PRESETS_AS_CUSTOM[id]! }, r);
       expect(b.edgeOnAction).toBeCloseTo(a.edgeOnAction, 12);
       expect(b.expectedLossPerRoll).toBeCloseTo(a.expectedLossPerRoll, 12);
-      expect(b.avgAction).toBeCloseTo(a.avgAction!, 12);
+      expect(b.avgAction).toBeCloseTo(a.avgAction, 12);
       expect(!!b.approximate).toBe(!!a.approximate);
     }
   });

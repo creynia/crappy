@@ -3,10 +3,11 @@
 import type { AnyDrill } from '../types';
 import { bestMove } from './bestMove';
 import { callTheBet } from './callTheBet';
+import { evQuiz } from './evQuiz';
 import { lineCalls } from './lineCalls';
 import { ways } from './ways';
 
-export const DRILLS: readonly AnyDrill[] = [lineCalls, ways, callTheBet, bestMove];
+export const DRILLS: readonly AnyDrill[] = [lineCalls, ways, bestMove, callTheBet, evQuiz];
 
 export function getDrill(id: string): AnyDrill | undefined {
   return DRILLS.find((d) => d.id === id);

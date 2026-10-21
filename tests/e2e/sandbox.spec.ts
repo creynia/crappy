@@ -654,4 +654,18 @@ test.describe('sandbox flows', () => {
     // the panel's first control (strategy picker, or a view toggle above it)
     await clear('.sim-autoroll :is(select, button, input)');
   });
+
+  test('the % of loss column is inside the table at 360px', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(url('seed=1&dice=3-4'));
+    await page.locator('[data-region="pass"]').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 7: the pass line resolves
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const head = page.locator('.sim-session-table th', { hasText: '% of loss' });
+    await expect(head).toBeVisible();
+    const h = await head.boundingBox();
+    const w = await page.locator('.sim-session-table-wrap').boundingBox();
+    expect(h!.x + h!.width).toBeLessThanOrEqual(w!.x + w!.width + 1);
+  });
 });

@@ -161,3 +161,28 @@ test('a panel a lesson step opens by itself does not scroll the page or take foc
   await expect(panel).not.toBeFocused();
   await expect(panel.locator('h1, h2, h3, legend').first()).not.toBeFocused();
 });
+
+test('lesson 2: callouts point at the Pass Line, then the Field', async ({ page }) => {
+  await page.goto('/#/learn/table-tour');
+  const scene = await openScene(page, 0);
+  const callout = scene.locator('.sim-callout');
+  await expect(callout).toHaveCount(1);
+  await expect(callout).toContainText('you bet with the shooter');
+  const pass = scene.locator('[data-region="pass"]');
+  const id = await pass.getAttribute('aria-describedby');
+  expect(id).toBeTruthy();
+  await expect(scene.locator(`[id="${id}"]`)).toContainText('Pays 1 to 1');
+  // the callout box sits inside the table's picture
+  const svg = await scene.locator('svg.sim-table').first().boundingBox();
+  const box = await callout.locator('rect').boundingBox();
+  expect(box!.y).toBeGreaterThanOrEqual(svg!.y - 1);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(svg!.x + svg!.width + 1);
+  // the next step (Don't Pass) has no callout; the Field step has its own
+  await pass.click();
+  await scene
+    .getByRole('dialog')
+    .getByRole('button', { name: /Close|Cancel/ })
+    .first()
+    .click();
+  await expect(callout).toHaveCount(0);
+});

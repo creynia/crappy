@@ -30,6 +30,40 @@ export type RegionId =
   | 'all'
   | 'tall'
   | 'small';
+/** Every region id, as a runtime list (scene validation of callout targets). */
+export const REGION_IDS: readonly RegionId[] = [
+  'pass',
+  'dont-pass',
+  'come',
+  'dont-come',
+  'field',
+  'big-6',
+  'big-8',
+  'box-4',
+  'box-5',
+  'box-6',
+  'box-8',
+  'box-9',
+  'box-10',
+  'any-7',
+  'any-craps',
+  'yo-11',
+  'aces-2',
+  'boxcars-12',
+  'ace-deuce-3',
+  'horn',
+  'c-e',
+  'world',
+  'hop',
+  'hard-4',
+  'hard-6',
+  'hard-8',
+  'hard-10',
+  'fire',
+  'all',
+  'tall',
+  'small',
+];
 export type ChipSpotKey = 'main' | 'odds' | 'come-point' | 'dc-point' | 'lay' | 'buy';
 export type Point2 = { x: number; y: number };
 

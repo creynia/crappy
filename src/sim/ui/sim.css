@@ -1087,3 +1087,25 @@
   position: absolute;
   transform: translateX(-50%);
 }
+
+/* ---------- Scene callouts (I015): labelled pointers at table regions ---------- */
+.sim-callouts {
+  pointer-events: none;
+}
+.sim-callout-box {
+  fill: #fffbea;
+  stroke: var(--gold, #f5c542);
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
+}
+.sim-callout-text {
+  fill: #1d2b22;
+  font-weight: 600;
+}
+.sim-callout-line {
+  stroke: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-callout-dot {
+  fill: var(--gold, #f5c542);
+}

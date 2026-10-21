@@ -48,6 +48,8 @@ ui:
 steps:
   - id: pass-line
     text: "Tap the **Pass Line**."
+    callouts:
+      - { target: pass, text: "The main bet: you bet with the shooter. Pays 1 to 1." }
     completeWhen: { previewed: pass-line }
   - id: dont-pass
     text: "Tap the **Don't Pass Bar**."
@@ -57,9 +59,15 @@ steps:
     completeWhen: { previewed: come }
   - id: field
     text: "Tap the **Field**."
+    callouts:
+      - { target: field, text: "One roll only: wins on 2, 3, 4, 9, 10, 11 or 12." }
     completeWhen: { previewed: field }
   - id: six
     text: "Tap the **6** number box."
+    callouts:
+      - target: box-6
+        text: "Place bets on the 6 sit here, and Come bets travel here when a 6 rolls."
+        placement: below
     completeWhen: { previewed: place-6 }
   - id: center
     text: "Tap any bet in the **center**. Those are the proposition bets."

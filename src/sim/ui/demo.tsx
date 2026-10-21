@@ -56,6 +56,8 @@ const BETS: Bet[] = [
   bet('b14', 'horn', 400),
   bet('b15', 'dont-pass', 20000),
   bet('b16', 'yo-11', 100),
+  bet('b17', 'dont-come-odds', 1000, 4),
+  bet('b18', 'dont-pass-odds', 3000),
 ];
 const rec = (
   n: number,

@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { memo } from 'preact/compat';
 import type { PointNumber } from '../engine/types';
 import { DieFaceSvg } from './Dice';
-import { NUMBER_WORD } from './layouts/shared';
+import { BOX_BAR, NUMBER_WORD } from './layouts/shared';
 import type { RegionDef } from './layouts/types';
 
 export interface ArtCtx {
@@ -27,6 +27,37 @@ function Dice2({ x, y, a, b, s }: { x: number; y: number; a: number; b: number; 
       <g transform="translate(112 0)">
         <DieFaceSvg value={b} />
       </g>
+    </g>
+  );
+}
+
+/** The printed odds area of a line bet: a dashed circle at the region's `odds` chip spot. */
+function OddsArea({ region, label }: { region: RegionDef; label: string }) {
+  const p = region.chipSpots.odds;
+  if (!p) return null;
+  const r = region.rect.h * 0.33;
+  return (
+    <g class="sim-odds-area" data-odds-area={region.id}>
+      <circle
+        cx={p.x}
+        cy={p.y}
+        r={r}
+        fill="rgba(0,0,0,0.12)"
+        stroke={WHITE}
+        stroke-width="2"
+        stroke-dasharray="7 5"
+        opacity="0.8"
+      />
+      <text
+        x={p.x}
+        y={p.y + r * 0.13}
+        class="sim-tiny"
+        font-size={r * 0.36}
+        text-anchor="middle"
+        fill={YELLOW}
+      >
+        {label}
+      </text>
     </g>
   );
 }
@@ -69,6 +100,25 @@ function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
     return (
       <g>
         {outline(region, WHITE, isPoint ? 'rgba(245,197,66,0.14)' : 'rgba(0,0,0,0.07)')}
+        {/* top bar: don't come and lay bets */}
+        <rect
+          class="sim-box-bar"
+          x={x + 6}
+          y={y + 6}
+          width={w - 12}
+          height={h * BOX_BAR - 6}
+          rx="9"
+          fill="rgba(0,0,0,0.14)"
+        />
+        <line
+          x1={x + 8}
+          x2={x + w - 8}
+          y1={y + h * BOX_BAR}
+          y2={y + h * BOX_BAR}
+          stroke={WHITE}
+          stroke-width="1.5"
+          opacity="0.45"
+        />
         <text
           x={cx}
           y={y + h * 0.47 + fs * 0.34}
@@ -109,6 +159,7 @@ function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
           >
             PASS LINE
           </text>
+          <OddsArea region={region} label="ODDS" />
         </g>
       );
     case 'dont-pass': {
@@ -137,6 +188,7 @@ function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
           >
             BAR 12
           </text>
+          <OddsArea region={region} label="LAY ODDS" />
         </g>
       );
     }

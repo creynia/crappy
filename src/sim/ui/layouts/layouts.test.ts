@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { BET_TYPES } from '../../engine';
+import { BOX_BAR } from './shared';
 import {
   centerLayout,
+  findRegion,
   landscapeLayout,
   portraitLayout,
   regionIdForBet,
   spotPosition,
 } from './index';
-import type { Rect, TableLayout } from './types';
+import type { ChipSpotKey, Point2, Rect, TableLayout } from './types';
 
 const VIEWPORT: Record<TableLayout['id'], number> = {
   portrait: 390 / 900,
@@ -79,4 +82,81 @@ describe('main layouts', () => {
     expect(spotPosition(box, 'buy-6')).toEqual(box.chipSpots.buy);
     expect(spotPosition(box, 'lay-6')).toEqual(box.chipSpots.lay);
   });
+});
+
+describe('chip spots: every bet type renders at its documented spot (simulator.md 3.2)', () => {
+  // The chip spot each bet type uses on the main felt; props use `main` on the center panel.
+  const SPOT: Record<string, ChipSpotKey> = {
+    'pass-line': 'main',
+    'pass-odds': 'odds',
+    'dont-pass': 'main',
+    'dont-pass-odds': 'odds',
+    field: 'main',
+    'big-6': 'main',
+    'big-8': 'main',
+  };
+  const boxSpot = (type: string): ChipSpotKey | null => {
+    if (type === 'come') return 'come-point';
+    if (type === 'come-odds') return 'odds';
+    if (type === 'dont-come') return 'dc-point';
+    if (type === 'dont-come-odds') return 'dc-odds';
+    if (type.startsWith('place-')) return 'main';
+    if (type.startsWith('buy-')) return 'buy';
+    if (type.startsWith('lay-')) return 'lay';
+    return null;
+  };
+  const inside = (p: Point2, r: Rect) =>
+    p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+  const dist = (a: Point2, b: Point2) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it.each([portraitLayout, landscapeLayout])('$id: all bet types have a spot', (layout) => {
+    for (const type of Object.keys(BET_TYPES)) {
+      const needsPoint = /^(come|dont-come)(-odds)?$/.test(type);
+      const box = needsPoint ? 6 : /-(\d+)$/.exec(type)?.[1];
+      const rid = regionIdForBet(type, needsPoint ? 6 : null);
+      const onCenter = rid !== null && findRegion(centerLayout, rid) !== undefined;
+      const region = findRegion(onCenter ? centerLayout : layout, rid!);
+      expect(region, type).toBeDefined();
+      const key = onCenter ? 'main' : (SPOT[type] ?? (box ? boxSpot(type) : null));
+      expect(key, type).toBeTruthy();
+      const spot = region!.chipSpots[key!];
+      expect(spot, `${type} -> ${key}`).toBeDefined();
+      expect(spotPosition(region!, type), type).toEqual(spot);
+      expect(inside(spot!, region!.rect), type).toBe(true);
+    }
+  });
+
+  it.each([portraitLayout, landscapeLayout])('$id: number box geography', (layout) => {
+    const r = layout.chipRadius;
+    for (const n of [4, 5, 6, 8, 9, 10] as const) {
+      const box = findRegion(layout, `box-${n}`)!;
+      const s = box.chipSpots;
+      const barBottom = box.rect.y + box.rect.h * BOX_BAR;
+      // don't come and lay on the top bar
+      for (const k of ['dc-point', 'lay'] as const) expect(s[k]!.y, k).toBeLessThan(barBottom);
+      // come odds sit offset on the come chips, lay odds on the don't-come chips
+      expect(dist(s.odds!, s['come-point']!)).toBeLessThan(r * 1.5);
+      expect(dist(s.odds!, s['come-point']!)).toBeGreaterThan(r * 0.5);
+      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeLessThan(r * 1.5);
+      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeGreaterThan(r * 0.5);
+      // place and buy below the numeral, side by side; the come-point area is clear of them
+      expect(s.main!.y).toBeGreaterThan(box.rect.y + box.rect.h * 0.7);
+      expect(s.buy!.y).toBe(s.main!.y);
+      expect(dist(s.main!, s.buy!)).toBeGreaterThanOrEqual(r * 2);
+      expect(dist(s['come-point']!, s.main!)).toBeGreaterThanOrEqual(r * 2);
+      // the lay stack clears the ON puck at the top right
+      expect(dist(s.lay!, layout.puck[n])).toBeGreaterThanOrEqual(r + layout.puckRadius - 1);
+    }
+  });
+
+  it.each([portraitLayout, landscapeLayout])(
+    '$id: pass and don’t pass odds have their own printed area next to the flat bet',
+    (layout) => {
+      for (const id of ['pass', 'dont-pass'] as const) {
+        const s = findRegion(layout, id)!.chipSpots;
+        expect(dist(s.odds!, s.main!), id).toBeGreaterThanOrEqual(layout.chipRadius * 2);
+        expect(dist(s.odds!, s.main!), id).toBeLessThan(layout.chipRadius * 4);
+      }
+    },
+  );
 });

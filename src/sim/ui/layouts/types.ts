@@ -25,7 +25,12 @@ export type RegionId =
   | 'c-e'
   | 'world'
   | `hard-${4 | 6 | 8 | 10}`;
-export type ChipSpotKey = 'main' | 'odds' | 'come-point' | 'dc-point' | 'lay' | 'buy';
+/**
+ * Chip spots inside a region. Number boxes use all of them except `main` is the place spot;
+ * `odds` / `dc-odds` sit offset on top of the come-point / don't-come chips, as a dealer would
+ * place them. Line regions use `main` (flat bet) and `odds` (the printed odds area).
+ */
+export type ChipSpotKey = 'main' | 'odds' | 'come-point' | 'dc-point' | 'dc-odds' | 'lay' | 'buy';
 export type Point2 = { x: number; y: number };
 
 export interface RegionDef {

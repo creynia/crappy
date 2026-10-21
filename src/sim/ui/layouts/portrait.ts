@@ -72,7 +72,7 @@ const regions: RegionDef[] = [
     betTypes: ['dont-pass', 'dont-pass-odds'],
     chipSpots: {
       main: { x: dpRect.x + 150, y: dpRect.y + 56 },
-      odds: { x: dpRect.x + 215, y: dpRect.y + 40 },
+      odds: { x: dpRect.x + 250, y: dpRect.y + 56 },
     },
   },
   {
@@ -84,7 +84,7 @@ const regions: RegionDef[] = [
     shape: 'pass-arc',
     chipSpots: {
       main: { x: passRect.x + 150, y: passRect.y + 62 },
-      odds: { x: passRect.x + 215, y: passRect.y + 44 },
+      odds: { x: passRect.x + 250, y: passRect.y + 62 },
     },
   },
 ];

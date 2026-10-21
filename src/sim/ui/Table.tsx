@@ -43,9 +43,23 @@ interface Placed {
   amount: Cents;
   betIds: string[];
   off: boolean;
+  /** turned on (working: 'on') on the come-out, where it would usually be off */
+  on: boolean;
 }
 
-function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySet<string>) {
+/** Odds stacks are drawn after (on top of) the flat bets they sit on. */
+const isOdds = (t: string) => t.endsWith('-odds');
+
+function markerFor(type: string): 'buy' | 'lay' | undefined {
+  return type.startsWith('buy-') ? 'buy' : type.startsWith('lay-') ? 'lay' : undefined;
+}
+
+function placeBets(
+  layout: TableLayout,
+  bets: readonly Bet[],
+  offIds: ReadonlySet<string>,
+  comeOut: boolean,
+) {
   const byRegion = new Map<RegionId, Bet[]>();
   const stacks = new Map<string, Placed>();
   for (const b of bets) {
@@ -57,10 +71,12 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
     const key = `${pos.x},${pos.y},${b.type}`;
     const prev = stacks.get(key);
     const off = offIds.has(b.id);
+    const on = comeOut && !off && b.working === 'on';
     if (prev) {
       prev.amount += b.amount;
       prev.betIds.push(b.id);
       prev.off = prev.off && off;
+      prev.on = prev.on && on;
     } else {
       stacks.set(key, {
         key,
@@ -71,10 +87,14 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
         amount: b.amount,
         betIds: [b.id],
         off,
+        on,
       });
     }
   }
-  return { byRegion, stacks: [...stacks.values()] };
+  const ordered = [...stacks.values()].sort(
+    (a, b) => Number(isOdds(a.type)) - Number(isOdds(b.type)),
+  );
+  return { byRegion, stacks: ordered };
 }
 
 export function Table({
@@ -98,8 +118,8 @@ export function Table({
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
   const { byRegion, stacks } = useMemo(
-    () => placeBets(layout, bets, offIds),
-    [layout, bets, offIds],
+    () => placeBets(layout, bets, offIds, point === null),
+    [layout, bets, offIds, point],
   );
   const { w, h } = layout.viewBox;
   const hasPuck = layout.puckRadius > 0;
@@ -216,7 +236,15 @@ export function Table({
                 data-stack={s.betIds[0]}
                 data-count={nums}
               >
-                <ChipStack x={s.x} y={s.y} amount={s.amount} r={layout.chipRadius} off={s.off} />
+                <ChipStack
+                  x={s.x}
+                  y={s.y}
+                  amount={s.amount}
+                  r={layout.chipRadius}
+                  off={s.off}
+                  on={s.on}
+                  marker={markerFor(s.type)}
+                />
               </g>
             );
           })}
@@ -224,7 +252,13 @@ export function Table({
             const p = ghostPos(b);
             return p ? (
               <g key={'lost-' + b.id} class="sim-ghost sim-ghost-lose">
-                <ChipStack x={p.x} y={p.y} amount={b.amount} r={layout.chipRadius} />
+                <ChipStack
+                  x={p.x}
+                  y={p.y}
+                  amount={b.amount}
+                  r={layout.chipRadius}
+                  marker={markerFor(b.type)}
+                />
               </g>
             ) : null;
           })}

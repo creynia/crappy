@@ -173,6 +173,65 @@ describe('Table', () => {
   });
 });
 
+describe('Table chip placement (dealer positions)', () => {
+  const markers = (betId: string) =>
+    [...document.querySelectorAll(`[data-stack="${betId}"] [data-marker]`)].map((m) =>
+      m.getAttribute('data-marker'),
+    );
+  it('puts BUY / LAY buttons on buy and lay stacks', () => {
+    render(
+      <Table
+        layout={portraitLayout}
+        bets={[bet('b1', 'buy-4', 2000), bet('b2', 'lay-10', 4000), bet('b3', 'place-6', 1200)]}
+        point={5}
+      />,
+    );
+    expect(markers('b1')).toEqual(['buy']);
+    expect(markers('b2')).toEqual(['lay']);
+    expect(markers('b3')).toEqual([]);
+  });
+  it('shows OFF and ON mini pucks for bets that are off, or turned on for the come-out', () => {
+    const on = { ...bet('b2', 'place-8', 1200), working: 'on' as const };
+    render(
+      <Table
+        layout={portraitLayout}
+        bets={[bet('b1', 'place-6', 1200), on, bet('b3', 'place-5', 500)]}
+        point={null}
+        offBetIds={new Set(['b1'])}
+      />,
+    );
+    expect(markers('b1')).toEqual(['off']);
+    expect(markers('b2')).toEqual(['on']);
+    expect(markers('b3')).toEqual([]);
+  });
+  it('no ON puck once a point is set (everything works then)', () => {
+    const on = { ...bet('b2', 'place-8', 1200), working: 'on' as const };
+    render(<Table layout={portraitLayout} bets={[on]} point={6} />);
+    expect(markers('b2')).toEqual([]);
+  });
+  it('draws odds on top of their flat bet, offset from it', () => {
+    render(
+      <Table
+        layout={portraitLayout}
+        bets={[bet('o', 'come-odds', 1500, 8), bet('c', 'come', 500, 8)]}
+        point={6}
+      />,
+    );
+    const order = [...document.querySelectorAll('[data-stack]')].map((g) =>
+      g.getAttribute('data-stack'),
+    );
+    expect(order).toEqual(['c', 'o']);
+    const pos = (id: string) =>
+      document.querySelector(`[data-stack="${id}"] .sim-stack`)!.getAttribute('transform');
+    expect(pos('o')).not.toEqual(pos('c'));
+  });
+  it('prints odds areas on the pass line and the don’t pass bar', () => {
+    render(<Table layout={portraitLayout} bets={[]} point={null} />);
+    expect(document.querySelector('[data-odds-area="pass"]')).toBeTruthy();
+    expect(document.querySelector('[data-odds-area="dont-pass"]')?.textContent).toBe('LAY ODDS');
+  });
+});
+
 describe('chips', () => {
   it('breaks amounts into chips largest first', () => {
     expect(chipBreakdown(13000)).toEqual([10000, 2500, 500]);

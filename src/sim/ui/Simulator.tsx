@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
-import type { Bet, Cents, RulePresetId } from '../engine/types';
+import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
@@ -30,6 +30,7 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { usePanelReveal } from './usePanelReveal';
 import './sim.css';
 import './simulator.css';
 
@@ -46,11 +47,15 @@ const isCenterBet = (b: Bet) => {
 };
 
 export function Simulator(props: SimulatorInternalProps) {
-  const [scene, setScene] = useState<SceneConfig>(props.scene ?? SANDBOX_SCENE);
+  const initialScene = props.scene ?? SANDBOX_SCENE;
   const mode = props.mode ?? (props.scene ? 'embedded' : 'sandbox');
   const sandbox = mode === 'sandbox';
+  const { settings, setSettings, boot } = useUrlBoot(props, initialScene, mode);
+  // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
+  const [scene, setScene] = useState<SceneConfig>(() =>
+    boot.customRules ? { ...initialScene, rules: boot.customRules } : initialScene,
+  );
   const ui = scene.ui ?? {};
-  const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -68,7 +73,12 @@ export function Simulator(props: SimulatorInternalProps) {
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
-  const togglePanel = (name: keyof Panels) => setPanels((p) => ({ ...p, [name]: !p[name] }));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const requestReveal = usePanelReveal(panels, rootRef);
+  const togglePanel = (name: keyof Panels) => {
+    requestReveal(name);
+    setPanels((p) => ({ ...p, [name]: !p[name] }));
+  };
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
   const landscape = useLandscape(scene);
@@ -150,7 +160,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | Partial<TableRules> }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
@@ -188,6 +198,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
   const rulesSelectValue = typeof scene.rules === 'string' ? scene.rules : settings.rulesPreset;
+  // I033: a rules object (the custom editor, or a restored custom sandbox) shows as "Custom"
+  const menuRulesValue = typeof scene.rules === 'object' ? 'custom' : rulesSelectValue;
 
   const tableProps = {
     bets: game.bets,
@@ -260,6 +272,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   return (
     <div
+      ref={rootRef}
       class={`sim-root${landscape ? ' sim-land' : ''}${ui.compact ? ' sim-compact' : ''}${ui.showBankroll === false ? ' sim-hide-money' : ''}${ui.showHistory === false ? ' sim-hide-history' : ''}`}
       data-testid="simulator"
       data-mode={mode}
@@ -321,7 +334,8 @@ export function Simulator(props: SimulatorInternalProps) {
           busy={anim.busy}
           onRebet={rebet}
           onReset={resetGame}
-          rulesValue={rulesSelectValue}
+          rulesValue={menuRulesValue}
+          currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
         />

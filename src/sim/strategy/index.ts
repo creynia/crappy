@@ -17,3 +17,5 @@ export {
 export function strategyMetrics(spec: StrategySpec, rules?: TableRules): StrategyMetrics {
   return metrics(spec, rules ?? resolveRules());
 }
+
+export * from './plan';

@@ -20,6 +20,7 @@ import type {
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { PlanPanel } from './PlanPanel';
 import { ResultsHistogram } from './ResultsHistogram';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
@@ -184,6 +185,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  const [panelMode, setPanelMode] = useState<'run' | 'plan'>('run');
+  // guided lessons script their own controls; the free planner is for the open sandbox
+  const planAvailable = !fixedSpecs && !config?.strategies && !config?.defaultStrategy;
 
   const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
@@ -283,8 +287,23 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       />
     );
 
+  const modeTabs = planAvailable ? (
+    <div class="sim-ar-group" role="group" aria-label="Auto-roll mode">
+      {button(panelMode === 'run', 'Run', () => setPanelMode('run'))}
+      {button(panelMode === 'plan', 'Plan', () => setPanelMode('plan'))}
+    </div>
+  ) : null;
+  if (planAvailable && panelMode === 'plan')
+    return (
+      <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
+        {modeTabs}
+        <PlanPanel rules={props.rules} bankroll={bankroll} rollsPerHour={rollsPerHour} />
+      </section>
+    );
+
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
+      {modeTabs}
       <div class="sim-ar-form">
         <fieldset class="sim-ar-fieldset">
           <legend>

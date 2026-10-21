@@ -446,3 +446,17 @@
 .sim-sweep-table td {
   padding: 4px 3px;
 }
+
+/* ---------- session plan ---------- */
+.sim-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sim-plan-list {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.sim-plan select {
+  max-width: 100%;
+}

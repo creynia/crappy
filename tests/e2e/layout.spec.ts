@@ -153,4 +153,48 @@ guardTest.describe('immersive landscape play', () => {
       page.locator('#immersive-nav').getByRole('link', { name: 'Challenge' }),
     ).toBeVisible();
   });
+
+  guardTest('a tap at the felt edge reaches Big 6, not the Pages handle', async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.goto('/#/play?speed=instant&seed=7');
+    const region = page.locator('[data-region="big-6"]');
+    const box = (await region.boundingBox())!;
+    const handle = (await page.locator('.immersive-menu').boundingBox())!;
+    expect(handle.x + handle.width).toBeLessThanOrEqual(box.x + 0.5); // the 44px target never overlaps the felt
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    // Big 6 is a red-tier bet: the sheet asks twice
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: /^(Confirm|Place anyway)/ }).click();
+    if (await sheet.isVisible())
+      await sheet.getByRole('button', { name: /again to place anyway|^Place anyway/i }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // the bet landed
+    await expect(page.locator('#immersive-nav')).toBeHidden();
+  });
+
+  for (const [w, h] of [
+    [844, 390],
+    [667, 375],
+    [568, 320],
+  ] as const) {
+    guardTest(
+      `${w}x${h}: the page never scrolls, even after a bet and with a toast`,
+      async ({ page }) => {
+        await page.setViewportSize({ width: w, height: h });
+        await page.goto('/#/play?speed=instant&seed=7');
+        const fits = async (state: string) =>
+          expect(
+            await page.evaluate('document.documentElement.scrollHeight - innerHeight'),
+            state,
+          ).toBeLessThanOrEqual(0);
+        await fits('fresh table');
+        await page.locator('[data-region="pass"]').click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+        await fits('after a bet');
+        await page.getByRole('button', { name: /^Roll/ }).click();
+        await expect(page.locator('.sim-toast').first()).toBeVisible();
+        await fits('with a toast showing');
+      },
+    );
+  }
 });

@@ -168,7 +168,15 @@ class Ctx {
         this.bet(`${path}.betOnTable.type`, val.type);
         if (val.minAmount !== undefined)
           this.cents(`${path}.betOnTable.minAmount`, val.minAmount, { min: 1 });
-        if (val.point !== undefined) this.point(`${path}.betOnTable.point`, val.point);
+        if (val.point !== undefined) {
+          this.point(`${path}.betOnTable.point`, val.point);
+          const t = val.type;
+          if (typeof t === 'string' && t !== 'come' && t !== 'dont-come' && !t.endsWith('-odds'))
+            this.err(
+              `${path}.betOnTable.point`,
+              'point only applies to come, dont-come and odds bets',
+            );
+        }
         break;
       case 'betResolved':
         if (!isObj(val)) return this.err(`${path}.betResolved`, 'must be an object');
@@ -186,7 +194,7 @@ class Ctx {
         break;
       case 'equityAtLeast':
       case 'equityAtMost':
-        if (!isInt(val)) this.err(`${path}.${k}`, 'must be an integer number of cents');
+        this.cents(`${path}.${k}`, val);
         break;
       case 'previewed':
         this.bet(`${path}.previewed`, val);

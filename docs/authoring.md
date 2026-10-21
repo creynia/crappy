@@ -60,9 +60,23 @@ Rules:
 - A step's `completeWhen` is a condition. Kinds: `all`, `any`, `not` (nest freely); `action` (with
   `count`); `event` (with `betType`, `count`); `rolls`; `phase`; `point`; `betOnTable`
   (`type`, optional `minAmount` and `point`, e.g. a come bet travelled to 6); `betResolved`
-  (`type`, optional `result`: `won`, `lost` or `pushed`); `bankrollAtLeast` / `bankrollAtMost`;
+  (`type`, optional `result`: `won`, `lost` or `pushed`; `pushed` is a push such as a dont-pass bet on
+  12, not odds returned when they are off; a win on a standing bet such as a come bet counts as
+  resolved on that roll, so `won` means the bet paid); `bankrollAtLeast` / `bankrollAtMost`;
   `equityAtLeast` / `equityAtMost` (equity is bankroll plus chips on the table); `previewed`;
   `autoRollCompleted`; `acknowledged`.
+- Example, a come bet that travels to 6 and then wins (two steps; the second waits for the win):
+
+  ```yaml
+  steps:
+    - id: travel
+      text: Place a $5 come bet. The next roll moves it to 6.
+      completeWhen: { betOnTable: { type: come, point: 6 } }
+    - id: win
+      text: Roll the 6 to win the come bet.
+      completeWhen: { betResolved: { type: come, result: won } }
+  ```
+
 - A condition that is already true when a step starts completes that step at once. Equity does not
   change when a bet is placed, so wait for a roll (for example `forcedDice` that loses) before
   testing equity.

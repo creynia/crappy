@@ -274,7 +274,8 @@ describe('validate richer conditions', () => {
   it('accepts the new condition kinds', () => {
     expect(validateScene(scene({ betOnTable: { type: 'come', point: 6 } })).ok).toBe(true);
     expect(validateScene(scene({ betResolved: { type: 'come', result: 'won' } })).ok).toBe(true);
-    expect(validateScene(scene({ equityAtLeast: -500 })).ok).toBe(true);
+    expect(validateScene(scene({ equityAtLeast: 0 })).ok).toBe(true);
+    expect(validateScene(scene({ equityAtLeast: -500 })).ok).toBe(false);
     expect(validateScene(scene({ not: { equityAtMost: 0 } })).ok).toBe(true);
   });
 
@@ -288,5 +289,92 @@ describe('validate richer conditions', () => {
     const r3 = validateScene(scene({ not: { equityAtLeast: 1.5 } }));
     expect(r3.ok).toBe(false);
     if (!r3.ok) expect(r3.errors.join('\n')).toContain('not.equityAtLeast');
+  });
+});
+
+describe('richer conditions: resolution edge cases (I018 review)', () => {
+  it("betResolved 'pushed': dont-pass on a 12 is a push", () => {
+    const scene: SceneConfig = {
+      id: 'push',
+      version: 1,
+      bankroll: 10000,
+      phase: 'come-out',
+      forcedDice: [[6, 6]],
+      allowedBets: ['dont-pass'],
+      steps: [
+        { id: 'bet', text: 'bet', completeWhen: { betOnTable: { type: 'dont-pass' } } },
+        {
+          id: 'res',
+          text: 'res',
+          completeWhen: { betResolved: { type: 'dont-pass', result: 'pushed' } },
+        },
+      ],
+    };
+    expect(play(scene, [place('dont-pass', 500), { type: 'roll' }])).toEqual(['bet', 'res']);
+  });
+
+  it('a come bet that travels to 6 does not count as resolved', () => {
+    const scene: SceneConfig = {
+      id: 'travel',
+      version: 1,
+      bankroll: 10000,
+      phase: 'point',
+      point: 8,
+      forcedDice: [[3, 3]],
+      allowedBets: ['come'],
+      steps: [
+        { id: 'a', text: 'a', completeWhen: { betOnTable: { type: 'come', point: 6 } } },
+        { id: 'b', text: 'b', completeWhen: { betResolved: { type: 'come' } } },
+      ],
+    };
+    // travelling happens on the roll and completes step a; step b (resolution) stays open
+    expect(play(scene, [place('come', 500), { type: 'roll' }])).toEqual([undefined, 'a']);
+  });
+
+  it('an unqualified betResolved completes on a win', () => {
+    const scene: SceneConfig = {
+      id: 'any',
+      version: 1,
+      bankroll: 10000,
+      phase: 'come-out',
+      forcedDice: [[3, 4]],
+      allowedBets: ['pass-line'],
+      steps: [
+        { id: 'bet', text: 'bet', completeWhen: { betOnTable: { type: 'pass-line' } } },
+        { id: 'res', text: 'res', completeWhen: { betResolved: { type: 'pass-line' } } },
+      ],
+    };
+    expect(play(scene, [place('pass-line', 500), { type: 'roll' }])).toEqual(['bet', 'res']);
+  });
+});
+
+describe('validate richer conditions: rejections (I018 review)', () => {
+  const scene = (completeWhen: unknown) => ({
+    id: 'v',
+    version: 1,
+    allowedBets: ['come', 'pass-line'],
+    steps: [{ id: 's', text: 's', completeWhen }],
+  });
+
+  it('rejects an unknown bet id in betResolved and betOnTable', () => {
+    const r = validateScene(scene({ betResolved: { type: 'nope' } }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join('\n')).toContain('betResolved.type');
+    expect(validateScene(scene({ betOnTable: { type: 'nope' } })).ok).toBe(false);
+  });
+
+  it('rejects an empty not', () => {
+    const r = validateScene(scene({ not: {} }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join('\n')).toContain('exactly one condition key');
+  });
+
+  it('rejects point on a bet that is not a come, dont-come or odds bet', () => {
+    const r = validateScene(scene({ betOnTable: { type: 'pass-line', point: 6 } }));
+    expect(r.ok).toBe(false);
+    if (!r.ok)
+      expect(r.errors.join('\n')).toContain('point only applies to come, dont-come and odds bets');
+    expect(validateScene(scene({ betOnTable: { type: 'pass-odds', point: 6 } })).ok).toBe(true);
+    expect(validateScene(scene({ betOnTable: { type: 'come', point: 6 } })).ok).toBe(true);
   });
 });

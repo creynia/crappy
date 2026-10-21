@@ -272,3 +272,29 @@ describe('typeEdgeLabel', () => {
     expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
   });
 });
+
+describe('typical swing values (I004 review)', () => {
+  const swingOfBet = (type: string, amount: number, extra: Record<string, unknown> = {}) => {
+    const g = createGame({ bankroll: 100000 });
+    const f = buildEvFacts(
+      previewAction(g, { type: 'place-bet', betType: type, amount, ...extra } as never),
+      g,
+    )!;
+    return f;
+  };
+  it('place 6 $12 swings $12.95 and any-7 $5 shows swing and edge', () => {
+    expect(swingCopy(swingOfBet('place-6', 1200).swingCents!, 0.0152, 0)).toContain('±$12.95');
+    const any7 = swingOfBet('any-7', 500);
+    expect(any7.swingCents).not.toBeNull();
+    expect(any7.edge).not.toBeNull();
+  });
+  it('field $10 swings $10.79, hard 8 $10 swings $28.75, dont-pass $10 swings $9.86', () => {
+    expect(Math.round(swingOfBet('field', 1000).swingCents!)).toBe(1079);
+    expect(Math.round(swingOfBet('hard-8', 1000).swingCents!)).toBe(2875);
+    expect(Math.round(swingOfBet('dont-pass', 1000).swingCents!)).toBe(986);
+  });
+  it('a null edge shows the swing only; a zero edge says "No edge"', () => {
+    expect(swingCopy(1000, null, 0)).toBe('Typical swing per decision: ±$10.00.');
+    expect(swingCopy(1000, 0, 0)).toBe('No edge, but it adds ±$10.00 of swing.');
+  });
+});

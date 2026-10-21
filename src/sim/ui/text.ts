@@ -7,7 +7,7 @@ import {
   isBonusType,
   isHardHop,
 } from '../engine/bets';
-import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
+import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
 import { betEdge, betStdDev, edgeTier as tierOf } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
@@ -288,7 +288,13 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
-    swingCents: swingOf(type, amount, bet?.point ?? state.point, state),
+    swingCents: swingOf(
+      type,
+      amount,
+      bet?.point ?? state.point,
+      state,
+      a.type === 'place-bet' ? a.hop : bet?.hop,
+    ),
   };
 }
 
@@ -297,10 +303,11 @@ function swingOf(
   amount: Cents,
   point: GameState['point'],
   state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+  hop?: Dice,
 ): number | null {
   try {
     return betStdDev(
-      { type, amount, point },
+      { type, amount, point, ...(hop ? { hop } : {}) },
       { phase: state.phase, point: state.point, rules: state.rules },
     );
   } catch {
@@ -315,9 +322,10 @@ export function swingCopy(
   expectedLossCents: number,
 ): string {
   const swing = fmtMoney(swingCents, { exact: true });
-  return edge !== null && edge > 0
-    ? `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`
-    : `No edge, but it adds ±${swing} of swing.`;
+  if (edge === null) return `Typical swing per decision: ±${swing}.`;
+  if (edge === 0) return `No edge, but it adds ±${swing} of swing.`;
+  if (edge < 0) return `Typical swing per decision: ±${swing}.`;
+  return `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`;
 }
 
 // ---------- roll descriptions ----------

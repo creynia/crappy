@@ -317,6 +317,10 @@ test.describe('sandbox', () => {
       await page.addStyleTag({ content: '.sim-cost-toggle { display: none !important; }' });
       const statusBase = await page.locator('.sim-status').first().boundingBox();
       const rollBase = await page.locator('.sim-roll').boundingBox();
+      // remove the baseline style: a hash-only goto keeps the page, so it would hide the toggle at the next width
+      await page.evaluate(
+        `document.querySelectorAll('style').forEach((s) => { if (s.textContent?.includes('sim-cost-toggle { display: none')) s.remove(); })`,
+      );
       expect(
         Math.abs(status!.height - statusBase!.height),
         `${width}x${height} status height`,

@@ -13,14 +13,15 @@ describe('watchAnimationSpeed', () => {
       expect(watchAnimationSpeed(s, 'normal', true)).toBe('instant');
   });
   it('reads prefers-reduced-motion when not told', () => {
-    const real = window.matchMedia;
+    const real = Object.getOwnPropertyDescriptor(window, 'matchMedia');
     window.matchMedia = ((q: string) => ({
       matches: q.includes('reduce'),
     })) as typeof window.matchMedia;
     try {
       expect(watchAnimationSpeed(4, 'normal')).toBe('instant');
     } finally {
-      window.matchMedia = real;
+      if (real) Object.defineProperty(window, 'matchMedia', real);
+      else delete (window as { matchMedia?: unknown }).matchMedia;
     }
   });
 });

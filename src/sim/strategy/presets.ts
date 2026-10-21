@@ -1,3 +1,4 @@
+import { isHandStart } from '../engine/hand';
 import type { Action, Bet, BetTypeId, Cents, GameState, TableRules } from '../engine/types';
 import { suggestAmount } from '../engine';
 import type { Strategy, StrategyId, StrategyLens, StrategySpec } from './types';
@@ -266,6 +267,14 @@ function repeatLayout(state: GameState, spec: StrategySpec): Plan {
         if (amt >= D) b.place(t, amt, parent.id, false);
         break;
       }
+      case 'fire':
+      case 'all':
+      case 'tall':
+      case 'small':
+        // bonus bets go up for each new shooter (never core: the hand decides when they come down)
+        if (!find(state, t) && isHandStart(state))
+          b.place(t, propAmount(rules, amount), undefined, false);
+        break;
       default: {
         // center/number bets: one instance per type
         if (find(state, t)) break;

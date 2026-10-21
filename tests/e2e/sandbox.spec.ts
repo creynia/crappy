@@ -51,6 +51,33 @@ test.describe('sandbox', () => {
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
   });
 
+  test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
+    page,
+  }) => {
+    await page.goto(url('seed=1&dice=1-1,1-2,3-4'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="fire"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toContainText('house edge 20.76%');
+    await expect(sheet).toContainText('Sucker bet');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.locator('[data-region="small"]').click();
+    await expect(sheet).toContainText('house edge 7.76%');
+    await expect(sheet).toContainText('Costly');
+    await expect(sheet.getByLabel('Bet amount')).toHaveText('$5');
+    await sheet.getByRole('button', { name: 'Confirm' }).click();
+    await expect(sheet).toHaveCount(0);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 2
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 3
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(2);
+    await page.locator('[data-stack]').first().click();
+    await expect(sheet).toContainText('stays up until the hand decides it');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 7: Small loses
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();

@@ -84,8 +84,12 @@ export interface ChipStackProps {
   y: number;
   amount: Cents;
   r?: number;
-  /** bet is not working (e.g. place bets on the come-out) */
+  /** bet is not working (e.g. place bets on the come-out): an OFF mini puck on the stack */
   off?: boolean;
+  /** bet was turned on where it would normally be off (e.g. place bets on the come-out): an ON mini puck */
+  on?: boolean;
+  /** dealer's button on buy and lay bets */
+  marker?: 'buy' | 'lay';
   /** show a "$12" badge under the stack (default true) */
   badge?: boolean;
   /** short tag above the stack, e.g. a hop bet's pair "2-4" (I035) */
@@ -95,6 +99,13 @@ export interface ChipStackProps {
 
 const STACK_LIMIT = 5;
 
+/** Width of the amount badge under a stack, e.g. "$1,000" (layout tests use it for spacing). */
+export function badgeWidth(text: string, r: number): number {
+  return Math.max(r * 1.5, text.length * r * 0.34 + r * 0.5);
+}
+/** Height of the amount badge; its centre sits about 1.1r below the stack's spot. */
+export const BADGE_HEIGHT = 0.84;
+
 /** Up to 5 chips (offset -6 units each) plus an amount badge. Purely decorative: the region label announces the bet. */
 export function ChipStack({
   x,
@@ -102,6 +113,8 @@ export function ChipStack({
   amount,
   r = 34,
   off,
+  on,
+  marker,
   badge = true,
   caption,
   class: cls,
@@ -110,7 +123,7 @@ export function ChipStack({
   const bottomFirst = [...chips].reverse(); // largest at the bottom
   const thick = Math.max(4, r * 0.14);
   const text = fmtMoney(amount);
-  const bw = Math.max(r * 1.5, text.length * r * 0.34 + r * 0.5);
+  const bw = badgeWidth(text, r);
   return (
     <g
       class={`sim-stack${off ? ' is-off' : ''}${cls ? ' ' + cls : ''}`}
@@ -172,29 +185,55 @@ export function ChipStack({
           </text>
         </g>
       ) : null}
-      {off ? (
-        <g transform={`translate(${r * 0.7} ${-r * 0.7})`}>
-          <rect
-            x={-r * 0.6}
-            y={-r * 0.3}
-            width={r * 1.2}
-            height={r * 0.6}
-            rx={r * 0.15}
-            fill="#111"
-            stroke="#f5c542"
-            stroke-width="2"
-          />
-          <text
-            text-anchor="middle"
-            y={r * 0.17}
-            font-size={r * 0.42}
-            font-weight="800"
-            fill="#f5c542"
-          >
-            OFF
-          </text>
-        </g>
-      ) : null}
+      {marker ? <StackButton r={r} kind={marker} /> : null}
+      {off || on ? <MiniPuck r={r} on={!off} /> : null}
+    </g>
+  );
+}
+
+/** A small black-and-white puck on the stack's top right: OFF (not working) or ON (turned on). */
+function MiniPuck({ r, on }: { r: number; on: boolean }) {
+  const pr = r * 0.6;
+  return (
+    <g
+      class={`sim-mini-puck ${on ? 'is-on' : 'is-off'}`}
+      data-marker={on ? 'on' : 'off'}
+      transform={`translate(${r * 0.8} ${-r * 0.8})`}
+    >
+      <circle
+        r={pr}
+        fill={on ? '#f8f5ec' : '#16181a'}
+        stroke={on ? '#1a1a1a' : '#f8f5ec'}
+        stroke-width={pr * 0.12}
+      />
+      <text
+        y={pr * 0.3}
+        text-anchor="middle"
+        font-size={pr * 0.75}
+        font-weight="900"
+        fill={on ? '#111' : '#f8f5ec'}
+      >
+        {on ? 'ON' : 'OFF'}
+      </text>
+    </g>
+  );
+}
+
+/** The dealer's BUY / LAY button (lammer) on the stack's top left. */
+function StackButton({ r, kind }: { r: number; kind: 'buy' | 'lay' }) {
+  const br = r * 0.56;
+  return (
+    <g class="sim-lammer" data-marker={kind} transform={`translate(${-r * 0.8} ${-r * 0.8})`}>
+      <circle r={br} fill="#f5c542" stroke="#3a2a00" stroke-width={br * 0.12} />
+      <text
+        y={br * 0.3}
+        text-anchor="middle"
+        font-size={br * 0.62}
+        font-weight="900"
+        fill="#3a2a00"
+      >
+        {kind === 'buy' ? 'BUY' : 'LAY'}
+      </text>
     </g>
   );
 }

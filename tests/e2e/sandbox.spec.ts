@@ -109,9 +109,10 @@ test.describe('sandbox flows', () => {
     await roll(page); // 6: point
     await expect(page.getByText('Point: 6')).toBeVisible();
     await place(page, 'come');
-    expect(await bank(page)).toBe('$490');
+    await expect.poll(() => bank(page)).toBe('$490');
     await roll(page); // 5: the Come bet travels to the 5
-    expect(await onTable(page)).toBe('$10');
+    await expect(page.getByRole('button', { name: /^Edit Come bet.*5/ })).toBeVisible();
+    await expect.poll(() => onTable(page)).toBe('$10');
     const comeBet = page.getByRole('button', { name: /^Edit Come bet/ });
     await comeBet.click();
     const sheet = page.getByRole('dialog');
@@ -123,12 +124,12 @@ test.describe('sandbox flows', () => {
     await sheet.getByRole('button', { name: 'Confirm' }).click();
     await expect(sheet).toHaveCount(0);
     expect(Number(odds)).toBeGreaterThan(0);
-    expect(await bank(page)).toBe(`$${490 - Number(odds)}`);
+    await expect.poll(() => bank(page)).toBe(`$${490 - Number(odds)}`);
     await roll(page); // 5 again: Come + odds win, pass line stays up
     // 5:5 even money on the flat bet, 3:2 on the odds, both returned
     const won = 5 + Math.floor((Number(odds) * 3) / 2);
     await expect.poll(() => bank(page)).toBe(`$${490 - Number(odds) + 5 + Number(odds) + won}`);
-    await expect(page.locator('.sim-toast').first()).toContainText('5');
+    await expect(page.locator('.sim-toast').first()).toContainText(/^5\b/);
   });
 
   test('sucker bet needs two taps and nothing is placed on the first', async ({ page }) => {
@@ -138,12 +139,12 @@ test.describe('sandbox flows', () => {
     const sheet = page.getByRole('dialog');
     await sheet.getByRole('button', { name: 'Place anyway' }).click();
     await expect(sheet.getByRole('alert').filter({ hasText: 'sucker bet' })).toBeVisible();
-    expect(await bank(page)).toBe('$500');
-    expect(await onTable(page)).toBe('$0');
+    await expect.poll(() => bank(page)).toBe('$500');
+    await expect.poll(() => onTable(page)).toBe('$0');
     await sheet.getByRole('button', { name: /again to place anyway/i }).click();
     await expect(sheet).toHaveCount(0);
-    expect(await bank(page)).toBe('$495');
-    expect(await onTable(page)).toBe('$5');
+    await expect.poll(() => bank(page)).toBe('$495');
+    await expect.poll(() => onTable(page)).toBe('$5');
   });
 
   test('rebet puts a one-roll bet back after it resolves', async ({ page }) => {
@@ -155,13 +156,13 @@ test.describe('sandbox flows', () => {
     await sheet.getByRole('button', { name: /again to place anyway/i }).click();
     await roll(page); // snake eyes: Any 7 loses
     await expect.poll(() => onTable(page)).toBe('$0');
-    expect(await bank(page)).toBe('$495');
+    await expect.poll(() => bank(page)).toBe('$495');
     await menu(page).click();
     const rebet = page.getByRole('button', { name: 'Rebet' });
     await expect(rebet).toBeEnabled();
     await rebet.click();
     await expect.poll(() => onTable(page)).toBe('$5');
-    expect(await bank(page)).toBe('$490');
+    await expect.poll(() => bank(page)).toBe('$490');
     await expect(rebet).toBeDisabled();
   });
 
@@ -169,11 +170,13 @@ test.describe('sandbox flows', () => {
     await page.goto(url('seed=1&' + dice('3-3')));
     await place(page, 'pass');
     await roll(page);
-    expect(await onTable(page)).toBe('$5');
+    await expect(page.getByText('Point: 6')).toBeVisible();
+    await expect.poll(() => onTable(page)).toBe('$5');
     await menu(page).click();
     await page.getByLabel('Rules').selectOption({ label: '10x odds' });
-    expect(await bank(page)).toBe('$500');
-    expect(await onTable(page)).toBe('$0');
+    await expect.poll(() => bank(page)).toBe('$500');
+    await expect.poll(() => onTable(page)).toBe('$0');
+    await expect(page.getByText('Point: 6')).toHaveCount(0); // table reset
     await expect(page.getByText('Come-out roll')).toBeVisible();
     await expect(page.getByLabel('Rules')).toHaveValue('odds-10x');
   });
@@ -186,14 +189,20 @@ test.describe('sandbox flows', () => {
     await page.goto(url()); // no seed/dice/rules: restores the saved table
     await page.reload();
     await expect(page.getByText('Point: 6')).toBeVisible();
-    expect(await bank(page)).toBe('$495');
-    expect(await onTable(page)).toBe('$5');
+    await expect.poll(() => bank(page)).toBe('$495');
+    await expect.poll(() => onTable(page)).toBe('$5');
   });
 
   test('URL params: seed and dice are deterministic, rules preset applies', async ({ page }) => {
+    // five rolls, so a lucky repeat of the first total cannot fake determinism
     const firstToast = async () => {
-      await roll(page);
-      return page.locator('.sim-toast').first().innerText();
+      const seen: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        await roll(page);
+        await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+        seen.push(await page.locator('.sim-toast').last().innerText());
+      }
+      return seen.join('|');
     };
     await fresh(page, 'seed=42');
     const a = await firstToast();
@@ -208,12 +217,21 @@ test.describe('sandbox flows', () => {
     await roll(page);
     await expect(page.locator('.sim-toast').last()).toContainText('7');
 
-    await fresh(page, 'rules=odds-100x&seed=1');
-    await menu(page).click();
-    await expect(page.getByLabel('Rules')).toHaveValue('odds-100x');
+    await fresh(page, 'rules=odds-100x&seed=1&' + dice('3-3'));
+    await place(page, 'pass');
+    await roll(page);
+    await expect(page.getByText('Point: 6')).toBeVisible();
+    await page.getByRole('button', { name: /^Edit Pass line bet/ }).click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: 'Add odds' }).click();
+    await sheet.getByRole('button', { name: 'Max odds' }).click();
+    // standard 3-4-5x would cap this at $25; 100x is limited only by the bankroll
+    const max = Number((await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9]/g, ''));
+    expect(max).toBeGreaterThan(100);
   });
 
-  test('bet sheet fits the viewport in portrait and landscape', async ({ page }) => {
+  test('bet sheet fits the viewport in portrait and landscape', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'sets its own viewports');
     for (const vp of [
       { width: 390, height: 844 },
       { width: 844, height: 390 },
@@ -264,16 +282,19 @@ test.describe('sandbox flows', () => {
   });
 
   test('tapping the table skips the roll animation', async ({ page }) => {
+    // Freeze time so only the tap can finish the roll: with the clock paused the animation timers
+    // never fire, so "Roll is enabled again" proves the skip, not a fast machine.
+    await page.clock.install();
     await page.goto('/#/play?speed=normal&seed=1&' + dice('3-4'));
     await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
     await roll(page);
-    await expect(page.getByRole('button', { name: 'Rolling…' })).toBeVisible();
-    const t0 = Date.now();
+    const rollBtn = page.getByRole('button', { name: /^Roll/ });
+    await expect(rollBtn).toHaveAccessibleName(/Rolling/);
+    await page.waitForTimeout(1200); // real time passes, the paused clock does not
+    await expect(rollBtn).toHaveAccessibleName(/Rolling/);
     await page.getByRole('group', { name: 'Craps table' }).click({ position: { x: 4, y: 4 } });
-    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled({
-      timeout: 800,
-    });
-    expect(Date.now() - t0).toBeLessThan(1500);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
   });

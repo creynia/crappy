@@ -10,12 +10,20 @@ const PAD = 8;
 /** Horizontal step: wider than a chip (2r) and its pair caption (1.9r). */
 export const hopStepX = (r: number) => r * 2.35;
 /**
- * Vertical step: a 5-chip stack with caption above and badge below spans about
- * 1.68r + 24 above the centre and 1.42r + 4 below, i.e. < 4r for r >= 28.
+ * How far a captioned chip stack (ChipStack, up to 5 chips) reaches above and below its centre:
+ * the pair caption sits over the top chip (4 chips x 6 units of offset), the amount badge under it.
  */
-export const hopStepY = (r: number) => r * 4;
+export function stackExtent(r: number): { above: number; below: number } {
+  const thick = Math.max(4, r * 0.14);
+  return { above: r + 4 * 6 + r * 0.32 + r * 0.36, below: r + thick - 2 + r * 0.42 };
+}
+/** Vertical step: one full stack plus a small gap (4r at r = 32). */
+export const hopStepY = (r: number) => {
+  const e = stackExtent(r);
+  return Math.ceil(e.above + e.below + 2);
+};
 /** Centre of the first row: caption top clears the title band. */
-const firstRowY = (r: number) => HOP_BAND + r * 1.68 + 26;
+const firstRowY = (r: number) => HOP_BAND + stackExtent(r).above + 2;
 
 export function hopCols(rect: Rect, r: number): number {
   return Math.max(1, Math.floor((rect.w - 2 * PAD) / hopStepX(r)));

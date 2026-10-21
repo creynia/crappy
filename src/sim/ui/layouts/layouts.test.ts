@@ -7,7 +7,7 @@ import {
   hopSpot,
   spotPosition,
 } from './index';
-import { HOP_BAND } from './hopSlots';
+import { HOP_BAND, stackExtent } from './hopSlots';
 import type { Rect, TableLayout } from './types';
 
 const VIEWPORT: Record<TableLayout['id'], number> = {
@@ -92,6 +92,7 @@ describe('center layout: hop region (I035)', () => {
   });
   it('fits all 21 pairs: slots >= 2r apart, stacks inside the region and below the title', () => {
     const r = centerLayout.chipRadius;
+    const ext = stackExtent(r);
     const spots = Array.from({ length: 21 }, (_, i) => hopSpot(hop, i, r));
     for (let i = 0; i < spots.length; i++)
       for (let j = i + 1; j < spots.length; j++) {
@@ -99,14 +100,14 @@ describe('center layout: hop region (I035)', () => {
         const b = spots[j]!;
         expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * r);
         // same column, next row: the lower stack's caption clears the upper stack's badge
-        if (a.x === b.x) expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(3.1 * r + 26);
+        if (a.x === b.x) expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(ext.above + ext.below);
       }
     for (const p of spots) {
       expect(p.x - r).toBeGreaterThanOrEqual(hop.rect.x);
       expect(p.x + r).toBeLessThanOrEqual(hop.rect.x + hop.rect.w);
-      // a 5-chip stack: caption top at 1.68r + 24 above, badge bottom 1.42r + 3 below
-      expect(p.y - 1.68 * r - 24).toBeGreaterThanOrEqual(hop.rect.y + HOP_BAND);
-      expect(p.y + 1.42 * r + 3).toBeLessThanOrEqual(hop.rect.y + hop.rect.h);
+      // a 5-chip stack, caption and badge included, stays below the title band and in the region
+      expect(p.y - ext.above).toBeGreaterThanOrEqual(hop.rect.y + HOP_BAND);
+      expect(p.y + ext.below).toBeLessThanOrEqual(hop.rect.y + hop.rect.h);
     }
     expect(hop.rect.y + hop.rect.h).toBeLessThanOrEqual(centerLayout.viewBox.h);
   });

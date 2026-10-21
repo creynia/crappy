@@ -1,5 +1,8 @@
 import { HOP_PAYS, isHardHop, normalizeHop, sameHop } from '../engine/bets';
+import { DEFAULT_RULES } from '../engine/rules';
 import type { Dice, Die } from '../engine/types';
+import { betEdge } from '../math/ev';
+import { fmtPct, fracToNumber } from './text';
 import './hop.css';
 
 const FACES: readonly Die[] = [1, 2, 3, 4, 5, 6];
@@ -16,6 +19,12 @@ export interface HopPickerProps {
  */
 export function HopPicker({ value, onChange, disabled }: HopPickerProps) {
   const v = normalizeHop(value);
+  // exact house edge of this pair (easy 1/9 = 11.11%, hard 5/36 = 13.89%)
+  const edge = fmtPct(
+    fracToNumber(
+      betEdge('hop', 100, { phase: 'come-out', point: null, rules: DEFAULT_RULES }, v).perResolved,
+    ),
+  );
   return (
     <div class="sim-hop" role="group" aria-label="Dice pair">
       <div class="sim-hop-grid">
@@ -48,8 +57,8 @@ export function HopPicker({ value, onChange, disabled }: HopPickerProps) {
       </div>
       <p class="sim-hop-note">
         {isHardHop(v)
-          ? `Hard hop ${v[0]}-${v[1]}: wins on 1 of 36 rolls, pays ${HOP_PAYS.hard} to 1.`
-          : `Easy hop ${v[0]}-${v[1]}: wins on ${v[0]}-${v[1]} or ${v[1]}-${v[0]}, 2 of 36 rolls, pays ${HOP_PAYS.easy} to 1.`}
+          ? `Hard hop ${v[0]}-${v[1]}: wins on 1 of 36 rolls, pays ${HOP_PAYS.hard} to 1 · edge ${edge}.`
+          : `Easy hop ${v[0]}-${v[1]}: wins on ${v[0]}-${v[1]} or ${v[1]}-${v[0]}, 2 of 36 rolls, pays ${HOP_PAYS.easy} to 1 · edge ${edge}.`}
       </p>
     </div>
   );

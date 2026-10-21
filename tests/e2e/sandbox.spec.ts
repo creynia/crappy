@@ -61,6 +61,7 @@ test.describe('sandbox', () => {
     await sheet.locator('[data-hop="3-3"]').click();
     await expect(sheet.locator('[data-hop="3-3"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(sheet).toContainText('13.89%');
+    await expect(sheet.locator('.sim-hop-note')).toContainText('pays 30 to 1 · edge 13.89%');
     const amount = Number(
       (await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9.]/g, ''),
     );

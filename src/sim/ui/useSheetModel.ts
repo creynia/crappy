@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, isToggleable } from '../engine/bets';
 import type { Action, BetTypeId, Cents, Dice, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
@@ -10,6 +10,7 @@ import type { QuickAction, TypeOption } from './BetSheet';
 import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
 import type { RegionDef, RegionId } from './layouts/types';
 import type { ResolvedSimSettings } from './settings';
+import { workingProp } from './workingProp';
 import {
   defaultAmount,
   defaultBetForRegion,
@@ -162,6 +163,7 @@ export function buildSheetModel(
           parentId: bet.id,
         }
       : null;
+  const working = bet && isToggleable(bet.type) ? workingProp(game, bet, rollsPerHour) : undefined;
   return {
     bet,
     action,
@@ -174,6 +176,7 @@ export function buildSheetModel(
     removePreview,
     contract,
     addOdds,
+    working,
   };
 }
 

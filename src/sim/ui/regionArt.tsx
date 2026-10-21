@@ -461,6 +461,29 @@ function RegionArtImpl({
         <text x={x + 28} y={y + 42} class="sim-label" font-size="36" fill={WHITE}>
           HOP BETS
         </text>
+        {/* the title band never holds chips, so it stays a tap target for a new hop */}
+        <g opacity="0.9">
+          <rect
+            x={x + 236}
+            y={y + 12}
+            width={150}
+            height={34}
+            rx={17}
+            fill="none"
+            stroke={WHITE}
+            stroke-width="2"
+          />
+          <text
+            x={x + 311}
+            y={y + 35}
+            class="sim-tiny"
+            font-size="17"
+            text-anchor="middle"
+            fill={WHITE}
+          >
+            + ADD A HOP
+          </text>
+        </g>
         <text
           x={x + w - 28}
           y={y + 40}

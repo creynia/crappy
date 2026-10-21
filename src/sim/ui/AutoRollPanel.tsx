@@ -19,6 +19,7 @@ import type {
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { ResultsHistogram } from './ResultsHistogram';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
@@ -490,6 +491,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
+        {o.kind === 'many' && chartTab === 'results' && (
+          <ResultsHistogram
+            start={start}
+            series={o.results.map((r, i) => ({
+              label: nameOf(o.specs[i]!.id),
+              color: COLORS[i]!,
+              finals: r.finals,
+              busted: Math.round(r.bustRate * r.sessions),
+              expected: r.expected[r.expected.length - 1]! - start,
+            }))}
+          />
+        )}
         <table class="sim-ar-summary" data-testid="auto-roll-summary">
           <thead>
             <tr>

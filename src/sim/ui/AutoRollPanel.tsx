@@ -19,6 +19,7 @@ import type {
   SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
+import { BANKROLL_CHIPS, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
@@ -124,7 +125,11 @@ function randomSeed(): number {
 
 export function AutoRollPanel(props: AutoRollPanelProps) {
   const { config, layout, rollsPerHour = 100 } = props;
-  const bankroll = props.bankroll ?? 50_000;
+  const tableBankroll = props.bankroll ?? 50_000;
+  const [bankrollPick, setBankrollPick] = useState<'table' | Cents>('table');
+  const [bankrollText, setBankrollText] = useState('');
+  const [bankrollError, setBankrollError] = useState<string | null>(null);
+  const bankroll = bankrollPick === 'table' ? tableBankroll : bankrollPick;
   const all = useMemo(() => {
     const l = listStrategies();
     return config?.strategies ? l.filter((s) => config.strategies!.includes(s.id)) : l;
@@ -180,6 +185,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
+    if (bankrollError) {
+      setError(bankrollError);
+      return;
+    }
     // computed once per run, with the rules this run uses
     const metricsFor = (specs: StrategySpec[]): Metrics[] =>
       specs.map((s) => strategyMetrics(s, rules));
@@ -385,6 +394,58 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             />
           </label>
         </div>
+        <div class="sim-ar-group" role="group" aria-label="Starting bankroll">
+          <span>Bankroll</span>
+          {button(
+            bankrollPick === 'table' && bankrollText === '',
+            'Table',
+            () => {
+              setBankrollText('');
+              setBankrollError(null);
+              setBankrollPick('table');
+            },
+            'table',
+          )}
+          {BANKROLL_CHIPS.map((c) =>
+            button(
+              bankrollPick === c && bankrollText === '',
+              money(c),
+              () => {
+                setBankrollText('');
+                setBankrollError(null);
+                setBankrollPick(c);
+              },
+              c,
+            ),
+          )}
+          <label>
+            <span class="sim-sr">Custom starting bankroll in whole dollars</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Custom"
+              value={bankrollText}
+              disabled={running}
+              class="sim-ar-num"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setBankrollText(v);
+                const r = parseBankroll(v, rules.tableMin);
+                if (r.ok) {
+                  setBankrollPick(r.cents);
+                  setBankrollError(null);
+                } else {
+                  setBankrollError(r.message);
+                }
+              }}
+            />
+          </label>
+          {bankrollError ? (
+            <p role="alert" class="sim-ar-desc">
+              {bankrollError}
+            </p>
+          ) : null}
+        </div>
         <div class="sim-ar-group" role="group" aria-label="Sessions">
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
@@ -463,7 +524,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
 
   function renderOutput(o: Outcome) {
-    const start = bankroll;
+    const start = o.cfg.bankroll;
     const noBet = o.specs.length === 1 && o.specs[0]!.id === 'no-bet';
     if (noBet && o.kind === 'single') return <TotalsHistogram counts={o.results[0]!.totals} />;
     let series: ChartSeries[];
@@ -548,7 +609,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ? o.results.map((r) => (r.rollsPlayed > 0 ? r.expectedLoss / r.rollsPlayed : 0))
         : o.results.map((r) => {
             const n = Math.max(1, r.expected.length - 1);
-            return (bankroll - r.expected[r.expected.length - 1]!) / n;
+            return (o.cfg.bankroll - r.expected[r.expected.length - 1]!) / n;
           });
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
@@ -557,12 +618,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (o.kind === 'single') {
       const rs = o.results;
       return [
+        ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
         ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
-        ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
+        ['Actual result', rs.map((r) => money2(r.finalEquity - o.cfg.bankroll, true))],
         ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
         [
           'Luck (actual minus expected)',
-          rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
+          rs.map((r) => money2(r.finalEquity - o.cfg.bankroll + r.expectedLoss, true)),
         ],
         ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],
@@ -577,6 +639,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
     return [
+      ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
       ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
       ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
       ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],

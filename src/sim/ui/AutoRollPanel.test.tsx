@@ -91,3 +91,39 @@ describe('AutoRollPanel', () => {
     expect(row.querySelector('td')!.textContent).toMatch(/\.\d\d$/);
   });
 });
+
+describe('AutoRollPanel starting bankroll', () => {
+  const bustRow = (el: HTMLElement) =>
+    [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
+      tr.textContent?.startsWith('Busted sessions'),
+    ) ?? null;
+  const bustRate = (el: HTMLElement) => parseFloat(bustRow(el)!.querySelector('td')!.textContent);
+  const clickButton = async (el: HTMLElement, name: string) => {
+    await act(async () => {
+      const b = [...el.querySelectorAll('button')].find((x) => x.textContent === name)!;
+      b.click();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+  };
+
+  it('a $5,000 run starts at $5,000 and busts less often than a $200 run on the same seed', async () => {
+    const config = { rollOptions: [100], sessions: [100] };
+    const small = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, small);
+    await click(small, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => bustRow(small));
+    const smallRate = bustRate(small);
+
+    const big = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, big);
+    await clickButton(big, '$5,000');
+    await click(big, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => bustRow(big));
+    const bigRate = bustRate(big);
+    const start = [...big.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find(
+      (tr) => tr.textContent?.startsWith('Starting bankroll'),
+    )!;
+    expect(start.querySelector('td')!.textContent).toBe('$5,000.00');
+    expect(bigRate).toBeLessThan(smallRate);
+  });
+});

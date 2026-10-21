@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
-import type { Bet, Cents, RulePresetId } from '../engine/types';
+import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
@@ -50,11 +50,15 @@ const isCenterBet = (b: Bet) => {
 };
 
 export function Simulator(props: SimulatorInternalProps) {
-  const [scene, setScene] = useState<SceneConfig>(props.scene ?? SANDBOX_SCENE);
+  const initialScene = props.scene ?? SANDBOX_SCENE;
   const mode = props.mode ?? (props.scene ? 'embedded' : 'sandbox');
   const sandbox = mode === 'sandbox';
+  const { settings, setSettings, boot } = useUrlBoot(props, initialScene, mode);
+  // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
+  const [scene, setScene] = useState<SceneConfig>(() =>
+    boot.customRules ? { ...initialScene, rules: boot.customRules } : initialScene,
+  );
   const ui = scene.ui ?? {};
-  const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -174,7 +178,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | Partial<TableRules> }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
@@ -212,6 +216,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
   const rulesSelectValue = typeof scene.rules === 'string' ? scene.rules : settings.rulesPreset;
+  // I033: a rules object (the custom editor, or a restored custom sandbox) shows as "Custom"
+  const menuRulesValue = typeof scene.rules === 'object' ? 'custom' : rulesSelectValue;
 
   const tableProps = {
     bets: game.bets,
@@ -357,7 +363,8 @@ export function Simulator(props: SimulatorInternalProps) {
           busy={anim.busy}
           onRebet={rebet}
           onReset={resetGame}
-          rulesValue={rulesSelectValue}
+          rulesValue={menuRulesValue}
+          currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
         />

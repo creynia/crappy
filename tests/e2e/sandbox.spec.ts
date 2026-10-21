@@ -103,6 +103,33 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
+  test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
+    await page.goto(url());
+    const buy4 = async () => {
+      await page.locator('[data-region="box-4"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('radio', { name: /^Buy/ }).click();
+      const text = await sheet.locator('.sim-headline').innerText();
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      return text;
+    };
+    expect(await buy4()).toContain('1.67%');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const menu = page.locator('.sim-menu');
+    await menu.getByLabel('Rules').selectOption('custom');
+    const form = page.locator('form.sim-rules');
+    await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
+    await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await form.getByRole('button', { name: /^Apply/ }).click();
+    await expect(form).toHaveCount(0);
+    await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    expect(await buy4()).toContain('4.76%');
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();

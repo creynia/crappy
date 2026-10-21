@@ -2,7 +2,15 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Action, BetTypeId, Cents, Dice } from '../engine/types';
 import { HopPicker } from './HopPicker';
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
+import {
+  fmtMoney,
+  fmtPct,
+  fracToNumber,
+  normalizeTier,
+  swingCopy,
+  TIER_LABEL,
+  type EvFacts,
+} from './text';
 import { DiceGrid } from './DiceGrid';
 import { OddsTree } from './OddsTree';
 import './sim.css';
@@ -429,6 +437,9 @@ export function EvLines({ facts: f }: { facts: EvFacts }) {
         )}
         .
       </li>
+      {f.swingCents != null ? (
+        <li data-line="swing">{swingCopy(f.swingCents, f.edge, f.expectedLossCents)}</li>
+      ) : null}
       {f.perHourCents !== null ? (
         <li data-line="hour" class={f.oneRoll ? 'is-strong' : ''}>
           If you keep this bet up for an hour (~{f.rollsPerHour} rolls): about{' '}

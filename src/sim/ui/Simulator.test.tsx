@@ -556,7 +556,7 @@ describe('watch mode accessibility', () => {
         await waitFor(() => screen.getByTestId('watch-controls'));
         fireEvent.click(screen.getByRole('button', { name: '4x' }));
         fireEvent.click(screen.getByTestId('watch-toggle')); // pause
-        const step = screen.getByTestId('watch-step') as HTMLButtonElement;
+        const step = screen.getByTestId<HTMLButtonElement>('watch-step');
         await waitFor(() => expect(step.disabled).toBe(false));
         fireEvent.click(step);
         // an animation in flight keeps Step disabled; instant rolls do not

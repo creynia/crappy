@@ -253,8 +253,11 @@ describe('strategyMetrics (simulator.md 2.4)', () => {
     expect(m('pass-max-odds', 1000).expectedLossPerRoll).toBeCloseTo(0.0419, 3);
     expect(m('pass-max-odds', 1000).rollsPerDollar).toBeCloseTo(23.9, 0);
     expect(m('dont-pass-max-lay', 1000).expectedLossPerRoll).toBeCloseTo(0.0404, 3);
-    expect(m('place-6-8', 600).expectedLossPerRoll).toBeCloseTo(0.0556, 3);
-    expect(m('iron-cross', 500).expectedLossPerRoll).toBeCloseTo(7 / 18, 3);
+    // per roll overall: bets that are off on the come-out work 392/557 of rolls
+    expect(m('place-6-8', 600).expectedLossPerRoll).toBeCloseTo((1 / 18) * (392 / 557), 6);
+    expect(m('place-6-8', 600).expectedLossPerRoll * 100).toBeCloseTo(3.91, 2);
+    expect(m('iron-cross', 500).expectedLossPerRoll).toBeCloseTo((7 / 18) * (392 / 557), 6);
+    expect(m('iron-cross', 500).expectedLossPerRoll * 100).toBeCloseTo(27.37, 2);
     expect(m('any-7-every-roll', 500).expectedLossPerRoll).toBeCloseTo(0.8333, 3);
     expect(m('no-bet', 500).expectedLossPerRoll).toBe(0);
     expect(
@@ -262,6 +265,48 @@ describe('strategyMetrics (simulator.md 2.4)', () => {
     ).toBeCloseTo(0.01414, 4);
     // odds dilute the edge on total action
     expect(m('pass-max-odds', 1000).edgeOnAction).toBeLessThan(0.005);
+  });
+});
+
+describe('strategyMetrics avgAction', () => {
+  const rules = resolveRules('standard-vegas');
+  it('is the steady layout total in dollars', () => {
+    expect(strategyMetrics({ id: 'place-6-8', unit: 600 }, rules).avgAction).toBe(12);
+    expect(strategyMetrics({ id: 'iron-cross', unit: 500 }, rules).avgAction).toBe(22);
+    expect(strategyMetrics({ id: 'no-bet', unit: 500 }, rules).avgAction).toBe(0);
+    // $10 pass plus its maximum odds: 5x at point 6 = $50
+    // $10 pass plus 3-4-5x odds averaged over the point: 10 + 10 x 25/6
+    expect(strategyMetrics({ id: 'pass-max-odds', unit: 1000 }, rules).avgAction).toBeCloseTo(
+      10 + 250 / 6,
+      6,
+    );
+  });
+});
+
+describe('strategyMetrics odds edges and Molly', () => {
+  const rules = resolveRules('standard-vegas');
+  const e = (id: StrategyId, oddsMultiple?: number) =>
+    strategyMetrics(
+      oddsMultiple === undefined ? { id, unit: 1000 } : { id, unit: 1000, oddsMultiple },
+      rules,
+    ).edgeOnAction;
+  it('pass + 1x, 2x and max odds are 7/495 / (1 + 2/3 x multiple)', () => {
+    const flat = 7 / 495;
+    expect(e('pass-max-odds', 1)).toBeCloseTo(flat / (1 + (24 / 36) * 1), 8);
+    expect(e('pass-max-odds', 2)).toBeCloseTo(1 / 165, 8);
+    expect(e('pass-2x-odds')).toBeCloseTo(1 / 165, 8);
+    expect(e('pass-max-odds')).toBeCloseTo(flat / (1 + 100 / 36), 8);
+  });
+  it('three-point Molly costs $10.11 an hour at $10 with a 0.404% edge on action (come odds off on come-out)', () => {
+    const m = strategyMetrics({ id: 'three-point-molly', unit: 1000 }, rules);
+    expect(m.expectedLossPerRoll * 100).toBeCloseTo(10.11, 2);
+    expect(m.edgeOnAction * 100).toBeCloseTo(0.4044, 4);
+    // with come odds working on the come-out they count as action there, which lowers the edge
+    const on = strategyMetrics(
+      { id: 'three-point-molly', unit: 1000 },
+      resolveRules({ ...rules, comeOddsWorkOnComeOut: true }),
+    );
+    expect(on.edgeOnAction * 100).toBeCloseTo(0.38453, 4);
   });
 });
 
@@ -340,14 +385,43 @@ describe('more presets (I012)', () => {
     // each $20 buy: vig $1 paid on the 1/3 of resolutions it wins = $20/60 per resolution
     const perRoll = m('buy-4-10').expectedLossPerRoll;
     // each number resolves on 3/36 (hit) + 6/36 (seven) = 9/36 of point-phase rolls
-    expect(perRoll).toBeCloseTo(2 * 20 * (1 / 60) * (9 / 36), 3);
+    // point-phase only: x 392/557 of all rolls
+    expect(perRoll).toBeCloseTo(2 * 20 * (1 / 60) * (9 / 36) * (392 / 557), 6);
     expect(m('buy-4-10').edgeOnAction).toBeCloseTo(1 / 60, 3);
   });
   it('lay 4/10: $40 laid, loss per resolution is $40 x 1/60 on the amount laid', () => {
     // lay $40 wins $20 on 7 before the number (2/3): vig $1; loss per resolution = 2/3 x $1
     expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
-    // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of point-phase rolls
-    expect(m('lay-4-10').expectedLossPerRoll).toBeCloseTo(2 * (2 / 3) * (9 / 36), 6);
+    // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of rolls; lay bets stay up through
+    // come-outs, so there is no 392/557 scaling
+    // coverage is a little below 1: a lay that resolves on a come-out waits for the next point
+    const lay = m('lay-4-10').expectedLossPerRoll;
+    expect(lay).toBeLessThan(2 * (2 / 3) * (9 / 36));
+    expect(lay).toBeGreaterThan(2 * (2 / 3) * (9 / 36) * (392 / 557));
+    expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
+  });
+  it('lay 4/10 chain matches a seeded engine session to 3 decimals', () => {
+    const r = simulateSession({
+      strategy: { id: 'lay-4-10', unit: 500 },
+      rolls: 150_000,
+      seed: 5,
+      bankroll: 100_000_000,
+      stopAtBust: false,
+    });
+    expect(r.expectedLoss / r.rollsPlayed / 100).toBeCloseTo(m('lay-4-10').expectedLossPerRoll, 3);
+  });
+  it('point-phase-only presets are scaled once by 392/557; always-on ones are not', () => {
+    const press = m('place-6-8-press');
+    const plain = strategyMetrics({ id: 'place-6-8', unit: 500 }, rules);
+    expect(press.expectedLossPerRoll).toBeCloseTo(plain.expectedLossPerRoll, 9);
+    expect(press.edgeOnAction).toBeCloseTo(plain.edgeOnAction, 9);
+    // edge per dollar is unchanged by the scaling (loss and action scale together)
+    expect(plain.edgeOnAction).toBeCloseTo(1 / 66, 4);
+    // field every roll works on every roll: no scaling
+    expect(m('field-every-roll').expectedLossPerRoll).toBeCloseTo(0.05556 * 5, 3);
+    const molly = m('dont-come-molly');
+    expect(molly.expectedLossPerRoll).toBeGreaterThan(0);
+    expect(molly.edgeOnAction).toBeLessThan(0.015);
   });
   it('hedging the pass line with Any Craps raises the edge on action', () => {
     const hedge = m('pass-hedge-any-craps');

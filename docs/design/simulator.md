@@ -671,7 +671,16 @@ export interface TableLayout { viewBox: { w: number; h: number }; regions: Regio
 | dont-pass | (20,980,860,110) | dont-pass, dont-pass-odds |
 | pass | (20,1105,860,135) | pass-line, pass-odds |
 
-Inside each number box: a top band (y+0..60) holds the DC and lay chip spots, the center holds the large numeral (5 and 9 spelled "FIVE"/"NINE" as on real tables) and the place/buy chip spot, and a bottom band (y+190..250) holds the come-point chip spot with odds offset (+40, −20). The puck (r = 42) sits at the box's top-right `(x+w−50, y+50)` when ON. When OFF it sits at the top-left of the come region (black disc, "OFF").
+Inside each number box, chips sit where a dealer puts them (spots in `layouts/shared.ts` `numberBox`; x positions scale with the box width k = w/280, odds offsets are in chip radii r; tested in `layouts.test.ts`):
+
+| Area | Bets | Spot |
+|---|---|---|
+| Top bar (shaded, left) | travelled don't come (`dc-point`), its lay odds beside it (`dc-odds`, +1.75r: a $100 lay odds badge clears a $25 don't-come badge) | `(x+44k, y+r+28)`: a full stack stays inside the box |
+| Right, under the puck | lay bets (`lay`) with a LAY button | `(x+w−44k, y+54%)` |
+| Come-point area (left, middle) | travelled come bets (`come-point`), come odds offset on the flat (`odds`, +1.35r, −0.9r: both amount badges show, and even a $1,000 odds badge leaves the flat's centre free, so a tap there opens the come bet) | `(x+44k, y+56%)` |
+| Bottom (y+80%) | place bets (`main`, left), buy bets (`buy`, right) with a BUY button | `(x+30%, y+80%)`, `(x+70%, y+80%)` |
+
+The tests keep lay ≥ 2r from the don't-come stacks, come odds ≥ 2r from place, buy ≥ 2r from the puck, and lay and lay odds clear of the puck. The large numeral (5 and 9 spelled "FIVE"/"NINE" as on real tables) sits in the middle. The puck (r = 42) sits at the box's top-right `(x+w−50, y+50)` when ON. When OFF it sits at the top-left of the come region (black disc, "OFF"). Pass line and Don't Pass bar each print a dashed odds area ("ODDS" / "LAY ODDS") about 100 units right of the flat bet; pass and don't pass odds go there. The printed odds areas and the separate buy spot are stylisations for clarity: real layouts print neither, and dealers put line odds behind the flat bet and mark buy bets with a button on the place spot. A stack that is not working carries a small black OFF puck on its top right; a toggleable bet turned on for the come-out carries a white ON puck (the stack's label says "off" / "on for the come-out"). Odds stacks are drawn over flat stacks.
 
 Total stack at 390×844: app header 48px, status bar 56px (bankroll, point, last roll, history strip), table about 543px, control bar 120px (chip rack + Center tab + Roll). That is 767px, which fits.
 

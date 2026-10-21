@@ -94,6 +94,8 @@ export interface CheckResult {
   expected: string;
   /** the correct answer value (for choices: its id), so the input can mark it after a miss */
   correct?: BuiltinAnswer;
+  /** optional ordered detail shown under `explain` as a numbered list (e.g. options ranked) */
+  explainList?: readonly string[];
 }
 
 /** Props for a drill's custom answer input. Call `onAnswer` once; `disabled` after answering. */

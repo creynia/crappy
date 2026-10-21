@@ -37,6 +37,7 @@ import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './ro
 import { fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
+import { useDemoPlayback } from './useDemoPlayback';
 import { useGameCore } from './useGameCore';
 import { useGuidedSteps } from './useGuidedSteps';
 import { useLandscape } from './useLandscape';
@@ -114,11 +115,13 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
+  const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
     () => settingsRef.current.speed,
     pushToast,
     announce,
     (pre, post, events) => {
+      if (demoActive.current()) return; // a demo's scripted rolls are not the learner's rolls
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
     },
@@ -138,6 +141,20 @@ export function Simulator(props: SimulatorInternalProps) {
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
   const step = currentStep(scene, rt);
+  const demo = useDemoPlayback({
+    step,
+    stepIndex: rt.stepIndex,
+    done: rt.done,
+    coreRef,
+    setCore,
+    doAction,
+    getSpeed: () => settingsRef.current.speed,
+    announce,
+    clearAnimation: anim.clear,
+    skipAnimation: anim.skip,
+    animBusy: anim.busy,
+  });
+  demoActive.current = demo.isActive;
 
   // ---------- events + effects ----------
   useEffect(() => {
@@ -196,7 +213,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const lock = rollLock(scene, rt, liveGame);
 
   const roll = () => {
-    if (anim.busy || sheet || lock) return;
+    if (anim.busy || sheet || lock || demo.playing) return;
     doAction({ type: 'roll' });
   };
 
@@ -208,6 +225,7 @@ export function Simulator(props: SimulatorInternalProps) {
     if (opts?.rules) setScene(sc);
     const init = initScene(sc, { seed: guided ? 1 : randomSeed() });
     startedRef.current = -1;
+    demo.reset();
     startEquity.current = equity(init.game);
     setToasts([]);
     setLog([]);
@@ -301,8 +319,12 @@ export function Simulator(props: SimulatorInternalProps) {
     chipPhase: anim.chipPhase,
     rollingDice: anim.rolling,
     selectedRegion: sheet?.regionId ?? null,
-    onRegionTap: sh.onRegionTap,
-    onStackTap: sh.onStackTap,
+    onRegionTap: (...a: Parameters<typeof sh.onRegionTap>) => {
+      if (!demo.playing) sh.onRegionTap(...a);
+    },
+    onStackTap: (...a: Parameters<typeof sh.onStackTap>) => {
+      if (!demo.playing) sh.onStackTap(...a);
+    },
   };
   const session = equity(game) - startEquity.current;
 
@@ -315,7 +337,7 @@ export function Simulator(props: SimulatorInternalProps) {
       game={liveGame}
       onSelectChip={setChip}
       onRoll={roll}
-      rollDisabled={anim.busy || !!sheet || !!lock}
+      rollDisabled={anim.busy || !!sheet || !!lock || demo.playing}
       busy={anim.busy}
       lock={lock}
       view={view}
@@ -343,6 +365,18 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
+      onReplay={
+        step?.play && demo.canReplay && !demo.playing
+          ? () => {
+              demo.replay();
+              // the Replay button unmounts while the demo plays: keep keyboard focus in the step panel
+              rootRef.current
+                ?.querySelector<HTMLElement>('.sim-step')
+                ?.focus({ preventScroll: true });
+            }
+          : undefined
+      }
+      captions={step?.play ? demo.captions : undefined}
       resolve={resolverFor(game)}
     />
   );
@@ -378,14 +412,21 @@ export function Simulator(props: SimulatorInternalProps) {
       data-testid="simulator"
       data-mode={mode}
       onClickCapture={(e) => {
-        if (anim.playing()) {
+        if (demo.playing) {
+          e.preventDefault();
+          e.stopPropagation();
+          demo.skip();
+        } else if (anim.playing()) {
           e.preventDefault();
           e.stopPropagation();
           anim.skip();
         }
       }}
       onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
+        if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
+          e.preventDefault();
+          demo.skip();
+        } else if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
           e.preventDefault();
           anim.skip();
         }

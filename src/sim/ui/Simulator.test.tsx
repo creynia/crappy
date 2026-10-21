@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Simulator } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
+import { askFeedback } from './StepPanel';
 import { buildEvFacts } from './text';
 import { createGame, previewAction } from '../index';
 
@@ -276,5 +277,39 @@ describe('odds nudge', () => {
     fireEvent.click(rollBtn());
     await waitFor(() => expect(live(container)).toMatch(/\S/));
     expect(nudge()).toBeNull();
+  });
+});
+
+describe('ask step announcer', () => {
+  const scene: SceneConfig = {
+    id: 'ask',
+    version: 1,
+    bankroll: 10000,
+    allowedActions: ['roll'],
+    forcedDice: [[3, 4]],
+    steps: [
+      {
+        id: 'q',
+        text: 'Call it.',
+        ask: { q: 'What?', options: ['a', 'b'], answer: 1, explain: 'because' },
+        completeWhen: { all: [{ answered: 'correct' }, { rolls: 1 }] },
+      },
+      { id: 'end', text: 'End.', completeWhen: { acknowledged: true } },
+    ],
+  };
+  it('speaks the feedback through the single announcer and names the pick', async () => {
+    const events: SimulatorEvent[] = [];
+    render(<Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'a' }));
+    const announcer = screen.getByTestId('roll-announcer');
+    await waitFor(() => expect(announcer.textContent).toBe(askFeedback(scene.steps![0]!.ask!, 0)));
+    expect(announcer.textContent).toContain('You chose "a"');
+    expect(announcer.textContent).toContain('Not quite.');
+    fireEvent.click(screen.getByRole('button', { name: 'b' }));
+    await waitFor(() => expect(announcer.textContent).toBe(askFeedback(scene.steps![0]!.ask!, 1)));
+    expect(announcer.textContent).toContain('Now roll to check your call.');
+    expect(events.filter((e) => e.type === 'step-answered')).toHaveLength(2);
+    // focus moved on to the unlocked Roll button
+    await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
   });
 });

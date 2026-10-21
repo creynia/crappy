@@ -1,5 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
-import { watchPage } from './helpers';
+import { expect, test, type Page } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
 
@@ -9,8 +8,7 @@ async function bankroll(page: Page): Promise<number> {
 }
 
 test.describe('sandbox', () => {
-  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page }) => {
-    const guard = watchPage(page);
+  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page, guard }) => {
     await page.goto(url('seed=1&dice=3-4'));
     await page.locator('[data-region="pass"]').click();
     const sheet = page.getByRole('dialog');
@@ -40,8 +38,7 @@ test.describe('sandbox', () => {
     await expect(sheet.locator('.sim-oneroll')).toHaveCount(0);
   });
 
-  test('center prop needs Place anyway', async ({ page }) => {
-    const guard = watchPage(page);
+  test('center prop needs Place anyway', async ({ page, guard }) => {
     await page.goto(url());
     await page.getByRole('button', { name: 'Center' }).click();
     await page.locator('[data-region="any-7"]').click();
@@ -83,8 +80,7 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
-  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
-    const guard = watchPage(page);
+  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
@@ -94,41 +90,7 @@ test.describe('sandbox', () => {
     await guard.check('auto-roll-done');
   });
 
-  test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
-    const noHScroll = async (label: string) => {
-      const m = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
-        '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
-      );
-      expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
-    };
-    for (const { width, height } of [
-      { width: 360, height: 844 },
-      { width: 390, height: 844 },
-      { width: 412, height: 844 },
-      { width: 844, height: 390 },
-    ]) {
-      // single-strategy auto-roll in the sandbox
-      await page.setViewportSize({ width, height });
-      await page.goto('/#/play?speed=fast');
-      const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
-      if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
-      const panel = page.locator('.sim-auto');
-      await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
-      await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
-      await noHScroll(`auto-roll @${width}`);
-
-      // strategy compare run on a lesson scene (the 4-column summary table)
-      await page.goto('/#/learn/strategy-fun-per-dollar');
-      const scene = page.locator('section.scene').nth(0);
-      await scene.scrollIntoViewIfNeeded();
-      await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
-      await expect(scene.getByTestId('auto-roll-summary')).toBeVisible({ timeout: 15_000 });
-      await noHScroll(`compare @${width}`);
-    }
-  });
-
-  test('sandbox state persists across reload', async ({ page }) => {
-    const guard = watchPage(page);
+  test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();

@@ -1,8 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { watchPage } from './helpers';
+import { expect, test } from './helpers';
 
-test('app loads with the right title', async ({ page }) => {
-  const guard = watchPage(page);
+test('app loads with the right title', async ({ page, guard }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('crappy');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

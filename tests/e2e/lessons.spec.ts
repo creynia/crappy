@@ -1,5 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
-import { watchPage } from './helpers';
+import { expect, test, type Page } from './helpers';
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } }); // the app forces instant animations
 
@@ -19,8 +18,7 @@ test('home Continue leads to lesson 1', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page }) => {
-  const guard = watchPage(page);
+test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page, guard }) => {
   await page.goto('/#/learn/pass-line');
   const scene = await openScene(page, 0);
   const stepText = scene.locator('.sim-step-text');
@@ -61,8 +59,7 @@ test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page 
   await expect(q2.locator('legend')).toContainText('answered');
 });
 
-test('lesson 1: auto-roll scene completes its step', async ({ page }) => {
-  const guard = watchPage(page);
+test('lesson 1: auto-roll scene completes its step', async ({ page, guard }) => {
   await page.goto('/#/learn/dice-and-combinations');
   const scene = await openScene(page, 1);
   await scene.getByRole('button', { name: /^Auto-roll 600/ }).click();
@@ -70,8 +67,7 @@ test('lesson 1: auto-roll scene completes its step', async ({ page }) => {
   await guard.check('lesson-auto-roll-done');
 });
 
-test('lesson 20: compare runs all three strategies', async ({ page }) => {
-  const guard = watchPage(page);
+test('lesson 20: compare runs all three strategies', async ({ page, guard }) => {
   await page.goto('/#/learn/strategy-fun-per-dollar');
   const scene = await openScene(page, 0);
   await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
@@ -82,8 +78,7 @@ test('lesson 20: compare runs all three strategies', async ({ page }) => {
   await guard.check('lesson-compare-done');
 });
 
-test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ page }) => {
-  const guard = watchPage(page);
+test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ page, guard }) => {
   await page.goto('/#/learn/odds-bet');
   const scene = await openScene(page, 0);
   await scene.locator('[data-stack]').first().click();

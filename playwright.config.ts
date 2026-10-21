@@ -20,25 +20,13 @@ export default defineConfig({
     {
       name: 'phone-landscape',
       use: { ...devices['Pixel 7 landscape'] },
-      testMatch: /(sandbox|lessons|layout)\.spec\.ts/,
-    },
-    // Overflow guard widths (I047): narrow phones and the 844x390 landscape phone.
-    {
-      name: 'phone-360',
-      use: { ...devices['Pixel 7'], viewport: { width: 360, height: 780 } },
-      testMatch: /(sandbox|lessons|smoke)\.spec\.ts/,
+      testMatch: /(sandbox|lessons)\.spec\.ts/,
     },
     {
-      name: 'phone-390',
-      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
-      testMatch: /(sandbox|lessons|smoke)\.spec\.ts/,
+      name: 'desktop',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: [/visual\.spec\.ts/, /guard\.spec\.ts/],
     },
-    {
-      name: 'landscape-844',
-      use: { ...devices['Pixel 7 landscape'], viewport: { width: 844, height: 390 } },
-      testMatch: /(sandbox|lessons|layout)\.spec\.ts/,
-    },
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /visual\.spec\.ts/ },
     // Opt-in (VISUAL=1 or SCREENSHOTS=1) so pixel diffs never gate normal runs.
     ...(visual
       ? [

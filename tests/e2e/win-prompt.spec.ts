@@ -155,7 +155,7 @@ test.describe('win prompt', () => {
     await expect(prompt).toHaveCount(0);
   });
 
-  test('the win prompt replaces the odds nudge, which comes back after the choice', async ({
+  test('the odds nudge is gone by the time the win prompt shows, and stays gone', async ({
     page,
   }, info) => {
     test.skip(info.project.name === 'desktop', 'covered on phone sizes');
@@ -168,9 +168,10 @@ test.describe('win prompt', () => {
     await page.getByRole('button', { name: /^Roll/ }).click(); // 3-3: the 6 hits
     const prompt = page.getByTestId('win-prompt');
     await expect(prompt).toBeVisible();
-    await expect(hint).toBeHidden(); // one message at a time
+    // the nudge is not sticky: the roll took it away, so the prompt is the only message
+    await expect(hint).toHaveCount(0);
     await prompt.getByRole('button', { name: /^Same bet/ }).click();
     await expect(prompt).toHaveCount(0);
-    await expect(hint).toBeVisible();
+    await expect(hint).toHaveCount(0);
   });
 });

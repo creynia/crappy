@@ -227,12 +227,19 @@ export function Simulator(props: SimulatorInternalProps) {
   // Computed from the state after the roll has finished animating.
   const oddsNow =
     ui.hints === true && !hideOddsHint && !panels.auto && !anim.busy ? oddsRoom(liveGame) : null;
+  // the nudge is not sticky: the next roll takes it away (its own toast then shows as usual);
+  // "Don't show again" is the permanent opt-out
+  const oddsHintRoll = useRef(0);
+  useEffect(() => {
+    if (oddsHint && liveGame.rollCount > oddsHintRoll.current) setOddsHint(null);
+  }, [liveGame.rollCount]);
   useEffect(() => {
     if (rollSeq === 0) return;
     const roll = rollTextRef.current;
     rollTextRef.current = '';
     if (oddsNow && !oddsShownOnce.current) {
       oddsShownOnce.current = true;
+      oddsHintRoll.current = liveGame.rollCount;
       setOddsHint(oddsNow);
       announce(`${roll} ${oddsHintText(oddsNow)}`);
     } else announce(roll);

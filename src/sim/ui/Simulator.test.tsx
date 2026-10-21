@@ -265,6 +265,24 @@ describe('odds nudge', () => {
     expect(nudge()).toBeNull();
   });
 
+  it('is not sticky: the next roll takes it away and that roll shows its own toast', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(nudge()).not.toBeNull());
+    fireEvent.click(rollBtn()); // 2-2
+    await waitFor(() => expect(nudge()).toBeNull());
+    await waitFor(() =>
+      expect(container.querySelector('.sim-toasts')!.textContent).toMatch(/4|Hard 4|2 and 2/),
+    );
+  });
+
   it('"Don\'t show again" persists across a remount', async () => {
     const first = render(
       <Simulator

@@ -25,11 +25,6 @@ win, lose or stay (dealer-style). Builds table fluency.
 A small planner: pick bankroll, unit, strategy and session length, and see
 expected loss, risk of ruin and a suggested stop-loss before you play.
 
-### Combined edge with two Come bets
-`combinedEdge` in `src/sim/ui/text.ts` falls back to the first Come bet when the
-sheet manages a Come bet via `set-amount`; use the bet being managed so the max
-odds multiple comes from the right point.
-
 ### Contract-bet sheet wording
 For a Pass/Come bet already on a point, the sheet shows "Expected loss: $0.00".
 Show the bet's current (positive) value instead, or hide the loss line.
@@ -43,4 +38,4 @@ stacked card layout.
 
 ## Done
 
-_(nothing yet)_
+- Combined edge with two Come bets (PR #18): `combinedEdge` uses the managed bet (`betId` / `parentId`) for every lookup, so set-amount and odds on the second Come bet no longer fall back to the first.

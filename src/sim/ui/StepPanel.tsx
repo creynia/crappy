@@ -45,9 +45,8 @@ export function StepPanel(p: StepPanelProps) {
           </button>
         ) : null}
       </div>
-      <p class="sim-step-text" role="status" aria-live="polite">
-        {renderLite(p.step.text)}
-      </p>
+      {/* not a live region: the simulator has one announcer (roll results); see Simulator.tsx */}
+      <p class="sim-step-text">{renderLite(p.step.text)}</p>
       {p.hintVisible && p.step.hint ? (
         <p class="sim-step-hint" role="note">
           Hint: {renderLite(p.step.hint)}

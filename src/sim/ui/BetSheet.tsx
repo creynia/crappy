@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
-import type { Action, BetTypeId, Cents } from '../engine/types';
+import type { Action, BetTypeId, Cents, Dice } from '../engine/types';
+import { HopPicker } from './HopPicker';
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
 import { DiceGrid } from './DiceGrid';
@@ -54,6 +55,8 @@ export interface BetSheetProps {
   contract?: { reason: string; onAddOdds?: () => void };
   onConfirm: () => void;
   onCancel: () => void;
+  /** Hop bets (I035): the chosen pair and its picker (shown for a new hop only). */
+  hop?: { value: Dice; onChange: (d: Dice) => void };
 }
 
 const FOCUSABLE =
@@ -85,7 +88,7 @@ export function BetSheet(p: BetSheetProps) {
   const removeNeedsSecondTap =
     !!p.removePreview && normalizeTier(p.removePreview.tier) === 'avoid' && confirmSucker;
   const [removeArmed, setRemoveArmed] = useState(false);
-  const sig = `${p.selectedType}|${amount}|${preview.action.type}`;
+  const sig = `${p.selectedType}|${amount}|${preview.action.type}|${p.hop?.value.join('-') ?? ''}`;
 
   useEffect(() => {
     setArmed(false);
@@ -189,6 +192,10 @@ export function BetSheet(p: BetSheetProps) {
               </button>
             ))}
           </div>
+        ) : null}
+
+        {p.hop && mode === 'new' ? (
+          <HopPicker value={p.hop.value} onChange={p.hop.onChange} />
         ) : null}
 
         <div class="sim-stepper">

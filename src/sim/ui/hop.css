@@ -1,0 +1,49 @@
+/* Hop pair picker (I035): 21 cells, the upper triangle of a 6 x 6 grid. */
+.sim-hop-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(44px, 1fr));
+  gap: 4px;
+}
+.sim-sheet .sim-hop-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px;
+  line-height: 1.1;
+}
+.sim-hop-pair {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sim-hop-pays {
+  font-size: 0.72rem;
+  color: var(--sim-muted);
+}
+.sim-sheet .sim-hop-cell.is-hard {
+  border-style: dashed;
+}
+.sim-sheet .sim-hop-cell.is-selected {
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  border-color: var(--sim-accent);
+}
+.sim-hop-cell.is-selected .sim-hop-pays {
+  color: inherit;
+}
+.sim-hop-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--sim-muted);
+}
+/* Landscape side panel: the 21 cells as 3 rows of 7 (reading order, no triangle) so the
+   stepper and the EV text stay near the top of a 390px-tall panel. */
+.sim-sheet-panel .sim-hop-grid {
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
+}
+.sim-sheet-panel .sim-hop-gap {
+  display: none;
+}

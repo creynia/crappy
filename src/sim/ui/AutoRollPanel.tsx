@@ -205,10 +205,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
   const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
   const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
-  useEffect(
-    () => writeStoredBankroll(props.persistKey, bankrollPick),
-    [bankrollPick, props.persistKey],
-  );
   const [rolls, setRolls] = useState<number>(rollOptions.includes(100) ? 100 : rollOptions[0]!);
   const [custom, setCustom] = useState('');
   const [sessions, setSessions] = useState<number>(sessionOptions[0] ?? 1);
@@ -232,6 +228,14 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   // Below the table minimum the Table chip is disabled and the run uses $500 instead of blocking.
   const bankroll =
     bankrollPick === 'table' ? (tableTooSmall ? 50_000 : tableBankroll) : bankrollPick;
+  // Below the table minimum the run starts at $500 and the $500 chip shows pressed.
+  useEffect(() => {
+    if (tableTooSmall && bankrollPick === 'table') setBankrollPick(50_000);
+  }, [tableTooSmall, bankrollPick]);
+  // A fallback to $500 is not the learner's choice, so it is not remembered.
+  useEffect(() => {
+    if (!tableTooSmall) writeStoredBankroll(props.persistKey, bankrollPick);
+  }, [bankrollPick, tableTooSmall, props.persistKey]);
   useEffect(() => {
     if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
   }, [bankroll, stopLoss]);
@@ -256,10 +260,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
-    if (bankrollError) {
-      setError(bankrollError);
-      return;
-    }
+    if (bankrollError) return;
     if (stopLoss !== undefined && stopLoss > bankroll) {
       setError(
         'Stop if down is more than the starting bankroll. Pick a smaller stop or a larger bankroll.',
@@ -564,8 +565,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               }}
             />
           </label>
+          {tableTooSmall ? (
+            <p class="sim-ar-desc">
+              Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
           {bankrollError ? (
-            <p id="bankroll-error" role="alert">
+            <p id="bankroll-error" role="alert" class="sim-invalid">
               {bankrollError}
             </p>
           ) : null}

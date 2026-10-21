@@ -131,6 +131,16 @@ describe('autoRoll.bankroll', () => {
     expect(bad.ok).toBe(false);
     if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
   });
+  it('uses the scene table minimum for the bankroll floor', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      rules: { tableMin: 1000 },
+      autoRoll: { enabled: true, bankroll: 500 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
   it('checks stopLoss against the auto-roll bankroll, not only the scene bankroll', () => {
     const bad = validateScene({
       id: 'x',

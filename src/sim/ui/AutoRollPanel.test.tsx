@@ -272,7 +272,16 @@ describe('AutoRollPanel bankroll controls', () => {
   it('a scene with no table equity still runs: Table is disabled and the run uses $500', async () => {
     const el = document.createElement('div');
     render(<AutoRollPanel initialSeed={7} bankroll={0} config={config} />, el);
+    await waitUntil(() =>
+      btn(group(el, 'Starting bankroll'), '$500').getAttribute('aria-pressed') === 'true'
+        ? true
+        : null,
+    );
     expect(btn(group(el, 'Starting bankroll'), 'Table ($0.00)').disabled).toBe(true);
+    expect(btn(group(el, 'Starting bankroll'), 'Table ($0.00)').getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+    expect(el.textContent).toContain('Table has $0.00, so runs start at $500.');
     await click(el, '[data-testid="auto-roll-run"]');
     await waitUntil(() => el.querySelector('[data-testid="auto-roll-output"]'));
     expect(el.querySelector('[role="alert"]')).toBeNull();

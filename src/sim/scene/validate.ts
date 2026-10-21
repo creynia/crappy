@@ -1,6 +1,6 @@
 import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
-import { RULE_PRESETS } from '../engine/rules';
+import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
 import type { SceneConfig } from './types';
 
@@ -442,11 +442,20 @@ export function validateScene(
         if (typeof v === 'number' && !stopAmounts.includes(v))
           c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
       }
-      // Same range as the panel's custom input: at least the default $5 table minimum, at most $1,000,000.
+      // The panel's custom input uses the scene's own table minimum, capped at $1,000,000.
+      let tableMin = 500;
+      try {
+        tableMin = resolveRules(s.rules as Parameters<typeof resolveRules>[0]).tableMin;
+      } catch {
+        /* invalid rules are reported elsewhere; keep the default minimum */
+      }
       const startBankroll = a.bankroll !== undefined ? a.bankroll : s.bankroll;
       if (a.bankroll !== undefined) {
-        if (!isInt(a.bankroll) || a.bankroll < 500 || a.bankroll > 100_000_000)
-          c.err('autoRoll.bankroll', 'must be integer cents from $5 to $1,000,000');
+        if (!isInt(a.bankroll) || a.bankroll < tableMin || a.bankroll > 100_000_000)
+          c.err(
+            'autoRoll.bankroll',
+            `must be integer cents from ${tableMin} (the table minimum) to $1,000,000`,
+          );
       }
       if (
         typeof a.stopLoss === 'number' &&

@@ -50,6 +50,8 @@ export interface Strategy {
   name: string;
   lens: StrategyLens;
   description: string;
+  /** Bet size grows with losses (martingale): per-dollar statistics that assume steady bets, like the edge chart's funnel, do not apply. */
+  escalating?: boolean;
   /** Actions to take before the next roll so the layout matches the strategy. Must return only legal actions. */
   decide(state: GameState, spec: StrategySpec): Action[];
 }
@@ -74,6 +76,8 @@ export interface SessionResult {
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss
+  /** Cumulative total wagered (cents) after each roll; [0] = 0. Same length as `equity`. */
+  wagered: Float64Array;
   finalEquity: Cents;
   totalWagered: Cents;
   expectedLoss: number;

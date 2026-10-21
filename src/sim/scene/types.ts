@@ -53,6 +53,8 @@ export interface SceneConfig {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** chart a single session opens with: bankroll (default) or result per dollar wagered */
+    chart?: 'bankroll' | 'edge';
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
     /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */

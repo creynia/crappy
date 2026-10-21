@@ -11,6 +11,7 @@ import { fmtMoney } from './text';
 export interface Panels {
   auto: boolean;
   session: boolean;
+  log: boolean;
   menu: boolean;
 }
 
@@ -94,6 +95,14 @@ export function SimControls(p: SimControlsProps) {
           onClick={() => p.onToggle('session')}
         >
           Session
+        </button>
+        <button
+          type="button"
+          class="sim-tab"
+          aria-expanded={p.panels.log}
+          onClick={() => p.onToggle('log')}
+        >
+          Log
         </button>
         {p.showMenu ? (
           <button

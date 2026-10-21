@@ -2,7 +2,7 @@ import type { GameEvent } from '../engine/types';
 
 export type Speed = 'normal' | 'fast' | 'instant';
 
-export type StepKind = 'dice' | 'puck' | 'lose' | 'win' | 'push';
+export type StepKind = 'dice' | 'puck' | 'travel' | 'lose' | 'win' | 'push';
 export interface TimelineStep {
   kind: StepKind;
   /** ms from the start of the timeline */
@@ -16,8 +16,8 @@ export interface Timeline {
 }
 
 const DUR: Record<Exclude<Speed, 'instant'>, Record<StepKind, number>> = {
-  normal: { dice: 650, puck: 100, lose: 150, win: 200, push: 100 },
-  fast: { dice: 250, puck: 60, lose: 80, win: 100, push: 60 },
+  normal: { dice: 650, puck: 100, travel: 200, lose: 150, win: 200, push: 100 },
+  fast: { dice: 250, puck: 60, travel: 80, lose: 80, win: 100, push: 60 },
 };
 const TOAST_MS: Record<Speed, number> = { normal: 2500, fast: 1500, instant: 2500 };
 
@@ -58,6 +58,8 @@ export function buildAnimationQueue(events: readonly GameEvent[], speed: Speed):
         (e) => e.type === 'point-established' || e.type === 'point-made' || e.type === 'seven-out',
       ),
     ],
+    // come / don't-come chips move to their number before anything is paid or swept
+    ['travel', events.filter((e) => e.type === 'bet-travelled')],
     ['lose', events.filter((e) => e.type === 'bet-lost')],
     ['win', events.filter((e) => e.type === 'bet-won')],
     ['push', events.filter((e) => e.type === 'bet-pushed' || e.type === 'bet-returned')],

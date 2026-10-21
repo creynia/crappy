@@ -96,17 +96,24 @@ export interface ActionMatcher {
   hop?: Dice;
 }
 
+/** Outcome of a resolved bet, for `betResolved` (sugar over the bet-won / bet-lost / bet-pushed events). */
+export type BetResult = 'won' | 'lost' | 'pushed';
+
 export type Condition =
   | { all: Condition[] }
   | { any: Condition[] }
+  | { not: Condition }
   | { action: ActionMatcher; count?: number }
   | { event: GameEvent['type']; betType?: BetTypeId; count?: number }
   | { rolls: number }
   | { phase: Phase }
   | { point: PointNumber | null }
-  | { betOnTable: { type: BetTypeId; minAmount?: Cents } }
+  | { betOnTable: { type: BetTypeId; minAmount?: Cents; point?: PointNumber } }
+  | { betResolved: { type: BetTypeId; result?: BetResult } }
   | { bankrollAtLeast: Cents }
   | { bankrollAtMost: Cents }
+  | { equityAtLeast: Cents }
+  | { equityAtMost: Cents }
   | { previewed: BetTypeId }
   | { autoRollCompleted: { minRolls?: number; oddsMultiple?: number | 'default' } }
   | { acknowledged: true };

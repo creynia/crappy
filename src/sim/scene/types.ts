@@ -13,6 +13,15 @@ import type {
 import type { BetInit } from '../engine/game';
 import type { StrategyId, StrategySpec } from '../strategy/types';
 
+/** A labelled pointer at a table region (or at the region of a bet type), shown with a leader line. */
+export interface Callout {
+  /** a table region id (see REGION_IDS in ui/layouts/types.ts), or the region of a bet type */
+  target: string | { betType: BetTypeId };
+  text: string;
+  /** default 'above'; flips when there is no room */
+  placement?: 'above' | 'below';
+}
+
 export interface SceneConfig {
   id: string;
   version: 1;
@@ -28,6 +37,7 @@ export interface SceneConfig {
   allowedBets?: BetTypeId[] | 'all';
   allowedActions?: ActionType[];
   highlightedBets?: BetTypeId[];
+  callouts?: Callout[];
   showEV?: boolean;
   evDetail?: 'basic' | 'full';
   whyOpen?: boolean;
@@ -43,6 +53,10 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** hide the step panel's Restart (default shown); a challenge keeps its seed */
+    showRestart?: boolean;
+    /** accessible name of the step panel (default "Lesson step") */
+    stepPanelLabel?: string;
   };
   autoRoll?: {
     enabled: boolean;
@@ -55,6 +69,8 @@ export interface SceneConfig {
     chart?: 'bankroll' | 'edge';
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** open on the sortable all-presets comparison table */
+    table?: boolean;
     /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */
@@ -63,8 +79,21 @@ export interface SceneConfig {
     bankroll?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
+    /** show a lab tool instead of the run form: 'streaks' = the gambler's-fallacy streak lab */
+    lab?: 'streaks';
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: { rolls: number; scoring: { minResolved: Cents } };
+}
+
+/** One scripted action of a demo step, played by the runner with an optional caption. */
+export interface PlayFrame {
+  action: Action;
+  /** caption shown as a toast while this action plays */
+  say?: string;
+  /** ms to wait before the next frame (default depends on speed; 0 at instant speed) */
+  pauseMs?: number;
 }
 
 export interface SceneStep {
@@ -83,12 +112,20 @@ export interface SceneStep {
   allowedBets?: BetTypeId[] | 'all';
   allowedActions?: ActionType[];
   highlightedBets?: BetTypeId[];
+  /** replaces the scene-level callouts for this step ([] = none) */
+  callouts?: Callout[];
   expect?: ActionMatcher[];
   /** An in-sim question. With mode 'before-roll' (default) Roll stays locked until it is answered. */
   ask?: StepAsk;
   completeWhen: Condition;
   advance?: 'auto' | 'button';
   showEV?: boolean;
+  /**
+   * Demo: when the step starts, these actions are played one at a time (bets, rolls with forced dice)
+   * with captions, then control is handed back. The learner can Replay or tap to skip to the end.
+   * Scripted actions skip the step's allowed-action gate but are counted toward `completeWhen`.
+   */
+  play?: PlayFrame[];
 }
 
 export interface StepAsk {

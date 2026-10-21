@@ -26,16 +26,16 @@ function withBoxes(
   // numeral, place/buy (and lay, sharing the buy spot) a bottom row clear of the "PAYS ..." line and the
   // border. There is no don't side here, so the dc-point spot is unused.
   const numbered = boxes.map(([n, rect]): RegionDef => {
-    const b = numberBox(n, rect);
+    const b = numberBox(n, rect, Math.round(base.chipRadius * chipScale));
     const at = (fx: number, fy: number) => ({ x: rect.x + rect.w * fx, y: rect.y + rect.h * fy });
     return {
       ...b,
       chipSpots: {
-        'come-point': at(0.3, 0.14),
-        odds: at(0.72, 0.14),
-        main: at(0.3, 0.8),
-        buy: at(0.7, 0.8),
-        lay: at(0.7, 0.8),
+        'come-point': at(0.28, 0.22),
+        odds: at(0.72, 0.22),
+        main: at(0.28, 0.8),
+        buy: at(0.72, 0.8),
+        lay: at(0.72, 0.8),
       },
     };
   });

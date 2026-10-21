@@ -42,15 +42,38 @@ function boxBetTypes(n: PointNumber): BetTypeId[] {
   return t;
 }
 
-/** A number box with chip spots placed relative to its rect (see simulator.md section 3.2). */
-export function numberBox(n: PointNumber, rect: Rect): RegionDef {
+/**
+ * Odds sit offset on their flat bet, in chip radii. Come odds go up and to the right, far enough
+ * that both amount badges show and a tap on the flat's centre still hits the flat. Lay odds on a
+ * don't-come bet go beside it (the top bar has no room above).
+ */
+export const ODDS_OFFSET = { dx: 1.35, dy: -0.9 } as const;
+export const DC_ODDS_OFFSET = { dx: 1.75, dy: 0 } as const;
+/** Height of the shaded top bar (don't come), as a fraction of the box height. */
+export const BOX_BAR = 0.27;
+/** How far a full stack (5 chips) rises above its spot, in viewBox units. */
+export const STACK_RISE = 24;
+
+/**
+ * A number box with chip spots placed where a dealer puts them (simulator.md section 3.2).
+ * `r` is the layout's chip radius. Horizontal positions scale with the box width (k).
+ * - top bar, left: travelled don't-come chips, with their lay odds beside them;
+ * - right, under the puck: lay bets (with a LAY button);
+ * - come-point area, left middle: travelled come bets, with come odds offset on the flat;
+ * - bottom (y + 80%): place bets on the left, buy bets on the right (with a BUY button).
+ */
+export function numberBox(n: PointNumber, rect: Rect, r: number): RegionDef {
   const { x, y, w, h } = rect;
   const k = w / 280; // horizontal scale relative to the portrait box
+  // a full stack on the top bar stays inside the box
+  const dc = { x: x + 44 * k, y: y + r + STACK_RISE + 4 };
+  const come = { x: x + 44 * k, y: y + h * 0.56 };
   const spots: Partial<Record<ChipSpotKey, { x: number; y: number }>> = {
-    'dc-point': { x: x + 62 * k, y: y + h * 0.14 },
-    lay: { x: x + 135 * k, y: y + h * 0.14 },
-    'come-point': { x: x + 44 * k, y: y + h * 0.5 },
-    odds: { x: x + w - 44 * k, y: y + h * 0.5 },
+    'dc-point': dc,
+    'dc-odds': { x: dc.x + DC_ODDS_OFFSET.dx * r, y: dc.y + DC_ODDS_OFFSET.dy * r },
+    lay: { x: x + w - 44 * k, y: y + h * 0.54 },
+    'come-point': come,
+    odds: { x: come.x + ODDS_OFFSET.dx * r, y: come.y + ODDS_OFFSET.dy * r },
     main: { x: x + w * 0.3, y: y + h * 0.8 },
     buy: { x: x + w * 0.7, y: y + h * 0.8 },
   };

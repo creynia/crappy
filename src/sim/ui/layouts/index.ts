@@ -78,10 +78,7 @@ export function spotPosition(region: RegionDef, type: string): Point2 {
   if (type === 'come-odds') {
     return s.odds ?? fallback;
   }
-  if (type === 'dont-come-odds') {
-    const b = s['dc-point'] ?? fallback;
-    return { x: b.x + 26, y: b.y + 30 };
-  }
+  if (type === 'dont-come-odds') return s['dc-odds'] ?? s['dc-point'] ?? fallback;
   if (type === 'pass-odds' || type === 'dont-pass-odds') return s.odds ?? s.main ?? fallback;
   if (type === 'come')
     return region.id.startsWith('box-') ? (s['come-point'] ?? fallback) : (s.main ?? fallback);

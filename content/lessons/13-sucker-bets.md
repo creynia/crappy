@@ -42,7 +42,7 @@ Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% o
 
 They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy. In the simulator the Fire Bet shows the red **Sucker bet** tier; All, Tall and Small land in the orange **Costly** tier (between 5% and 9%), which is cheaper than any one-roll prop but still far from the line bets.
 
-**Crapless craps** is a whole table that looks friendlier: the Pass Line can't lose on the come-out. A 7 still wins, but 2, 3, 11 and 12 become points instead of craps. There is no Don't side, and you can place the 2, 3, 11 and 12.
+**Crapless craps** is a whole table that looks friendlier: the Pass Line can't lose on the come-out. A 7 still wins, but 2, 3, 11 and 12 become points instead of craps. There is no Don't side, and you can place the 2, 3, 11 and 12 (but not buy or lay them).
 
 | Bet | Pays | House edge |
 |---|---|---|

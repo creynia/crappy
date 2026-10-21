@@ -342,11 +342,46 @@
 }
 
 /* ---------- toasts ---------- */
+/* An overlay, never part of the page flow: showing or dismissing a toast must not move anything, and
+   it must never sit on a betting region. Portrait: just above the felt, over the status row (bankroll
+   and last dice, which nothing taps). Landscape (`.sim-land`, chosen in code): over the status block
+   in the side rail, below any lesson step card. Positioned against the felt body, not the viewport, so it never
+   lands on the app header or the tab bar. */
 .sim-toasts {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   pointer-events: none;
+}
+.sim-status-wrap {
+  position: relative;
+}
+.sim-land .sim-toasts {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: auto;
+  gap: 2px;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-land .sim-toast > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.sim-land .sim-toast {
+  font-size: 0.75rem;
+  line-height: 1.15;
+  padding: 2px 6px 2px 8px;
 }
 .sim-toast {
   pointer-events: auto;
@@ -354,13 +389,16 @@
   gap: 8px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 10px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
   border-left: 6px solid var(--sim-muted);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  touch-action: pan-y; /* horizontal swipes dismiss; vertical ones still scroll the page */
+  will-change: transform, opacity;
 }
 .sim-toast-win {
   border-left-color: var(--sim-win);
@@ -371,7 +409,7 @@
 .sim-toast-x {
   min-width: 44px;
   min-height: 44px;
-  margin: -8px -12px -8px 0;
+  margin: -8px -8px -8px 0;
   border: 0;
   background: none;
   color: inherit;
@@ -1058,4 +1096,103 @@
 .sim-luck-ticks span {
   position: absolute;
   transform: translateX(-50%);
+}
+
+/* ---------- Scene callouts (I015): labelled pointers at table regions ---------- */
+.sim-callouts {
+  pointer-events: none;
+}
+.sim-callout-box {
+  fill: #fffbea;
+  stroke: var(--gold, #f5c542);
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
+}
+.sim-callout-text {
+  fill: #1d2b22;
+  font-weight: 600;
+}
+.sim-callout-line {
+  stroke: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-callout-dot {
+  fill: var(--gold, #f5c542);
+}
+
+/* Streak lab */
+.sim-streak-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 8px 0;
+}
+.sim-streak-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+.sim-streak-form select,
+.sim-streak-form input {
+  min-height: 44px;
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+}
+.sim-streak-form input {
+  width: 5rem;
+}
+.sim-streak-list {
+  margin: 0 0 8px;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+}
+.sim-demo-captions {
+  margin: 4px 0;
+  padding-left: 1.3rem;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 2px;
+}
+.sim-step .sim-replay {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
+.sim-calls {
+  pointer-events: none;
+}
+.sim-stack-target {
+  fill: transparent;
+}
+.sim-call rect {
+  fill: #fff;
+  stroke: #1d2b22;
+  stroke-width: 2;
+}
+.sim-call text {
+  fill: #1d2b22;
+  font-weight: 700;
+}
+.sim-call.is-selected rect {
+  fill: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-call.is-right rect {
+  fill: var(--sim-win, #2f9e44);
+  stroke: #fff;
+}
+.sim-call.is-wrong rect {
+  fill: var(--sim-loss, #c92a2a);
+  stroke: #fff;
+}
+.sim-call.is-right text,
+.sim-call.is-wrong text {
+  fill: #fff;
 }

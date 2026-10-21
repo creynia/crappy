@@ -191,3 +191,62 @@
 .pr-missed li {
   margin: 0.4rem 0;
 }
+/* ranked feedback (best move): the rank is in the text, so ties can share a number */
+.pr-explain-list {
+  list-style: none;
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+/* ---------- Call the bet ---------- */
+.pr-call {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-table {
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+.pr-call .sim-stack-hit {
+  cursor: pointer;
+}
+.pr-call-sel {
+  margin: 0;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+.pr-choice.is-picked {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+.pr-call-check {
+  justify-self: start;
+}
+.pr-call-why {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.pr-call-why li.wrong {
+  color: var(--bad);
+  font-weight: 600;
+}
+.pr-call-tables {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-side {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+/* wide landscape: felt on the left, the call buttons beside it */
+.pr-call.is-wide {
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr);
+  align-items: start;
+}
+.pr-call.is-wide .pr-call-table {
+  max-width: none;
+}

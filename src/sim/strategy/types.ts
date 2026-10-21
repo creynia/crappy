@@ -130,6 +130,8 @@ export interface StrategyMetrics {
   edgeOnAction: number;
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
+  /** Dollars on the table on average in the steady layout (flat bets and odds). */
+  avgAction: number;
   /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
   approximate?: boolean;
   /** True when the rules don't offer a bet the strategy makes (crapless: no don't side): no edge to show. */

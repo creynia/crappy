@@ -2,8 +2,11 @@ import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import type { RulePresetId } from '../engine/types';
+import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
+import { runScript, stageFor } from './runner';
 import { answeredRequirements } from './conditions';
+import { BET_TYPES_WITHOUT_REGION, REGION_IDS } from '../ui/layouts/types';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -71,6 +74,30 @@ class Ctx {
   bet(path: string, v: unknown) {
     if (!isBetTypeId(v)) this.err(path, `unknown bet type id ${JSON.stringify(v)}`);
   }
+  callouts(path: string, v: unknown) {
+    if (!Array.isArray(v)) return this.err(path, 'must be an array of callouts');
+    v.forEach((c: unknown, i) => {
+      const p = `${path}[${i}]`;
+      if (!isObj(c)) return this.err(p, 'must be an object');
+      this.keys(p, c, ['target', 'text', 'placement']);
+      const t = c.target;
+      if (typeof t === 'string') {
+        if (!(REGION_IDS as readonly string[]).includes(t))
+          this.err(`${p}.target`, `unknown table region "${t}"`);
+      } else if (isObj(t)) {
+        this.keys(`${p}.target`, t, ['betType']);
+        this.bet(`${p}.target.betType`, t.betType);
+        if ((BET_TYPES_WITHOUT_REGION as readonly unknown[]).includes(t.betType))
+          this.err(
+            `${p}.target.betType`,
+            `${String(t.betType)} has no fixed table region; target a number box instead, e.g. "box-6"`,
+          );
+      } else this.err(`${p}.target`, 'must be a region id or { betType }');
+      this.str(`${p}.text`, c.text);
+      if (c.placement !== undefined && c.placement !== 'above' && c.placement !== 'below')
+        this.err(`${p}.placement`, 'must be "above" or "below"');
+    });
+  }
   betList(path: string, v: unknown, allowAll = true) {
     if (v === 'all' && allowAll) return;
     if (!Array.isArray(v))
@@ -98,6 +125,29 @@ class Ctx {
     v.forEach((a, i) => {
       if (!ACTION_TYPES.includes(a as string))
         this.err(`${path}[${i}]`, `unknown action type ${JSON.stringify(a)}`);
+    });
+  }
+  playFrames(path: string, v: unknown) {
+    if (!Array.isArray(v) || v.length === 0 || v.length > 30)
+      return this.err(path, 'must be an array of 1-30 frames');
+    v.forEach((f: unknown, i) => {
+      const p = `${path}[${i}]`;
+      if (!isObj(f)) return this.err(p, 'must be an object');
+      this.keys(p, f, ['action', 'say', 'pauseMs']);
+      if (f.say !== undefined) this.str(`${p}.say`, f.say);
+      if (f.pauseMs !== undefined && !(isInt(f.pauseMs) && f.pauseMs >= 0 && f.pauseMs <= 10_000))
+        this.err(`${p}.pauseMs`, 'must be an integer 0-10000');
+      const a = f.action;
+      if (!isObj(a) || !ACTION_TYPES.includes(a.type as string))
+        return this.err(`${p}.action`, 'must be an action with a known type');
+      if (a.type === 'place-bet') {
+        if (!isBetTypeId(a.betType)) this.err(`${p}.action.betType`, 'unknown bet type');
+        this.cents(`${p}.action.amount`, a.amount, { min: 1 });
+      } else if (a.type === 'roll') {
+        // a scripted roll must be forced, or the demo would differ on every replay
+        if (!isDicePair(a.dice))
+          this.err(`${p}.action.dice`, 'a scripted roll needs dice: a pair, each an integer 1-6');
+      } else if (typeof a.betId !== 'string') this.err(`${p}.action.betId`, 'must be a bet id');
     });
   }
   phase(path: string, v: unknown) {
@@ -335,6 +385,8 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'callouts',
+  'challenge',
 ];
 const STEP_KEYS = [
   'id',
@@ -350,7 +402,9 @@ const STEP_KEYS = [
   'completeWhen',
   'advance',
   'showEV',
+  'play',
   'ask',
+  'callouts',
 ];
 
 /** Strict scene validation: canonical ids, integer cents, dice 1-6, shapes, and engine-backed bet checks. */
@@ -406,6 +460,7 @@ export function validateScene(
   if (s.allowedBets !== undefined) c.betList('allowedBets', s.allowedBets);
   if (s.allowedActions !== undefined) c.actions('allowedActions', s.allowedActions);
   if (s.highlightedBets !== undefined) c.betList('highlightedBets', s.highlightedBets, false);
+  if (s.callouts !== undefined) c.callouts('callouts', s.callouts);
   if (s.showEV !== undefined) c.bool('showEV', s.showEV);
   if (s.evDetail !== undefined && s.evDetail !== 'basic' && s.evDetail !== 'full')
     c.err('evDetail', 'must be basic or full');
@@ -427,6 +482,8 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'showRestart',
+        'stepPanelLabel',
       ]);
       if (
         u.orientation !== undefined &&
@@ -448,8 +505,10 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
+      if (u.stepPanelLabel !== undefined) c.str('ui.stepPanelLabel', u.stepPanelLabel);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))
         c.err('ui.speed', 'must be normal, fast or instant');
     }
@@ -468,11 +527,13 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'table',
         'chart',
         'stopWin',
         'stopLoss',
         'bankroll',
         'sweep',
+        'lab',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -500,6 +561,7 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.table !== undefined) c.bool('autoRoll.table', a.table);
       if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
         c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       // The panel offers these amounts as chips, so a scene can only pick one of them.
@@ -539,6 +601,7 @@ export function validateScene(
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');
         else a.compare.forEach((x, i) => c.strategySpec(`autoRoll.compare[${i}]`, x));
       }
+      if (a.lab !== undefined && a.lab !== 'streaks') c.err('autoRoll.lab', 'must be "streaks"');
       if (a.sweep !== undefined) {
         const w = a.sweep;
         if (!isObj(w)) c.err('autoRoll.sweep', 'must be an object');
@@ -560,6 +623,19 @@ export function validateScene(
     }
   }
 
+  if (s.challenge !== undefined) {
+    if (!isObj(s.challenge)) c.err('challenge', 'must be an object');
+    else {
+      c.keys('challenge', s.challenge, ['rolls', 'scoring']);
+      if (!(isInt(s.challenge.rolls) && s.challenge.rolls >= 1))
+        c.err('challenge.rolls', 'must be a positive integer');
+      if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
+      else {
+        c.keys('challenge.scoring', s.challenge.scoring, ['minResolved']);
+        c.cents('challenge.scoring.minResolved', s.challenge.scoring.minResolved);
+      }
+    }
+  }
   if (s.steps !== undefined) {
     if (!Array.isArray(s.steps) || s.steps.length === 0)
       c.err('steps', 'must be a non-empty array');
@@ -577,11 +653,19 @@ export function validateScene(
         c.str(`${p}.text`, st.text);
         if (st.hint !== undefined) c.str(`${p}.hint`, st.hint);
         if (st.math !== undefined) c.str(`${p}.math`, st.math);
+        for (const [field, value] of [
+          ['text', st.text],
+          ['hint', st.hint],
+          ['math', st.math],
+        ] as const)
+          if (typeof value === 'string')
+            for (const msg of tokenProblems(value)) c.err(`${p}.${field}`, msg);
         if (st.forcedDice !== undefined) c.dice(`${p}.forcedDice`, st.forcedDice);
         if (st.allowedBets !== undefined) c.betList(`${p}.allowedBets`, st.allowedBets);
         if (st.allowedActions !== undefined) c.actions(`${p}.allowedActions`, st.allowedActions);
         if (st.highlightedBets !== undefined)
           c.betList(`${p}.highlightedBets`, st.highlightedBets, false);
+        if (st.callouts !== undefined) c.callouts(`${p}.callouts`, st.callouts);
         if (st.showEV !== undefined) c.bool(`${p}.showEV`, st.showEV);
         if (st.advance !== undefined && st.advance !== 'auto' && st.advance !== 'button')
           c.err(`${p}.advance`, 'must be auto or button');
@@ -590,6 +674,7 @@ export function validateScene(
             c.err(`${p}.expect`, 'must be a non-empty array');
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
+        if (st.play !== undefined) c.playFrames(`${p}.play`, st.play);
         if (st.ask !== undefined) c.ask(`${p}.ask`, st.ask);
         const needsAnswer = answeredRequirements(st.completeWhen).length > 0;
         if (needsAnswer && st.ask === undefined)
@@ -627,7 +712,46 @@ export function validateScene(
       });
     }
   }
-  return c.errors.length
-    ? { ok: false, errors: c.errors }
-    : { ok: true, scene: json as unknown as SceneConfig };
+  if (c.errors.length) return { ok: false, errors: c.errors };
+  const scene = json as unknown as SceneConfig;
+  // Demo scripts are replayed against the engine from the scene start plus the step's own setup,
+  // so an illegal scripted action is reported with its step id.
+  scene.steps?.forEach((st, i) => {
+    if (!st.play) return;
+    if (!('acknowledged' in st.completeWhen))
+      c.err(
+        `steps[${i}].completeWhen`,
+        `step "${st.id}": a demo step must complete with acknowledged`,
+      );
+    // later steps start from wherever the learner left the table, so the demo must stage its own
+    if (
+      i > 0 &&
+      !(
+        st.setup?.replaceBets === true &&
+        st.setup.phase !== undefined &&
+        (st.setup.phase === 'come-out' || st.setup.point !== undefined) &&
+        st.setup.bankroll !== undefined
+      )
+    )
+      c.err(
+        `steps[${i}].setup`,
+        `step "${st.id}": a demo step after the first needs setup with replaceBets: true, a phase (and point on a point), and a bankroll, so it starts from a known table`,
+      );
+    let stage;
+    try {
+      stage = stageFor(scene, i);
+    } catch (e) {
+      return c.err(
+        `steps[${i}].play`,
+        `step "${st.id}": cannot stage the step (${(e as Error).message})`,
+      );
+    }
+    const r = runScript(stage, st.play);
+    if (!r.ok)
+      c.err(
+        `steps[${i}].play[${r.index}]`,
+        `step "${st.id}": scripted action is illegal: ${r.message}`,
+      );
+  });
+  return c.errors.length ? { ok: false, errors: c.errors } : { ok: true, scene };
 }

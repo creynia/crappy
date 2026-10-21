@@ -112,7 +112,9 @@ export function buildSheetModel(
   const type = bet ? bet.type : sheet.type;
   const parent = parentFor(type, sheet.regionId, game);
   const def = BET_TYPES[type];
-  const facts = buildEvFacts(preview, game);
+  // basic EV detail hides the swing line, like the alternative (lessons 06-08)
+  const facts0 = buildEvFacts(preview, game);
+  const facts = scene.evDetail === 'basic' && facts0 ? { ...facts0, swingCents: null } : facts0;
   const removePreview = bet
     ? previewAction(game, { type: 'remove-bet', betId: bet.id }, { rollsPerHour })
     : undefined;

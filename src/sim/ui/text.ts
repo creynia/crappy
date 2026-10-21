@@ -7,8 +7,8 @@ import {
   isBonusType,
   isHardHop,
 } from '../engine/bets';
-import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge, edgeTier as tierOf } from '../math';
+import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
+import { betEdge, betStdDev, edgeTier as tierOf } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -126,6 +126,8 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
+  swingCents?: number | null;
 }
 
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
@@ -286,7 +288,44 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    swingCents: swingOf(
+      type,
+      amount,
+      bet?.point ?? state.point,
+      state,
+      a.type === 'place-bet' ? a.hop : bet?.hop,
+    ),
   };
+}
+
+function swingOf(
+  type: BetTypeId,
+  amount: Cents,
+  point: GameState['point'],
+  state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+  hop?: Dice,
+): number | null {
+  try {
+    return betStdDev(
+      { type, amount, point, ...(hop ? { hop } : {}) },
+      { phase: state.phase, point: state.point, rules: state.rules },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** "Typical swing" line under the expected loss; odds bets have no edge, so they say so. */
+export function swingCopy(
+  swingCents: number,
+  edge: number | null,
+  expectedLossCents: number,
+): string {
+  const swing = fmtMoney(swingCents, { exact: true });
+  if (edge === null) return `Typical swing per decision: ±${swing}.`;
+  if (edge === 0) return `No edge, but it adds ±${swing} of swing.`;
+  if (edge < 0) return `Typical swing per decision: ±${swing}.`;
+  return `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`;
 }
 
 // ---------- roll descriptions ----------
@@ -434,7 +473,9 @@ export interface RegionLabelOpts {
 
 export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): string {
   const parts = [region.label + '.'];
-  if (region.sublabel) parts.push(region.sublabel.replace(/\.?$/, '') + '.');
+  // a "not offered" sublabel would repeat the reason given at the end
+  if (region.sublabel && !(opts.notOffered && /not offered/i.test(region.sublabel)))
+    parts.push(region.sublabel.replace(/\.?$/, '') + '.');
   const bets = opts.bets ?? [];
   if (bets.length) {
     const desc = bets.map((b) => {

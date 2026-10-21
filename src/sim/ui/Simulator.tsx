@@ -2,17 +2,35 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { BET_TYPES, betTypeAvailable } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
 import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
-import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
+import {
+  betTypeAllowed,
+  calloutsFor,
+  currentStep,
+  highlightedFor,
+  initScene,
+  rollLock,
+} from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { RollLog, type RollLogFocus } from './RollLog';
+import { exposureOf } from '../strategy/metrics';
 import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
+import {
+  buildShareUrl,
+  describeSkipped,
+  FRESH_RNG,
+  presetOf,
+  rngDraws,
+  toSceneYaml,
+  type RngPosition,
+} from './shareLink';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { resolverFor } from './stepTokens';
 import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
@@ -26,6 +44,7 @@ import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './ro
 import { fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
+import { useDemoPlayback } from './useDemoPlayback';
 import { useGameCore } from './useGameCore';
 import { useGuidedSteps } from './useGuidedSteps';
 import { useLandscape } from './useLandscape';
@@ -82,6 +101,9 @@ export function Simulator(props: SimulatorInternalProps) {
   });
   const [log, setLog] = useState<RollLogEntry[]>(() => boot.log ?? []);
   const [logFocus, setLogFocus] = useState<RollLogFocus | null>(null);
+  // Where this table stands in its dice sequence: the link's skip (if any) plus rolls since;
+  // reset with the table and saved with the sandbox so sharing survives Reset and a reload.
+  const [rngPos, setRngPos] = useState<RngPosition>(boot.rng ?? FRESH_RNG);
   const focusNonce = useRef(0);
   const autoSeq = useRef(boot.log?.length ?? 0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -100,11 +122,13 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
+  const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
     () => settingsRef.current.speed,
     pushToast,
     announce,
     (pre, post, events) => {
+      if (demoActive.current()) return; // a demo's scripted rolls are not the learner's rolls
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
     },
@@ -124,10 +148,30 @@ export function Simulator(props: SimulatorInternalProps) {
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
   const step = currentStep(scene, rt);
+  const demo = useDemoPlayback({
+    step,
+    stepIndex: rt.stepIndex,
+    done: rt.done,
+    coreRef,
+    setCore,
+    doAction,
+    getSpeed: () => settingsRef.current.speed,
+    announce,
+    clearAnimation: anim.clear,
+    skipAnimation: anim.skip,
+    animBusy: anim.busy,
+  });
+  demoActive.current = demo.isActive;
 
   // ---------- events + effects ----------
   useEffect(() => {
     emit({ type: 'ready', state: coreRef.current.game });
+    // parts of a shared link the table could not use
+    if (boot.skipped?.length) {
+      const text = describeSkipped(boot.skipped);
+      pushToast(text, 'info');
+      announce(text);
+    }
     return () => anim.cancel();
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
@@ -138,6 +182,7 @@ export function Simulator(props: SimulatorInternalProps) {
     liveGame,
     chip,
     log,
+    rngDraws(liveGame, rngPos),
   );
 
   // ---------- sheet ----------
@@ -183,7 +228,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const lock = rollLock(scene, rt, liveGame);
 
   const roll = () => {
-    if (anim.busy || sheet || lock) return;
+    if (anim.busy || sheet || lock || demo.playing) return;
     doAction({ type: 'roll' });
   };
 
@@ -194,13 +239,25 @@ export function Simulator(props: SimulatorInternalProps) {
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
     if (opts?.rules) setScene(sc);
     const init = initScene(sc, { seed: guided ? 1 : randomSeed() });
+    // bets the new rules don't offer (a Don't Pass when switching to crapless), read before the reset
+    const dropped = coreRef.current.game.bets.filter(
+      (b) => !betTypeAvailable(b.type, init.game.rules),
+    );
     startedRef.current = -1;
+    demo.reset();
     startEquity.current = equity(init.game);
     setToasts([]);
     setLog([]);
     setLogFocus(null);
+    setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
+    if (opts?.rules && dropped.length) {
+      const names = [...new Set(dropped.map((b) => BET_TYPES[b.type].label))].join(' and ');
+      const msg = `Crapless craps has no don't side, so the new table starts without your ${names}.`;
+      pushToast(msg, 'info');
+      announce(msg);
+    }
   };
   const rebet = () => {
     for (const r of lastOneRoll.current) {
@@ -209,6 +266,48 @@ export function Simulator(props: SimulatorInternalProps) {
     }
   };
   const canRebet = lastOneRoll.current.some((r) => !liveGame.bets.some((b) => b.type === r.type));
+  // Share links (I071): the live table as a URL (Web Share, else the clipboard) or a scene block.
+  const shareBase = () => {
+    try {
+      return `${location.origin}${location.pathname}`;
+    } catch {
+      return '';
+    }
+  };
+  const copyText = async (text: string, what: string) => {
+    let msg: string;
+    try {
+      await navigator.clipboard.writeText(text);
+      msg = `${what} copied to the clipboard.`;
+    } catch {
+      msg = `Could not copy the ${what.toLowerCase()}.`;
+    }
+    pushToast(msg, 'info');
+    announce(msg);
+  };
+  const shareTable = async () => {
+    if (presetOf(coreRef.current.game.rules) === null) {
+      const msg =
+        "Custom table rules aren't included in shared links yet; the link uses Standard Vegas.";
+      pushToast(msg, 'info');
+      announce(msg);
+    }
+    const url = buildShareUrl(shareBase(), coreRef.current.game, rngPos);
+    const nav = typeof navigator === 'undefined' ? undefined : navigator;
+    if (nav?.share) {
+      try {
+        await nav.share({ title: 'Craps table', url });
+        return;
+      } catch (e) {
+        // the person closed the share sheet: nothing to do
+        if (e instanceof Error && e.name === 'AbortError') return;
+        /* unsupported: fall back to the clipboard */
+      }
+    }
+    await copyText(url, 'Link');
+  };
+  const copyScene = () =>
+    copyText(toSceneYaml(coreRef.current.game, 'shared-table', rngPos), 'Scene YAML');
 
   // ---------- imperative handle ----------
   useEffect(() => {
@@ -238,6 +337,7 @@ export function Simulator(props: SimulatorInternalProps) {
     disabledRegions,
     unofferedRegions,
     highlightedBets: highlighted,
+    callouts: calloutsFor(scene, step),
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,
     wonBets: anim.won,
@@ -246,8 +346,12 @@ export function Simulator(props: SimulatorInternalProps) {
     chipPhase: anim.chipPhase,
     rollingDice: anim.rolling,
     selectedRegion: sheet?.regionId ?? null,
-    onRegionTap: sh.onRegionTap,
-    onStackTap: sh.onStackTap,
+    onRegionTap: (...a: Parameters<typeof sh.onRegionTap>) => {
+      if (!demo.playing) sh.onRegionTap(...a);
+    },
+    onStackTap: (...a: Parameters<typeof sh.onStackTap>) => {
+      if (!demo.playing) sh.onStackTap(...a);
+    },
   };
   const session = equity(game) - startEquity.current;
 
@@ -259,7 +363,7 @@ export function Simulator(props: SimulatorInternalProps) {
       game={liveGame}
       onSelectChip={setChip}
       onRoll={roll}
-      rollDisabled={anim.busy || !!sheet || !!lock}
+      rollDisabled={anim.busy || !!sheet || !!lock || demo.playing}
       busy={anim.busy}
       lock={lock}
       view={view}
@@ -287,9 +391,31 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
+      onReplay={
+        step?.play && demo.canReplay && !demo.playing
+          ? () => {
+              demo.replay();
+              // the Replay button unmounts while the demo plays: keep keyboard focus in the step panel
+              rootRef.current
+                ?.querySelector<HTMLElement>('.sim-step')
+                ?.focus({ preventScroll: true });
+            }
+          : undefined
+      }
+      captions={step?.play ? demo.captions : undefined}
+      resolve={resolverFor(game)}
     />
   );
 
+  // Toasts overlay the status block (above the felt in portrait, the rail's status in landscape):
+  // text nothing taps, never a betting region or the lesson step card.
+  const toastsEl = (
+    <Toasts
+      toasts={toasts}
+      onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+      autoDismissMs={toastDurationMs(settings.speed)}
+    />
+  );
   const status = (compact: boolean) => (
     <StatusBar
       {...(compact ? { compact } : {})}
@@ -312,14 +438,21 @@ export function Simulator(props: SimulatorInternalProps) {
       data-testid="simulator"
       data-mode={mode}
       onClickCapture={(e) => {
-        if (anim.playing()) {
+        if (demo.playing) {
+          e.preventDefault();
+          e.stopPropagation();
+          demo.skip();
+        } else if (anim.playing()) {
           e.preventDefault();
           e.stopPropagation();
           anim.skip();
         }
       }}
       onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
+        if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
+          e.preventDefault();
+          demo.skip();
+        } else if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
           e.preventDefault();
           anim.skip();
         }
@@ -341,12 +474,16 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            {landscape ? null : toastsEl}
           </div>
         </div>
         {landscape ? (
           <div class="sim-rail">
             {stepEl}
-            {status(true)}
+            <div class="sim-status-wrap">
+              {status(true)}
+              {toastsEl}
+            </div>
             {controls}
           </div>
         ) : (
@@ -357,11 +494,6 @@ export function Simulator(props: SimulatorInternalProps) {
       <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
         <span key={live.n}>{live.text}</span>
       </div>
-      <Toasts
-        toasts={toasts}
-        onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
-        autoDismissMs={toastDurationMs(settings.speed)}
-      />
 
       {panels.menu ? (
         <SimMenu
@@ -373,11 +505,19 @@ export function Simulator(props: SimulatorInternalProps) {
           currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
+          {...(sandbox
+            ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
+            : {})}
         />
       ) : null}
 
       {panels.session ? (
-        <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
+        <SessionPanel
+          stats={liveGame.stats}
+          rollCount={liveGame.rollCount}
+          exposure={exposureOf(liveGame.bets)}
+          bankroll={equity(liveGame)}
+        />
       ) : null}
 
       {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}

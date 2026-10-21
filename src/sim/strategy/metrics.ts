@@ -1,4 +1,4 @@
-import type { Action, Bet, GameState, PointNumber, TableRules } from '../engine';
+import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
 import { betEdge, lossPerRoll, toNumber } from '../math';
 import { POINT_PHASE_SHARE, offOnComeOut } from '../math/ev';
 import { isLineLike } from '../math/outcomes';
@@ -169,11 +169,27 @@ function materialize(state: GameState, actions: Action[]): GameState {
   return { ...state, bets, nextBetId };
 }
 
+const ONE_ROLL: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
+  'field',
+  'any-7',
+  'any-craps',
+  'yo-11',
+  'aces-2',
+  'boxcars-12',
+  'ace-deuce-3',
+  'horn',
+  'c-e',
+  'world',
+]);
+
+/** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
+const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-regress']);
+
 /** The strategy's steady-state layout in the point phase (point 6), built via its own `decide`. */
 function steadyState(
   spec: StrategySpec,
   rules: TableRules,
-): { state: GameState; comeOutIds: Set<string> } {
+): { state: GameState; comeOutTypes: Set<string>; comeOutOnly: Bet[] } {
   const impl = getImpl(spec.id);
   let s = {
     version: 1,
@@ -192,14 +208,19 @@ function steadyState(
   } as GameState;
   s = materialize(s, impl.decide(s, spec));
   // bets the strategy puts up before the point is set: they are up on come-out rolls too
-  const comeOutIds = new Set(s.bets.map((b) => b.id));
-  s = { ...s, phase: 'point', point: 6 };
+  const comeOutTypes = new Set<string>(s.bets.map((b) => b.type));
+  // One-roll bets placed on the come-out (an Any Craps hedge) are gone after that roll. Take them out
+  // of the point-phase layout; they are costed once per decision instead (see strategyMetrics). A
+  // one-roll bet the strategy re-places every roll (field, any 7) stays in the layout.
+  const oneRoll = s.bets.filter((b) => ONE_ROLL.has(b.type));
+  s = { ...s, phase: 'point', point: 6, bets: s.bets.filter((b) => !ONE_ROLL.has(b.type)) };
   for (let i = 0; i < 4; i++) {
     const acts = impl.decide(s, spec);
     if (acts.length === 0) break;
     s = materialize(s, acts);
   }
-  return { state: s, comeOutIds };
+  const comeOutOnly = oneRoll.filter((b) => !s.bets.some((x) => x.type === b.type));
+  return { state: s, comeOutTypes, comeOutOnly };
 }
 
 /**
@@ -209,7 +230,7 @@ function steadyState(
  */
 export function strategyMetrics(spec: StrategySpec, rules: TableRules): StrategyMetrics {
   const r = rules;
-  const { state, comeOutIds } = steadyState(spec, r);
+  const { state, comeOutTypes, comeOutOnly } = steadyState(spec, r);
   const ctx = { phase: 'point' as const, point: 6 as PointNumber, rules: r };
   let lossCents = 0;
   let action = 0; // dollars per roll (overall)
@@ -245,7 +266,9 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const e = betEdge(b.type, b.amount, bctx);
     // bets placed only after a point, or off on the come-out, work 392/557 of rolls
     const share =
-      !line && (!comeOutIds.has(b.id) || offOnComeOut(b.type, r)) ? toNumber(POINT_PHASE_SHARE) : 1;
+      !line && (!comeOutTypes.has(b.type) || offOnComeOut(b.type, r))
+        ? toNumber(POINT_PHASE_SHARE)
+        : 1;
     lossCents += toNumber(lossPerRoll(b, ctx)) * share;
     action += (b.amount / 100 / toNumber(e.expectedRolls)) * share;
   }
@@ -262,12 +285,28 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
         action += rates.oddsPerRoll[n] * (pass.amount / 100) * Math.min(mult, r.maxOdds[n]);
     }
   }
+  if (comeOutOnly.length > 0) {
+    // one come-out roll per decision: spread the bet over the rolls a decision lasts (already per roll overall)
+    const line = state.bets.find((b) => isLineLike(b.type));
+    const perDecision = line
+      ? toNumber(
+          betEdge(line.type, line.amount, { phase: 'come-out', point: null, rules: r })
+            .expectedRolls,
+        )
+      : 1;
+    for (const b of comeOutOnly) {
+      const e = betEdge(b.type, b.amount, { phase: 'come-out', point: null, rules: r });
+      lossCents += (toNumber(e.perResolved) * b.amount) / perDecision;
+      action += b.amount / 100 / perDecision;
+    }
+  }
   const expectedLossPerRoll = lossCents / 100;
   return {
     edgeOnAction: action > 0 ? expectedLossPerRoll / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
     avgAction: onTable,
+    ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
   };
 }
 
@@ -281,11 +320,7 @@ export function lineOddsEdge(
   multiple: number | 'max',
   lay = false,
 ): number {
-  if (multiple === 'max') return flatEdge / (1 + oddsMultiplePerDecision(rules, lay));
-  let t = 0;
-  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[]) {
-    const cap = (lay ? rules.maxLayOdds : rules.maxOdds)[n];
-    t += (POINT_WAYS[n] / 36) * Math.min(multiple, cap);
-  }
-  return flatEdge / (1 + t);
+  return (
+    flatEdge / (1 + oddsMultiplePerDecision(rules, lay, multiple === 'max' ? Infinity : multiple))
+  );
 }

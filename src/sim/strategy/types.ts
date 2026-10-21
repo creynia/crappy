@@ -22,7 +22,13 @@ export type StrategyId =
   | 'hardways-all'
   | 'no-bet'
   | 'my-layout'
-  | 'martingale-pass';
+  | 'martingale-pass'
+  | 'dont-come-molly'
+  | 'buy-4-10'
+  | 'lay-4-10'
+  | 'place-6-8-press'
+  | 'inside-regress'
+  | 'pass-hedge-any-craps';
 
 /** One bet of a player layout snapshot (used by `my-layout`). */
 export interface LayoutBet {
@@ -119,6 +125,8 @@ export interface StrategyMetrics {
   rollsPerDollar: number;
   /** Dollars on the table on average in the steady layout (flat bets and odds). */
   avgAction: number;
+  /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
+  approximate?: boolean;
 }
 
 /** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */

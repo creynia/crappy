@@ -15,6 +15,8 @@ import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
+import { OddsHint } from './OddsHint';
+import { oddsRoom } from './oddsHint';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
@@ -88,6 +90,24 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
+  // One-time odds nudge (scene ui.hints). "Don't show again" is a per-viewer preference in localStorage.
+  const [hideOddsHint, setHideOddsHint] = useState(() => {
+    try {
+      return localStorage.getItem('crappy-sim-hide-odds-hint') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [oddsHintKey, setOddsHintKey] = useState<string | null>(null);
+  const oddsShown = useRef(new Set<string>());
+  const oddsNow = ui.hints === true && !hideOddsHint ? oddsRoom(liveGame) : null;
+  const oddsNowKey = oddsNow ? `${oddsNow.betId}:${oddsNow.point}` : null;
+  useEffect(() => {
+    if (!oddsNowKey || oddsShown.current.has(oddsNowKey)) return;
+    oddsShown.current.add(oddsNowKey);
+    setOddsHintKey(oddsNowKey);
+  }, [oddsNowKey]);
+  const oddsHintRoom = oddsNow && oddsHintKey === oddsNowKey ? oddsNow : null;
   const step = currentStep(scene, rt);
 
   // ---------- events + effects ----------
@@ -288,6 +308,21 @@ export function Simulator(props: SimulatorInternalProps) {
         )}
       </div>
 
+      {oddsHintRoom ? (
+        <OddsHint
+          room={oddsHintRoom}
+          onDismiss={() => setOddsHintKey(null)}
+          onHideForever={() => {
+            try {
+              localStorage.setItem('crappy-sim-hide-odds-hint', '1');
+            } catch {
+              /* private mode: the hint just stays hidden for this session */
+            }
+            setHideOddsHint(true);
+            setOddsHintKey(null);
+          }}
+        />
+      ) : null}
       <Toasts
         toasts={toasts}
         onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}

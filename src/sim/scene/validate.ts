@@ -337,6 +337,7 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'hints',
       ]);
       if (
         u.orientation !== undefined &&
@@ -358,6 +359,7 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'hints',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))

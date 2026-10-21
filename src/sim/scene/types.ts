@@ -43,6 +43,8 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** show the one-time "odds are available, 0% edge" nudge after a point is set */
+    hints?: boolean;
   };
   autoRoll?: {
     enabled: boolean;

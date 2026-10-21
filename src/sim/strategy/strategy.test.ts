@@ -282,3 +282,81 @@ describe('edge on action is per decision', () => {
     expect(e({ id: 'dont-pass-max-lay', unit: 1000 })).toBeCloseTo(0.273, 2);
   });
 });
+
+describe('more presets (I012)', () => {
+  const rules = resolveRules('standard-vegas');
+  const m = (id: StrategyId, unit = 500) => strategyMetrics({ id, unit }, rules);
+
+  it('buy 4/10 at $20 loses 2 x $20 x 1/60 per resolution', () => {
+    // each $20 buy: vig $1 paid on the 1/3 of resolutions it wins = $20/60 per resolution
+    const perRoll = m('buy-4-10').expectedLossPerRoll;
+    // each number resolves on 3/36 (hit) + 6/36 (seven) = 9/36 of point-phase rolls
+    expect(perRoll).toBeCloseTo(2 * 20 * (1 / 60) * (9 / 36), 3);
+    expect(m('buy-4-10').edgeOnAction).toBeCloseTo(1 / 60, 3);
+  });
+  it('lay 4/10 costs 2 x $40 x 1/60 / ... on the amount laid per resolution', () => {
+    // lay $40 wins $20 with prob 2/3, vig $1: expected loss = 2/3 $1 = $0.667 = $40 / 60
+    expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 3);
+  });
+  it('hedging the pass line with Any Craps raises the edge on action', () => {
+    const base = m('pass-hedge-any-craps').edgeOnAction;
+    const flat = strategyMetrics({ id: 'pass-max-odds', unit: 500, oddsMultiple: 0 }, rules);
+    expect(base).toBeGreaterThan(flat.edgeOnAction);
+  });
+  it('progressions are flagged approximate', () => {
+    expect(m('inside-regress').approximate).toBe(true);
+    expect(m('place-6-8-press').approximate).toBe(true);
+    expect(m('buy-4-10').approximate).toBeUndefined();
+  });
+  it('inside-regress places $22 then keeps $12 on 6/8 after a hit', () => {
+    const seq = (dice: Array<[1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]>) => {
+      let s = createGame({ bankroll: 100_000, seed: 1, phase: 'point', point: 4 });
+      const sp = spec('inside-regress');
+      const run = () => {
+        for (const a of getStrategy('inside-regress').decide(s, sp)) {
+          const r = applyAction(s, a);
+          if (!r.ok) throw new Error(r.error.message);
+          s = r.state;
+        }
+      };
+      run();
+      const first = s.bets.reduce((a, b) => a + b.amount, 0);
+      for (const d of dice) {
+        const r = applyAction(s, { type: 'roll', dice: d });
+        if (!r.ok) throw new Error('roll');
+        s = r.state;
+        run();
+      }
+      return { first, bets: s.bets.map((b) => [b.type, b.amount]) };
+    };
+    const r = seq([[1, 2]]); // 3 does nothing
+    expect(r.first).toBe(2200);
+    expect(r.bets).toHaveLength(4);
+    const hit = seq([[4, 4]]); // 8 hits
+    expect(hit.bets.sort()).toEqual([
+      ['place-6', 600],
+      ['place-8', 600],
+    ]);
+  });
+  it('place-6-8-press presses by one unit per hit up to 5x', () => {
+    let s = createGame({ bankroll: 1_000_000, seed: 1, phase: 'point', point: 4 });
+    const sp = spec('place-6-8-press');
+    const step = () => {
+      for (const a of getStrategy('place-6-8-press').decide(s, sp)) {
+        const r = applyAction(s, a);
+        if (!r.ok) throw new Error(r.error.message);
+        s = r.state;
+      }
+    };
+    step();
+    const amt = () => s.bets.find((b) => b.type === 'place-6')!.amount;
+    expect(amt()).toBe(600);
+    for (let i = 0; i < 8; i++) {
+      const r = applyAction(s, { type: 'roll', dice: [3, 3] });
+      if (!r.ok) throw new Error('roll');
+      s = r.state;
+      step();
+    }
+    expect(amt()).toBe(3000);
+  });
+});

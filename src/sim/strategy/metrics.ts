@@ -91,6 +91,9 @@ function steadyState(spec: StrategySpec, rules: TableRules): GameState {
   return s;
 }
 
+/** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
+const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-regress']);
+
 /** Analytic cost of keeping the strategy's layout up (see simulator.md §2.4). */
 export function strategyMetrics(spec: StrategySpec, rules: TableRules): StrategyMetrics {
   const r = rules;
@@ -125,5 +128,6 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     edgeOnAction: action > 0 ? lossCents / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
+    ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
   };
 }

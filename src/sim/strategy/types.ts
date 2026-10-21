@@ -22,7 +22,13 @@ export type StrategyId =
   | 'hardways-all'
   | 'no-bet'
   | 'my-layout'
-  | 'martingale-pass';
+  | 'martingale-pass'
+  | 'dont-come-molly'
+  | 'buy-4-10'
+  | 'lay-4-10'
+  | 'place-6-8-press'
+  | 'inside-regress'
+  | 'pass-hedge-any-craps';
 
 /** One bet of a player layout snapshot (used by `my-layout`). */
 export interface LayoutBet {
@@ -102,4 +108,6 @@ export interface StrategyMetrics {
   edgeOnAction: number;
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
+  /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
+  approximate?: boolean;
 }

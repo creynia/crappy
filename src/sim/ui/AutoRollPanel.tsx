@@ -27,11 +27,16 @@ const MAX_ODDS_BY_DEFAULT = new Set<string>([
   'pass-max-odds',
   'dont-pass-max-lay',
   'three-point-molly',
+  'dont-come-molly',
 ]);
 
 // Strategies with no line bet, so an odds setting means nothing for them.
 const NO_ODDS_STRATEGIES = new Set<string>([
   'place-6-8',
+  'buy-4-10',
+  'lay-4-10',
+  'place-6-8-press',
+  'inside-regress',
   'iron-cross',
   'across',
   'field-every-roll',

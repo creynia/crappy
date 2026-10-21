@@ -1,4 +1,5 @@
 import type { Action, Bet, BetTypeId, Cents, GameState, TableRules } from '../engine/types';
+import { suggestAmount } from '../engine';
 import type { Strategy, StrategyId, StrategyLens, StrategySpec } from './types';
 
 const D = 100;
@@ -93,41 +94,43 @@ function lineStrategy(
   return b.plan();
 }
 
-function molly(state: GameState, spec: StrategySpec): Plan {
+function molly(state: GameState, spec: StrategySpec, dont = false): Plan {
   const rules = state.rules;
   const b = new Builder(state);
   const mult = spec.oddsMultiple ?? Infinity;
+  const lineT: BetTypeId = dont ? 'dont-pass' : 'pass-line';
+  const lineOdds: BetTypeId = dont ? 'dont-pass-odds' : 'pass-odds';
+  const comeT: BetTypeId = dont ? 'dont-come' : 'come';
+  const comeOdds: BetTypeId = dont ? 'dont-come-odds' : 'come-odds';
+  const maxOdds = dont ? rules.maxLayOdds : rules.maxOdds;
   const unit = flatAmount(rules, spec.unit);
-  const pass = find(state, 'pass-line');
+  const pass = find(state, lineT);
   if (state.phase === 'come-out') {
-    if (!pass) b.place('pass-line', unit);
+    if (!pass) b.place(lineT, unit);
   }
   if (state.phase === 'point' && state.point !== null) {
-    if (pass && !find(state, 'pass-odds') && mult > 0) {
-      const amt = Math.min(
-        oddsTarget(pass.amount, mult, rules.maxOdds[state.point]),
-        whole(b.cash),
-      );
-      if (amt >= D) b.place('pass-odds', amt, pass.id, false);
+    if (pass && !find(state, lineOdds) && mult > 0) {
+      const amt = Math.min(oddsTarget(pass.amount, mult, maxOdds[state.point]), whole(b.cash));
+      if (amt >= D) b.place(lineOdds, amt, pass.id, false);
     }
   }
   // odds behind travelled come bets (also during come-out when they may be off, odds stay legal)
   let comes = 0;
   let boxed = false;
   for (const c of state.bets) {
-    if (c.type !== 'come') continue;
+    if (c.type !== comeT) continue;
     comes++;
     if (c.point === null) {
       boxed = true;
       continue;
     }
     if (mult <= 0 || state.phase !== 'point') continue;
-    if (state.bets.some((o) => o.type === 'come-odds' && o.parentId === c.id)) continue;
-    const amt = Math.min(oddsTarget(c.amount, mult, rules.maxOdds[c.point]), whole(b.cash));
-    if (amt >= D) b.place('come-odds', amt, c.id, false);
+    if (state.bets.some((o) => o.type === comeOdds && o.parentId === c.id)) continue;
+    const amt = Math.min(oddsTarget(c.amount, mult, maxOdds[c.point]), whole(b.cash));
+    if (amt >= D) b.place(comeOdds, amt, c.id, false);
   }
   if (state.phase === 'point' && pass && !boxed && comes < 2) {
-    b.place('come', unit, undefined, comes === 0);
+    b.place(comeT, unit, undefined, comes === 0);
   }
   return b.plan();
 }
@@ -289,6 +292,86 @@ const PROPS: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
 const isProp = (t: BetTypeId): boolean => PROPS.has(t);
 const isHard = (t: BetTypeId): boolean => t.startsWith('hard-');
 
+/** Buy or lay the 4 and 10 after a point is set. Bets stay up until they resolve, then are re-placed. */
+function buyLay4And10(state: GameState, spec: StrategySpec, kind: 'buy' | 'lay'): Plan {
+  // buy: $20 at a $5 unit (the smallest buy where the $1 vig is exactly 5%); lay: $40 (wins $20)
+  const base = flatAmount(state.rules, spec.unit) * (kind === 'buy' ? 4 : 8);
+  const items = ([4, 10] as const).map((n): [BetTypeId, Cents] => {
+    const t: BetTypeId = `${kind}-${n}`;
+    return [t, suggestAmount(t, base, state)];
+  });
+  return placeNumbers(state, items);
+}
+
+/** True when the last roll was a point-phase roll that came up `n` (so a place bet on `n` just won). */
+function hitLastRoll(state: GameState, n: number): boolean {
+  const r = state.history[state.history.length - 1];
+  return r !== undefined && r.total === n && r.phaseBefore === 'point';
+}
+
+/** Place 6 and 8, then press each by one unit after every hit, up to PRESS_CAP times the starting bet. */
+const PRESS_CAP = 5;
+function placePress(state: GameState, spec: StrategySpec): Plan {
+  const a = place6(state.rules, spec);
+  const plan = placeNumbers(state, [
+    ['place-6', a],
+    ['place-8', a],
+  ]);
+  const b = new Builder(state);
+  b.actions = plan.actions;
+  b.blocked = plan.blocked;
+  for (const a2 of plan.actions) if (a2.type === 'place-bet') b.cash -= a2.amount;
+  for (const n of [6, 8] as const) {
+    const bet = find(state, `place-${n}`);
+    if (!bet || !hitLastRoll(state, n) || bet.amount >= a * PRESS_CAP) continue;
+    const next = Math.min(bet.amount + a, a * PRESS_CAP);
+    if (next - bet.amount <= b.cash) {
+      b.cash -= next - bet.amount;
+      b.actions.push({ type: 'set-amount', betId: bet.id, amount: next });
+    }
+  }
+  return b.plan();
+}
+
+/** Place the inside numbers, then take the 5 and 9 down after the first hit and keep 6 and 8 working. */
+function insideRegress(state: GameState, spec: StrategySpec): Plan {
+  const five = place5(state.rules, spec);
+  const six = place6(state.rules, spec);
+  const actions: Action[] = [];
+  const have = (t: BetTypeId): Bet | undefined => find(state, t);
+  const started = have('place-6') !== undefined || have('place-8') !== undefined;
+  const regressed = started && have('place-5') === undefined && have('place-9') === undefined;
+  if (started && !regressed) {
+    if ([5, 6, 8, 9].some((n) => hitLastRoll(state, n))) {
+      for (const t of ['place-5', 'place-9'] as const) {
+        const bet = have(t);
+        if (bet) actions.push({ type: 'remove-bet', betId: bet.id });
+      }
+    }
+    return { actions, blocked: false };
+  }
+  if (regressed) return { actions, blocked: false };
+  return placeNumbers(state, [
+    ['place-5', five],
+    ['place-6', six],
+    ['place-8', six],
+    ['place-9', five],
+  ]);
+}
+
+/** Pass line with a small Any Craps "hedge" on each come-out. */
+function passHedge(state: GameState, spec: StrategySpec): Plan {
+  const plan = lineStrategy(state, spec, false, 0);
+  if (state.phase === 'come-out' && !find(state, 'any-craps')) {
+    const spent = plan.actions.reduce((a, x) => a + (x.type === 'place-bet' ? x.amount : 0), 0);
+    const hedge = propAmount(state.rules, ceilTo(spec.unit / 5, D));
+    if (hedge <= state.bankroll - spent) {
+      plan.actions.push({ type: 'place-bet', betType: 'any-craps', amount: hedge });
+    }
+  }
+  return plan;
+}
+
 function make(
   id: StrategyId,
   name: string,
@@ -449,6 +532,48 @@ export const STRATEGIES: Impl[] = [
     'fun',
     'Double the pass line bet after each loss, back to one unit after a win (capped at the table max and your bankroll).',
     martingale,
+  ),
+  make(
+    'dont-come-molly',
+    "Don't Molly",
+    'lowest-edge',
+    "Don't pass plus up to two don't come bets, each with maximum lay odds: three numbers, all on the 7.",
+    (s, spec) => molly(s, spec, true),
+  ),
+  make(
+    'buy-4-10',
+    'Buy the 4 and 10',
+    'practical',
+    'Buy the 4 and 10 after a point ($20 at a $5 unit), paying the 5% vig only when they win.',
+    (s, spec) => buyLay4And10(s, spec, 'buy'),
+  ),
+  make(
+    'lay-4-10',
+    'Lay the 4 and 10',
+    'practical',
+    'Lay against the 4 and 10 after a point ($40 at a $5 unit): wins often, pays small, vig on wins.',
+    (s, spec) => buyLay4And10(s, spec, 'lay'),
+  ),
+  make(
+    'place-6-8-press',
+    'Place 6 and 8, press on hits',
+    'fun',
+    'Place the 6 and 8, then press each by one unit after every hit, up to five times the starting bet.',
+    placePress,
+  ),
+  make(
+    'inside-regress',
+    'Inside numbers, then regress',
+    'fun',
+    'Place 5, 6, 8 and 9 ($22 at a $5 unit); after the first hit take down the 5 and 9 and leave $12 on the 6 and 8.',
+    insideRegress,
+  ),
+  make(
+    'pass-hedge-any-craps',
+    'Pass line with an Any Craps hedge',
+    'fun',
+    'Pass line, plus a small Any Craps on each come-out to "cover" a loss. It adds an expensive bet, not safety.',
+    passHedge,
   ),
 ];
 

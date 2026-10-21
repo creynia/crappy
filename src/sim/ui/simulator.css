@@ -422,6 +422,9 @@
 }
 
 /* strategy comparison table: a real table above 480px, stacked cards below */
+.sim-st-wrap {
+  overflow-x: auto;
+}
 .sim-st-table {
   width: 100%;
   border-collapse: collapse;
@@ -447,7 +450,8 @@
   background: none;
   border: 0;
   padding: 4px 0;
-  min-height: 32px;
+  min-height: 44px;
+  min-width: 44px;
   color: inherit;
   cursor: pointer;
 }
@@ -470,9 +474,17 @@
     flex-wrap: wrap;
     gap: 4px;
   }
-  .sim-st-table thead th:first-child,
   .sim-st-table thead th:last-child {
     display: none;
+  }
+  .sim-st-table thead th {
+    display: block;
+    padding: 0;
+  }
+  .sim-st-table thead .sim-st-sort {
+    border: 1px solid var(--sim-border);
+    border-radius: 999px;
+    padding: 0 12px;
   }
   .sim-st-table tbody tr {
     border: 1px solid var(--sim-border);

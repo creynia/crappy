@@ -96,18 +96,20 @@ export function StrategyTable(props: StrategyTableProps) {
     if (k === key) setDir(dir === 'asc' ? 'desc' : 'asc');
     else {
       setKey(k);
-      setDir('asc');
+      // "Rolls per $1": more is cheaper, so best first
+      setDir(k === 'rollsPerDollar' ? 'desc' : 'asc');
     }
   };
   const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
   const cost = (c: number) => (c > 0 ? fmtMoney(Math.round(c * 100), { exact: true }) : '$0.00');
+  const perRoll = (c: number) => `$${c.toFixed(4)}`;
   const per1 = (r: number) => (Number.isFinite(r) ? r.toFixed(1) : 'no cost');
   const onTable = (d: number) => fmtMoney(Math.round(d * 100), { exact: true });
   const cell = (r: StrategyRow, k: TableSortKey): string =>
     k === 'edge'
       ? pct(r.edge)
       : k === 'lossPerRoll'
-        ? cost(r.lossPerRoll)
+        ? perRoll(r.lossPerRoll)
         : k === 'lossPerHour'
           ? cost(r.lossPerHour)
           : k === 'rollsPerDollar'
@@ -122,52 +124,54 @@ export function StrategyTable(props: StrategyTableProps) {
         Every preset at a {fmtMoney(unit)} unit, steady layout, {rollsPerHour} rolls an hour. Tap a
         heading to sort.
       </p>
-      <table class="sim-st-table">
-        <thead>
-          <tr>
-            {COLUMNS.map((c) => (
-              <th
-                key={c.key}
-                scope="col"
-                aria-sort={key === c.key ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-              >
-                <button type="button" class="sim-st-sort" onClick={() => sortBy(c.key)}>
-                  {c.label}
-                  {key === c.key ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                </button>
-              </th>
-            ))}
-            <th scope="col">
-              <span class="sim-sr">Run it</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} data-strategy={r.id}>
-              <th scope="row" data-label="Strategy">
-                {r.name}
-                <span class="sim-st-lens">{LENS_LABEL[r.lens]}</span>
-              </th>
-              {COLUMNS.slice(1).map((c) => (
-                <td key={c.key} data-label={c.label}>
-                  {cell(r, c.key)}
-                </td>
-              ))}
-              <td class="sim-st-run">
-                <button
-                  type="button"
-                  class="sim-ar-btn"
-                  aria-label={`Run it: ${r.name}`}
-                  onClick={() => props.onRun?.({ id: r.id, unit })}
+      <div class="sim-st-wrap">
+        <table class="sim-st-table">
+          <thead>
+            <tr>
+              {COLUMNS.map((c) => (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={key === c.key ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                 >
-                  Run it
-                </button>
-              </td>
+                  <button type="button" class="sim-st-sort" onClick={() => sortBy(c.key)}>
+                    {c.label}
+                    {key === c.key ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                </th>
+              ))}
+              <th scope="col">
+                <span class="sim-sr">Run it</span>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} data-strategy={r.id}>
+                <th scope="row" data-label="Strategy">
+                  {r.name}
+                  <span class="sim-st-lens">{LENS_LABEL[r.lens]}</span>
+                </th>
+                {COLUMNS.slice(1).map((c) => (
+                  <td key={c.key} data-label={c.label}>
+                    {cell(r, c.key)}
+                  </td>
+                ))}
+                <td class="sim-st-run">
+                  <button
+                    type="button"
+                    class="sim-ar-btn"
+                    aria-label={`Run it: ${r.name}`}
+                    onClick={() => props.onRun?.({ id: r.id, unit })}
+                  >
+                    Run it
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

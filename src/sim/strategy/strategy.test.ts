@@ -250,8 +250,11 @@ describe('strategyMetrics (simulator.md 2.4)', () => {
     expect(m('pass-max-odds', 1000).expectedLossPerRoll).toBeCloseTo(0.0419, 3);
     expect(m('pass-max-odds', 1000).rollsPerDollar).toBeCloseTo(23.9, 0);
     expect(m('dont-pass-max-lay', 1000).expectedLossPerRoll).toBeCloseTo(0.0404, 3);
-    expect(m('place-6-8', 600).expectedLossPerRoll).toBeCloseTo(0.0556, 3);
-    expect(m('iron-cross', 500).expectedLossPerRoll).toBeCloseTo(7 / 18, 3);
+    // per roll overall: bets that are off on the come-out work 392/557 of rolls
+    expect(m('place-6-8', 600).expectedLossPerRoll).toBeCloseTo((1 / 18) * (392 / 557), 6);
+    expect(m('place-6-8', 600).expectedLossPerRoll * 100).toBeCloseTo(3.91, 2);
+    expect(m('iron-cross', 500).expectedLossPerRoll).toBeCloseTo((7 / 18) * (392 / 557), 6);
+    expect(m('iron-cross', 500).expectedLossPerRoll * 100).toBeCloseTo(27.37, 2);
     expect(m('any-7-every-roll', 500).expectedLossPerRoll).toBeCloseTo(0.8333, 3);
     expect(m('no-bet', 500).expectedLossPerRoll).toBe(0);
     expect(
@@ -269,7 +272,32 @@ describe('strategyMetrics avgAction', () => {
     expect(strategyMetrics({ id: 'iron-cross', unit: 500 }, rules).avgAction).toBe(22);
     expect(strategyMetrics({ id: 'no-bet', unit: 500 }, rules).avgAction).toBe(0);
     // $10 pass plus its maximum odds: 5x at point 6 = $50
-    expect(strategyMetrics({ id: 'pass-max-odds', unit: 1000 }, rules).avgAction).toBe(60);
+    // $10 pass plus 3-4-5x odds averaged over the point: 10 + 10 x 25/6
+    expect(strategyMetrics({ id: 'pass-max-odds', unit: 1000 }, rules).avgAction).toBeCloseTo(
+      10 + 250 / 6,
+      6,
+    );
+  });
+});
+
+describe('strategyMetrics odds edges and Molly', () => {
+  const rules = resolveRules('standard-vegas');
+  const e = (id: StrategyId, oddsMultiple?: number) =>
+    strategyMetrics(
+      oddsMultiple === undefined ? { id, unit: 1000 } : { id, unit: 1000, oddsMultiple },
+      rules,
+    ).edgeOnAction;
+  it('pass + 1x, 2x and max odds are 7/495 / (1 + 2/3 x multiple)', () => {
+    const flat = 7 / 495;
+    expect(e('pass-max-odds', 1)).toBeCloseTo(flat / (1 + (24 / 36) * 1), 8);
+    expect(e('pass-max-odds', 2)).toBeCloseTo(1 / 165, 8);
+    expect(e('pass-2x-odds')).toBeCloseTo(1 / 165, 8);
+    expect(e('pass-max-odds')).toBeCloseTo(flat / (1 + 100 / 36), 8);
+  });
+  it('three-point Molly costs $10.11 an hour at $10 with a 0.39% edge on action', () => {
+    const m = strategyMetrics({ id: 'three-point-molly', unit: 1000 }, rules);
+    expect(m.expectedLossPerRoll * 100).toBeCloseTo(10.11, 2);
+    expect(m.edgeOnAction * 100).toBeCloseTo(0.391, 3);
   });
 });
 

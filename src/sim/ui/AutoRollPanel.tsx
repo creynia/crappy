@@ -224,6 +224,29 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     });
   };
 
+  const unitControl = (
+    <div class="sim-ar-group" role="group" aria-label="Unit">
+      <span>Unit</span>
+      {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
+    </div>
+  );
+  const rulesControl = typeof props.rules !== 'object' && !fixedSpecs && (
+    <label class="sim-ar-group">
+      Rules
+      <select
+        value={preset}
+        disabled={running}
+        onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
+      >
+        {PRESET_IDS.map((id) => (
+          <option key={id} value={id}>
+            {PRESET_LABEL[id]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   const needsLayout = strategyIds.includes('my-layout') && !(layout && layout.length > 0);
   const nameOf = (id: StrategyId): string => all.find((s) => s.id === id)?.name ?? id;
   const button = (active: boolean, label: string, onClick: () => void, key?: string | number) => (
@@ -246,6 +269,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
           {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
         </div>
+      )}
+      {view === 'table' && !fixedSpecs && (
+        <>
+          {unitControl}
+          {rulesControl}
+        </>
       )}
       {view === 'table' && !fixedSpecs && (
         <StrategyTable
@@ -346,10 +375,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
         {!fixedSpecs && (
           <>
-            <div class="sim-ar-group" role="group" aria-label="Unit">
-              <span>Unit</span>
-              {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
-            </div>
+            {unitControl}
             <div class="sim-ar-group" role="group" aria-label="Odds">
               <span>Odds</span>
               {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
@@ -395,22 +421,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
         </div>
-        {typeof props.rules !== 'object' && !fixedSpecs && (
-          <label class="sim-ar-group">
-            Rules
-            <select
-              value={preset}
-              disabled={running}
-              onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
-            >
-              {PRESET_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {PRESET_LABEL[id]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        {rulesControl}
         <div class="sim-ar-group">
           <label>
             Seed{' '}

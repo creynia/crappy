@@ -80,7 +80,7 @@ describe('SessionPanel loss share (I023)', () => {
       (td) => td.textContent,
     );
     expect(share).toEqual(['69%', '31%']); // rows sort by wagered, pass line first
-    expect(container.querySelector('.sim-session-note')?.textContent).toContain(
+    expect(container.querySelector('[data-k="loss-takeaway"]')?.textContent).toContain(
       'Field bets were 10% of your action but 31% of your expected loss.',
     );
   });

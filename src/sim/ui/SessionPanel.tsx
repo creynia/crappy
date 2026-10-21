@@ -100,7 +100,7 @@ export function SessionPanel({ stats, rollCount, exposure, bankroll }: SessionPa
                 <th scope="col">Expected</th>
                 <th scope="col">Actual</th>
                 <th scope="col">Edge (5+ bets)</th>
-                <th scope="col">Share of loss</th>
+                <th scope="col">% of loss</th>
               </tr>
             </thead>
             <tbody>
@@ -118,8 +118,12 @@ export function SessionPanel({ stats, rollCount, exposure, bankroll }: SessionPa
               ))}
             </tbody>
           </table>
-          {breakdown.sentence ? <p class="sim-session-note">{breakdown.sentence}</p> : null}
         </div>
+      ) : null}
+      {breakdown.sentence ? (
+        <p class="sim-session-note" data-k="loss-takeaway">
+          {breakdown.sentence}
+        </p>
       ) : null}
     </section>
   );

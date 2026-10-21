@@ -44,6 +44,6 @@ export function lossBreakdown(
   const sentence =
     `${betLabel(t)} bets were ${pct(s.wagered / totalWagered)} of your action but ` +
     `${pct(s.expectedLoss / totalLoss)} of your expected loss. ` +
-    `Pass Line would have cost about ${fmtMoney(costlyWagered * PASS_LINE_EDGE, { exact: true })} instead.`;
+    `Pass Line would have cost about ${fmtMoney(costlyWagered * PASS_LINE_EDGE, { exact: true })} on all your costly bets.`;
   return { loss, sentence };
 }

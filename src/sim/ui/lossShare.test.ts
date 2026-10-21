@@ -21,7 +21,7 @@ describe('lossBreakdown (I023)', () => {
     expect(Math.round(r.loss.field! * 100)).toBe(31);
     expect(Math.round(r.loss['pass-line']! * 100)).toBe(69);
     expect(r.sentence).toBe(
-      'Field bets were 10% of your action but 31% of your expected loss. Pass Line would have cost about $0.14 instead.',
+      'Field bets were 10% of your action but 31% of your expected loss. Pass Line would have cost about $0.14 on all your costly bets.',
     );
   });
 
@@ -34,5 +34,15 @@ describe('lossBreakdown (I023)', () => {
     const r = lossBreakdown({}, 0);
     expect(r.sentence).toBeNull();
     expect(r.loss).toEqual({});
+  });
+
+  it('sums all costly bets in the Pass Line comparison, not just the named one', () => {
+    // field 10% of action, any 7 5%: both costly (5.6% and 16.6%); X = (1000 + 500) x 7/495 = 21.2c
+    const r = lossBreakdown(
+      { field: bt(1000, 56), 'any-7': bt(500, 83), 'pass-line': bt(8500, 120) },
+      10000,
+    );
+    expect(r.sentence).toContain('Any seven bets were 5% of your action');
+    expect(r.sentence).toContain('Pass Line would have cost about $0.21 on all your costly bets.');
   });
 });

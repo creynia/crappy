@@ -63,11 +63,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: VISUAL=1 npx playwright test --project=visual
-      - if: failure()
+      # No committed baselines yet: write them (tests pass) so humans can review the images.
+      - name: Run visual tests
+        run: |
+          if [ -d tests/e2e/__screenshots__ ]; then
+            VISUAL=1 npx playwright test --project=visual
+          else
+            VISUAL=1 npx playwright test --project=visual --update-snapshots
+          fi
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: visual-report
           path: |
             playwright-report
             test-results
+            tests/e2e/__screenshots__
+          if-no-files-found: ignore

@@ -65,11 +65,11 @@ describe('PlanPanel', () => {
     render(<AutoRollPanel />, el);
     expect(el.querySelector('[data-testid="plan-panel"]')).toBeNull();
     await act(() => {
-      pressed(el, 'Auto-roll mode', 'Plan')!.click();
+      pressed(el, 'Auto-roll view', 'Plan')!.click();
     });
     expect(el.querySelector('[data-testid="plan-panel"]')).not.toBeNull();
     await act(() => {
-      pressed(el, 'Auto-roll mode', 'Run')!.click();
+      pressed(el, 'Auto-roll view', 'Run')!.click();
     });
     expect(el.querySelector('[data-testid="auto-roll-run"]')).not.toBeNull();
   });
@@ -77,6 +77,6 @@ describe('PlanPanel', () => {
   it('is not offered in a scripted lesson (fixed strategies)', () => {
     const el = document.createElement('div');
     render(<AutoRollPanel config={{ defaultStrategy: { id: 'pass-max-odds', unit: 500 } }} />, el);
-    expect(pressed(el, 'Auto-roll mode', 'Plan')).toBeUndefined();
+    expect(pressed(el, 'Auto-roll view', 'Plan')).toBeUndefined();
   });
 });

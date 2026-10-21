@@ -452,6 +452,7 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'table',
         'chart',
         'stopWin',
         'stopLoss',
@@ -484,6 +485,7 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.table !== undefined) c.bool('autoRoll.table', a.table);
       if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
         c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       // The panel offers these amounts as chips, so a scene can only pick one of them.

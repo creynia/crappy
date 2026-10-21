@@ -309,7 +309,7 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       let out = r.state;
       if (opts?.varianceFn) {
         const v = opts.varianceFn(state);
-        if (v) out = { ...out, stats: { ...out.stats, variance: out.stats.variance + v } };
+        if (v !== 0) out = { ...out, stats: { ...out.stats, variance: out.stats.variance + v } };
       }
       if (loss || byTypeLoss) {
         const byType = { ...out.stats.byType };

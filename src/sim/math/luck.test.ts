@@ -15,7 +15,12 @@ function session(seed: number, layout: Layout, rolls: number): GameState {
   for (let i = 0; i < rolls; i++) {
     for (const [type, dollars] of layout) {
       if (s.bets.some((b) => b.type === type)) continue;
-      const parent = type.endsWith('odds') ? s.bets.find((b) => b.type === 'pass-line') : undefined;
+      const parent =
+        type === 'pass-odds'
+          ? s.bets.find((b) => b.type === 'pass-line')
+          : type === 'come-odds'
+            ? s.bets.find((b) => b.type === 'come' && b.point !== null)
+            : undefined;
       const r = applyAction(s, {
         type: 'place-bet',
         betType: type,
@@ -32,6 +37,13 @@ function session(seed: number, layout: Layout, rolls: number): GameState {
 }
 
 const LAYOUTS: [string, Layout][] = [
+  [
+    'come + odds',
+    [
+      ['come', 10],
+      ['come-odds', 20],
+    ],
+  ],
   ['pass line', [['pass-line', 10]]],
   ["don't pass", [['dont-pass', 10]]],
   [
@@ -84,6 +96,25 @@ describe('luck z-score', () => {
     });
   }
 
+  for (const [name, layout] of [
+    ['fire', [['fire', 5]]],
+    ['all', [['all', 5]]],
+    [
+      'pass + tall + small',
+      [
+        ['pass-line', 10],
+        ['tall', 5],
+        ['small', 5],
+      ],
+    ],
+  ] as [string, Layout][]) {
+    it(`${name}: luck is reported as unavailable, not a wrong z`, () => {
+      const l = luckOf(session(7, layout, 40).stats);
+      expect(l.unknown).toBe(true);
+      expect(l.z).toBeNull();
+    });
+  }
+
   it('adds nothing without bets', () => {
     expect(makeVarianceFn()(createGame({ seed: 1 }))).toBe(0);
   });
@@ -110,6 +141,6 @@ describe('luck z-score', () => {
     const l = luckFrom(-500, 100, NaN);
     expect(l.unknown).toBe(true);
     expect(l.z).toBeNull();
-    expect(luckText(l)).toContain('before this update');
+    expect(luckText(l)).toContain('not available');
   });
 });

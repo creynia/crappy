@@ -25,7 +25,8 @@ export function loadSandbox(key: string): PersistedSandbox | null {
     // Saves from before luck was tracked have no variance. If they already hold results the luck
     // cannot be reconstructed, so mark it unknown (NaN) instead of showing an absurd z.
     const stats = p.game.stats;
-    if (typeof stats.variance !== 'number') stats.variance = stats.expectedLoss > 0 ? NaN : 0;
+    if (typeof stats.variance !== 'number')
+      stats.variance = p.game.rollCount > 0 || stats.totalWagered > 0 ? NaN : 0;
     return p;
   } catch {
     return null;

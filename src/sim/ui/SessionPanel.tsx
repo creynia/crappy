@@ -73,7 +73,7 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
             />
           </div>
           <div class="sim-luck-ticks" aria-hidden="true">
-            <span style={{ left: '10%' }}>-2</span>
+            <span style={{ left: '10%' }}>−2</span>
             <span style={{ left: '50%' }}>0</span>
             <span style={{ left: '90%' }}>+2</span>
           </div>

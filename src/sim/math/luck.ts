@@ -1,6 +1,7 @@
 import { applyAction } from '../engine/game';
 import type { GameEvent, GameState, SessionStats } from '../engine/types';
 import { ALL_DICE } from './dice';
+import { isBonusType } from '../engine/bets';
 import { betEV } from './ev';
 import { toNumber } from './fraction';
 import { isLineLike } from './outcomes';
@@ -27,7 +28,7 @@ function standingEV(s: GameState): number {
 function layoutKey(s: GameState): string {
   let key = s.phase === 'point' ? `p${s.point}` : 'c';
   for (const b of s.bets)
-    key += `|${b.type}:${b.amount}:${b.point ?? ''}:${b.working}:${b.parentId ?? ''}`;
+    key += `|${b.type}:${b.amount}:${b.point ?? ''}:${b.working}:${b.parentId ?? ''}:${b.progress?.join('.') ?? ''}`;
   return key;
 }
 
@@ -43,10 +44,14 @@ export function makeVarianceFn(): (s: GameState) => number {
   let rulesRef: GameState['rules'] | null = null;
   return (s) => {
     if (s.bets.length === 0) return 0;
+    // Fire and All/Tall/Small run for many rolls with a payout far from the usual: no standing-value
+    // model here, so luck is reported as unavailable (NaN is sticky) once one is on the table.
+    if (s.bets.some((b) => isBonusType(b.type))) return NaN;
     if (rulesRef !== s.rules) {
       cache.clear();
       rulesRef = s.rules;
     }
+    if (cache.size > 5000) cache.clear();
     const key = layoutKey(s);
     let v = cache.get(key);
     if (v === undefined) {
@@ -113,7 +118,8 @@ export function normalCdf(z: number): number {
 
 /** "within the normal range (about 0.8 typical swings above expected, about 1 in 5 sessions do better)" */
 export function luckText(l: Luck): string {
-  if (l.unknown) return 'not available for sessions started before this update (reset to see it)';
+  if (l.unknown)
+    return 'not available for this session (bonus bets, or a save from before luck was tracked); reset to see it';
   if (l.z === null) return 'too early to say';
   const n = Math.abs(l.z).toFixed(1);
   const dir = l.z >= 0 ? 'above' : 'below';

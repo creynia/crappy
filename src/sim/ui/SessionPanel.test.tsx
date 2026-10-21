@@ -33,13 +33,13 @@ describe('SessionPanel luck band', () => {
     render(<SessionPanel stats={stats(5000, 0, 100, 250_000)} rollCount={5} />);
     expect(screen.getByText(/unusually lucky/)).toBeTruthy();
   });
-  it('old state without variance renders without a verdict bar', () => {
+  it('a session with nothing resolved yet shows no verdict bar', () => {
     render(<SessionPanel stats={stats(0, 1000, 0, 0)} rollCount={5} />);
     expect(screen.getByText(/too early to say/)).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
   });
   it('says so when the save predates luck tracking', () => {
     render(<SessionPanel stats={stats(0, 1000, 100, NaN)} rollCount={5} />);
-    expect(screen.getByText(/before this update/)).toBeTruthy();
+    expect(screen.getByText(/not available/)).toBeTruthy();
   });
 });

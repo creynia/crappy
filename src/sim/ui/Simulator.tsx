@@ -44,16 +44,15 @@ const isCenterBet = (b: Bet) => {
 };
 
 export function Simulator(props: SimulatorInternalProps) {
-  const [scene, setScene] = useState<SceneConfig>(props.scene ?? SANDBOX_SCENE);
+  const initialScene = props.scene ?? SANDBOX_SCENE;
   const mode = props.mode ?? (props.scene ? 'embedded' : 'sandbox');
   const sandbox = mode === 'sandbox';
-  const ui = scene.ui ?? {};
-  const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
+  const { settings, setSettings, boot } = useUrlBoot(props, initialScene, mode);
   // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
-  useEffect(() => {
-    const r = boot.customRules;
-    if (r) setScene((s) => ({ ...s, rules: r }));
-  }, []);
+  const [scene, setScene] = useState<SceneConfig>(() =>
+    boot.customRules ? { ...initialScene, rules: boot.customRules } : initialScene,
+  );
+  const ui = scene.ui ?? {};
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -153,7 +152,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId | TableRules }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | Partial<TableRules> }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };

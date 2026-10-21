@@ -193,6 +193,9 @@ export function RulesEditor(p: RulesEditorProps) {
           </span>
         ))}
       </div>
+      <p class="sim-rules-note">
+        The come-out switches change when bets work, not their edge per bet resolved.
+      </p>
       <div class="sim-rules-actions">
         <button type="button" onClick={p.onCancel}>
           Cancel

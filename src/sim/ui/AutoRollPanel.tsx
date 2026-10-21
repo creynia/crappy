@@ -21,6 +21,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { matchingPreset } from './customRules';
 import { RulesEditor } from './RulesEditor';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
@@ -497,7 +498,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             onCancel={() => setEditingRules(false)}
             onApply={(r) => {
               setEditingRules(false);
-              setCustomRules(r);
+              // a form equal to a preset is that preset
+              const m = matchingPreset(r);
+              if (m) {
+                setPreset(m);
+                setCustomRules(null);
+              } else setCustomRules(r);
             }}
           />
         ) : null}

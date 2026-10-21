@@ -8,7 +8,7 @@ export interface SimMenuProps {
   canRebet: boolean;
   busy: boolean;
   onRebet: () => void;
-  onReset: (opts?: { rules?: RulePresetId | TableRules }) => void;
+  onReset: (opts?: { rules?: RulePresetId | Partial<TableRules> }) => void;
   /** the Rules select: a preset, or 'custom' when the table runs edited rules */
   rulesValue: RulePresetId | 'custom';
   /** the table's current rules, where the custom editor starts */
@@ -72,7 +72,9 @@ export function SimMenu({
           onCancel={() => setEditing(false)}
           onApply={(r) => {
             setEditing(false);
-            onReset({ rules: matchingPreset(r) ?? r });
+            // custom rules carry no preset id (resolveRules fills in the default)
+            const { presetId: _preset, ...custom } = r;
+            onReset({ rules: matchingPreset(r) ?? custom });
           }}
         />
       ) : null}

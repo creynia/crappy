@@ -38,13 +38,19 @@ function isPreset(s: string): s is RulePresetId {
   return (PRESETS as string[]).includes(s);
 }
 
+/** Custom rules carry no preset id (resolveRules fills in the default). */
+function withoutPreset(r: TableRules): Partial<TableRules> {
+  const { presetId: _preset, ...rest } = r;
+  return rest;
+}
+
 export function buildCore(
   scene: SceneConfig,
   settings: ResolvedSimSettings,
   mode: 'sandbox' | 'embedded',
   persistKey: string | undefined,
   url: URLSearchParams,
-): { core: Core; startEquity: Cents; chip?: Cents; customRules?: TableRules } {
+): { core: Core; startEquity: Cents; chip?: Cents; customRules?: Partial<TableRules> } {
   const sandbox = mode === 'sandbox';
   const hasUrl = sandbox && (url.has('seed') || url.has('dice') || url.has('rules'));
   const urlRules = url.get('rules');
@@ -68,7 +74,7 @@ export function buildCore(
         },
         startEquity: saved.startBankroll,
         ...(saved.chip ? { chip: saved.chip } : {}),
-        ...(custom ? { customRules: saved.game.rules } : {}),
+        ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
       };
     }
   }

@@ -84,12 +84,12 @@ describe('RulesEditor: each field maps to TableRules', () => {
   it('the live summary follows the form', () => {
     const e = editor();
     const summary = () => e.container.querySelector('[data-testid="rules-summary"]')!.textContent;
-    expect(summary()).toContain('Pass + max odds: 0.37%');
-    expect(summary()).toContain('Buy 4: 1.67%');
+    expect(summary()).toContain('Pass $10 + max odds: 0.37%');
+    expect(summary()).toContain('Buy 4 $25: 1.33%');
     e.pick('vigTiming', 'upfront');
     e.pick('field12', '3');
-    expect(summary()).toContain('Buy 4: 4.76%');
-    expect(summary()).toContain('Field: 2.78%');
+    expect(summary()).toContain('Buy 4 $25: 3.85%');
+    expect(summary()).toContain('Field $5: 2.78%');
   });
   it('keeps an odds limit or table minimum a scene set, without forcing a choice', () => {
     const e = editor(
@@ -138,13 +138,17 @@ describe('sandbox: custom rules from the menu', () => {
 });
 
 describe('auto-roll panel: custom rules', () => {
-  it('Custom… opens the editor and the runs use the applied rules', () => {
-    const { container } = render(<AutoRollPanel />);
+  it('Custom… opens the editor and the runs use the applied rules', async () => {
+    const { container } = render(
+      <AutoRollPanel config={{ defaultStrategy: { id: 'field-every-roll', unit: 500 } }} />,
+    );
     const sel = [...container.querySelectorAll('select')].find((s) =>
       [...s.options].some((o) => o.value === 'custom'),
     )!;
     change(sel, 'custom');
     change(container.querySelector('[name="field12"]'), '3');
+    // plus a payout unit, so the form is not just the "field 3x on 12" preset
+    change(container.querySelector('[name="payoutUnit"]'), '50');
     void act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     });
@@ -154,5 +158,25 @@ describe('auto-roll panel: custom rules', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Edit custom rules' }));
     });
     expect((container.querySelector('[name="field12"]') as HTMLSelectElement).value).toBe('3');
+    // the run's edge reflects the custom rules: field 3x on 12 is 2.78% (5.56% standard)
+    await act(async () => {
+      (container.querySelector('[data-testid="auto-roll-run"]') as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    const summary = container.querySelector('[data-testid="auto-roll-summary"]')!.textContent;
+    expect(summary).toContain('2.78%');
+    expect(summary).not.toContain('5.56%');
+  });
+  it('a form equal to a preset selects that preset', () => {
+    const { container } = render(<AutoRollPanel />);
+    const sel = [...container.querySelectorAll('select')].find((s) =>
+      [...s.options].some((o) => o.value === 'custom'),
+    )!;
+    change(sel, 'custom');
+    change(container.querySelector('[name="odds"]'), '100x');
+    void act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    });
+    expect(sel.value).toBe('odds-100x');
   });
 });

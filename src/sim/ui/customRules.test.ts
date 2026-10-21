@@ -47,26 +47,43 @@ describe('custom rules: live summary (exact)', () => {
     expect(passMaxOddsEdge(resolveRules(oddsLimits('2x')))).toEqual(frac(7 * 36, 495 * 84));
     expect(fmtEdgePct(rulesSummary(resolveRules('odds-100x'))[0]!.edge)).toBe('0.02%');
   });
-  it('field 2x/3x on 12, buy-4 on-win vs upfront vig', () => {
-    const pct = (r: ReturnType<typeof resolveRules>) =>
-      Object.fromEntries(rulesSummary(r).map((i) => [i.label, fmtEdgePct(i.edge)]));
-    expect(pct(resolveRules())).toEqual({
-      'Pass + max odds': '0.37%',
-      Field: '5.56%',
-      'Buy 4': '1.67%',
-      'Place 6': '1.52%',
-    });
-    const r = pct(
-      resolveRules({
-        fieldPays: { 2: 2, 12: 3 },
-        vig: { rate: 0.05, timing: 'upfront', rounding: 'floor-dollar-min-1' },
-      }),
-    );
-    expect(r.Field).toBe('2.78%');
-    expect(r['Buy 4']).toBe('4.76%');
+  const pct = (over: Parameters<typeof resolveRules>[0]) =>
+    Object.fromEntries(rulesSummary(resolveRules(over)).map((i) => [i.label, fmtEdgePct(i.edge)]));
+  const VIG = (timing: 'on-win' | 'upfront', rounding: 'floor-dollar-min-1' | 'exact-cents') => ({
+    vig: { rate: 0.05, timing, rounding },
   });
-  it('rounding payouts down to $1 changes nothing for properly sized bets ($10 flat, $12 place 6)', () => {
-    expect(rulesSummary(resolveRules({ payoutUnit: 100 }))).toEqual(rulesSummary(resolveRules()));
+  it('standard rules: every line at its usual size', () => {
+    expect(pct(undefined)).toEqual({
+      'Pass $10 + max odds': '0.37%',
+      'Field $5': '5.56%',
+      'Buy 4 $25': '1.33%',
+      'Place 6 $12': '1.52%',
+      'Place 6 $5': '1.55%',
+    });
+  });
+  it('field 3x on 12', () => {
+    expect(pct({ fieldPays: { 2: 2, 12: 3 } })['Field $5']).toBe('2.78%');
+  });
+  it('vig timing and rounding move Buy 4 $25 (decisions.md: 1.33% / 3.85%)', () => {
+    expect(pct(VIG('on-win', 'floor-dollar-min-1'))['Buy 4 $25']).toBe('1.33%'); // $1 vig on a win
+    expect(pct(VIG('upfront', 'floor-dollar-min-1'))['Buy 4 $25']).toBe('3.85%'); // 1/26
+    expect(pct(VIG('on-win', 'exact-cents'))['Buy 4 $25']).toBe('1.67%'); // $1.25 on a win
+    expect(pct(VIG('upfront', 'exact-cents'))['Buy 4 $25']).toBe('4.76%'); // 1.25/26.25
+  });
+  it('payout unit moves Place 6 $5 (pays $5.83): 1.55% / 4.55% / 9.09%', () => {
+    expect(pct({ payoutUnit: 1 })['Place 6 $5']).toBe('1.55%');
+    expect(pct({ payoutUnit: 50 })['Place 6 $5']).toBe('4.55%');
+    expect(pct({ payoutUnit: 100 })['Place 6 $5']).toBe('9.09%');
+    // properly sized bets lose nothing to rounding
+    expect(pct({ payoutUnit: 100 })['Place 6 $12']).toBe('1.52%');
+  });
+  it('bets are raised to the table minimum, so every line is legal', () => {
+    expect(Object.keys(pct({ tableMin: 2500 }))).toEqual([
+      'Pass $25 + max odds',
+      'Field $25',
+      'Buy 4 $25',
+      'Place 6 $25',
+    ]);
   });
 });
 

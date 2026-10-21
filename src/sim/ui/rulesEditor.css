@@ -24,7 +24,8 @@
   gap: 2px;
   font-size: 0.9rem;
 }
-.sim-rules select {
+/* form.sim-rules outranks `.sim-menu select` (40px) so every select is a 44px target */
+form.sim-rules select {
   min-height: 44px;
   font: inherit;
   background: var(--sim-surface);
@@ -81,4 +82,9 @@
 .sim-rules :is(button, select, input):focus-visible {
   outline: 3px solid var(--sim-focus);
   outline-offset: 2px;
+}
+.sim-rules-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--sim-muted);
 }

@@ -119,8 +119,11 @@ test.describe('sandbox', () => {
     await menu.getByLabel('Rules').selectOption('custom');
     const form = page.locator('form.sim-rules');
     await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
-    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4: 4.76%');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
     await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await form.getByRole('button', { name: /^Apply/ }).click();
     await expect(form).toHaveCount(0);
     await expect(menu.getByLabel('Rules')).toHaveValue('custom');

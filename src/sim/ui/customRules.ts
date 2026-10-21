@@ -69,11 +69,10 @@ const ratio = (f: Fraction) => toNumber(f);
 const POINT_WAYS: Record<PointNumber, number> = { 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3 };
 
 /**
- * House edge of a $10 Pass Line bet backed with full odds on every point, per dollar wagered
- * (flat plus the expected odds). Exact for the given rules, payout rounding included.
+ * House edge of a Pass Line bet (default $10) backed with full odds on every point, per dollar
+ * wagered (flat plus the expected odds). Exact for the given rules, payout rounding included.
  */
-export function passMaxOddsEdge(rules: TableRules): Fraction {
-  const flat = 1000;
+export function passMaxOddsEdge(rules: TableRules, flat: Cents = 1000): Fraction {
   let ev: Fraction = betEV({ type: 'pass-line', amount: flat, point: null }, comeOut(rules));
   let wagered: Fraction = frac(flat);
   for (const p of POINTS) {
@@ -94,16 +93,27 @@ export interface RulesSummaryItem {
   edge: number;
 }
 
-/** The live summary under the editor: what these rules do to the bets they change. */
+const dollars = (c: Cents) => `$${c / 100}`;
+
+/**
+ * The live summary under the editor: what these rules do to the bets they change, each at a
+ * typical size raised to the table minimum (so every line is a legal bet). Buy 4 at $25 shows the
+ * vig rounding (decisions.md: 1.33% on a win, 3.85% up front); Place 6 at $5 shows payout rounding
+ * (1.55% exact, 4.55% to 50¢, 9.09% to $1).
+ */
 export function rulesSummary(rules: TableRules): RulesSummaryItem[] {
+  const at = (x: Cents) => Math.max(x, rules.tableMin);
   const e = (t: Parameters<typeof betEdge>[0], amount: Cents) =>
     ratio(betEdge(t, amount, comeOut(rules)).perResolved);
-  return [
-    { label: 'Pass + max odds', edge: ratio(passMaxOddsEdge(rules)) },
-    { label: 'Field', edge: e('field', 500) },
-    { label: 'Buy 4', edge: e('buy-4', 2000) },
-    { label: 'Place 6', edge: e('place-6', 1200) },
+  const pass = at(1000);
+  const items: RulesSummaryItem[] = [
+    { label: `Pass ${dollars(pass)} + max odds`, edge: ratio(passMaxOddsEdge(rules, pass)) },
+    { label: `Field ${dollars(at(500))}`, edge: e('field', at(500)) },
+    { label: `Buy 4 ${dollars(at(2500))}`, edge: e('buy-4', at(2500)) },
+    { label: `Place 6 ${dollars(at(1200))}`, edge: e('place-6', at(1200)) },
   ];
+  if (rules.tableMin <= 500) items.push({ label: 'Place 6 $5', edge: e('place-6', 500) });
+  return items;
 }
 
 export const fmtEdgePct = (x: number) => `${(x * 100).toFixed(2)}%`;

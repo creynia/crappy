@@ -54,7 +54,7 @@ interface Candidate {
 
 const dollars = (c: Cents) => formatMoney(c);
 const pointOn = (point: PointNumber, rack: Cents, extra: string) =>
-  `The point is ${point}. ${extra} You have ${dollars(rack)} in the rack. Which move costs you the least?`;
+  `The point is ${point}. ${extra} You have ${dollars(rack)} in the rack. Which move has the lowest house edge (cost per dollar you bet)?`;
 
 function game(opts: { point?: PointNumber | null; bets?: BetInit[] }): GameState {
   const point = opts.point ?? null;
@@ -245,7 +245,7 @@ const TEMPLATES: Template[] = [
       ];
       return {
         state,
-        situation: `Come-out roll, nothing on the table, ${dollars(state.bankroll)} in the rack. Which bet gives the house the least?`,
+        situation: `Come-out roll, nothing on the table, ${dollars(state.bankroll)} in the rack. Which move has the lowest house edge (cost per dollar you bet)?`,
         candidates,
       };
     },
@@ -430,18 +430,29 @@ export function rankedLines(item: BestMoveItem): string[] {
       (prev && Math.abs(prev.evPerDollar - o.evPerDollar) < 1e-12) ||
       (ranked[i + 1] && Math.abs(ranked[i + 1]!.evPerDollar - o.evPerDollar) < 1e-12);
     if (!prev || Math.abs(prev.evPerDollar - o.evPerDollar) >= 1e-12) rank = i + 1;
-    // the headline already states the house edge when there is one
-    const per = /%/.test(o.headline)
+    // the headline already states the house edge (or "no house edge") when there is one
+    const head = o.headline.replace(/\.$/, '').replace('gives up +$', 'gives up $');
+    const takeDown = /^Taking this down gives up/.test(head);
+    const per = /%|no house edge/.test(head)
       ? ''
-      : o.evPerDollar >= 0
-        ? ' (no cost)'
-        : ` (${pct(-o.evPerDollar)} of the money at risk)`;
-    return `${rank}${tied ? ' (tied)' : ''}. ${o.label}: ${o.headline}${per}.`;
+      : takeDown
+        ? ` (${pct(-o.evPerDollar)} of the bet)`
+        : o.evPerDollar >= 0
+          ? ' (no cost)'
+          : ` (${pct(-o.evPerDollar)} of the money at risk)`;
+    return `${rank}${tied ? ' (tied)' : ''}. ${o.label}: ${head}${per}.`;
   });
 }
 
-const METRIC =
-  'Ranked by expected value per dollar, per bet resolved. Odds bets cost nothing, but they still add to the swings.';
+/** The metric, plus the variance caveat only when an odds bet is among the options. */
+export function metricText(item: BestMoveItem): string {
+  const odds = item.options.some(
+    (o) => o.action.type === 'place-bet' && o.action.betType.endsWith('-odds'),
+  );
+  return `Ranked by expected value per dollar, per bet resolved.${
+    odds ? ' Odds bets cost nothing, but they still add to the swings.' : ''
+  }`;
+}
 
 export const bestMove = defineDrill<BestMoveItem, string>({
   id: 'best-move',
@@ -455,7 +466,7 @@ export const bestMove = defineDrill<BestMoveItem, string>({
       ok: answer === item.best,
       expected: best.label,
       correct: item.best,
-      explain: METRIC,
+      explain: metricText(item),
       explainList: rankedLines(item),
     };
   },

@@ -8,6 +8,14 @@ const item = (seed: number, level: number) =>
   bestMove.generate(createDrillRng(seed), level) as BestMoveItem;
 
 describe('best move drill', () => {
+  it('asks for the lowest house edge per dollar, matching the ranking', () => {
+    for (let seed = 0; seed < 40; seed++)
+      for (const level of [1, 2, 3])
+        expect(item(seed, level).prompt).toContain(
+          'Which move has the lowest house edge (cost per dollar you bet)?',
+        );
+  });
+
   it('over 500 seeds per level the marked answer has the top EV per dollar, with no ties', () => {
     for (let level = 1; level <= bestMove.levels.length; level++) {
       for (let seed = 0; seed < 500; seed++) {
@@ -55,13 +63,19 @@ describe('best move drill', () => {
     expect(wrong.ok).toBe(false);
     expect(wrong.expected).toBe(it_.options.find((o) => o.id === it_.best)!.label);
     expect(wrong.explain).toContain('per bet resolved');
-    expect(wrong.explain).toContain('swings');
+    expect(wrong.explain.includes('swings')).toBe(
+      it_.options.some((o) => o.action.type === 'place-bet' && o.action.betType.endsWith('-odds')),
+    );
     const list = wrong.explainList!;
     expect(list).toHaveLength(it_.options.length);
     expect(list[0]).toMatch(/^1\. /);
     for (const o of it_.options) expect(list.some((l) => l.includes(o.headline))).toBe(true);
     // the house edge is stated once (in the headline), not again in a trailing parenthesis
-    for (const l of list) expect(l).not.toMatch(/house edge [\d.]+%\).*of the money at risk/);
+    for (const l of list) {
+      expect(l).not.toMatch(/house edge [\d.]+%\).*of the money at risk/);
+      expect(l).not.toMatch(/no house edge.*\(no cost\)/);
+      expect(l).not.toMatch(/\.\s\(/);
+    }
   });
 
   it('level 1 always offers free odds and marks them best; level 3 prices taking down a winning DP', () => {
@@ -81,6 +95,8 @@ describe('best move drill', () => {
       if (!down) continue;
       seen = true;
       expect(down.headline).toMatch(/^Taking this down gives up \+?\$\d/);
+      const row = rankedLines(l3).find((l) => l.includes('Take down'))!;
+      expect(row).toMatch(/gives up \$\d+\.\d\d of expected value \([\d.]+% of the bet\)\.$/);
       expect(down.evCents).toBeLessThan(0);
       expect(l3.best).toBe('lay-odds');
     }

@@ -198,6 +198,7 @@
   padding-left: 0;
   display: grid;
   gap: 0.25rem;
+}
 
 /* ---------- Call the bet ---------- */
 .pr-call {

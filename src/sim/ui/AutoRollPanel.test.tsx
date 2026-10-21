@@ -13,7 +13,7 @@ async function click(el: HTMLElement, selector: string) {
 /** Poll (inside act) until `check` returns a truthy value; the run is slow under CI load. */
 async function waitUntil<T>(check: () => T | null | undefined | false): Promise<T> {
   let found: T | null | undefined | false = null;
-  for (let i = 0; i < 300 && !found; i++) {
+  for (let i = 0; i < 80 && !found; i++) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });

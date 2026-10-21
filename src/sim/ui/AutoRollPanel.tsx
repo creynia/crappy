@@ -490,7 +490,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
-        <div class="sim-ar-summary-wrap">
+        <div class="sim-ar-summary-wrap" tabindex={0} role="region" aria-label="Strategy summary">
           <table class="sim-ar-summary" data-testid="auto-roll-summary">
             <thead>
               <tr>

@@ -399,6 +399,11 @@
   overflow-x: auto;
   max-width: 100%;
 }
+.sim-ar-summary th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--sim-surface);
+}
 .sim-ar-summary {
   width: 100%;
   margin-top: 12px;

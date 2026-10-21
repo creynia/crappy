@@ -67,9 +67,14 @@ test.describe('sandbox', () => {
       );
       expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
     };
-    for (const width of [390, 412]) {
+    for (const { width, height } of [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
       // single-strategy auto-roll in the sandbox
-      await page.setViewportSize({ width, height: 844 });
+      await page.setViewportSize({ width, height });
       await page.goto('/#/play?speed=fast');
       const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
       if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();

@@ -1,0 +1,90 @@
+/* Custom table rules editor (I033). Used in the sandbox menu and the auto-roll panel. */
+.sim-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--sim-border);
+  border-radius: 10px;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+}
+.sim-rules h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.sim-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+.sim-rules-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+/* form.sim-rules outranks `.sim-menu select` (40px) so every select is a 44px target */
+form.sim-rules select {
+  min-height: 44px;
+  font: inherit;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.sim-rules-checks {
+  margin: 0;
+  padding: 4px 8px 6px;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+}
+.sim-rules-checks legend {
+  font-size: 0.9rem;
+  padding: 0 4px;
+}
+.sim-rules-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+.sim-rules-check input {
+  width: 20px;
+  height: 20px;
+}
+.sim-rules-summary {
+  font-size: 0.9rem;
+  color: var(--sim-text);
+}
+.sim-rules-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sim-rules-actions button {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  font: inherit;
+  cursor: pointer;
+}
+.sim-rules-actions .sim-primary {
+  background: var(--sim-accent);
+  color: var(--sim-accent-ink);
+  border-color: transparent;
+  font-weight: 700;
+}
+.sim-rules :is(button, select, input):focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+.sim-rules-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--sim-muted);
+}

@@ -179,7 +179,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const pick = readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table';
     return pick !== 'table' && !BANKROLL_CHIPS.includes(pick) ? String(pick / 100) : '';
   });
-  const bankroll = bankrollPick === 'table' ? tableBankroll : bankrollPick;
   const all = useMemo(() => {
     const l = listStrategies();
     return config?.strategies ? l.filter((s) => config.strategies!.includes(s.id)) : l;
@@ -200,9 +199,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
   const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
   const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
-  useEffect(() => {
-    if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
-  }, [bankroll, stopLoss]);
   useEffect(
     () => writeStoredBankroll(props.persistKey, bankrollPick),
     [bankrollPick, props.persistKey],
@@ -227,6 +223,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     bankrollText.trim() === '' ? null : parseBankroll(bankrollText, rules.tableMin);
   const bankrollError = bankrollParse && !bankrollParse.ok ? bankrollParse.message : null;
   const tableTooSmall = tableBankroll < rules.tableMin;
+  // Below the table minimum the Table chip is disabled and the run uses $500 instead of blocking.
+  const bankroll =
+    bankrollPick === 'table' ? (tableTooSmall ? 50_000 : tableBankroll) : bankrollPick;
+  useEffect(() => {
+    if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
+  }, [bankroll, stopLoss]);
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -250,12 +252,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     setError(null);
     if (bankrollError) {
       setError(bankrollError);
-      return;
-    }
-    if (bankrollPick === 'table' && tableTooSmall) {
-      setError(
-        'Your table bankroll is below the table minimum. Pick a starting bankroll above it.',
-      );
       return;
     }
     if (stopLoss !== undefined && stopLoss > bankroll) {

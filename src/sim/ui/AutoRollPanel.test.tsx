@@ -268,4 +268,14 @@ describe('AutoRollPanel bankroll controls', () => {
     ).not.toThrow();
     spy.mockRestore();
   });
+
+  it('a scene with no table equity still runs: Table is disabled and the run uses $500', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={0} config={config} />, el);
+    expect(btn(group(el, 'Starting bankroll'), 'Table ($0.00)').disabled).toBe(true);
+    await click(el, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => el.querySelector('[data-testid="auto-roll-output"]'));
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain('$500.00');
+  });
 });

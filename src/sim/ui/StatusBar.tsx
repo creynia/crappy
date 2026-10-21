@@ -14,6 +14,8 @@ export interface StatusBarProps {
   onOpenHistory?: (n?: number) => void;
   /** hide the roll history strip (compact landscape rail) */
   compact?: boolean;
+  /** an optional control placed at the end of the phase row (portrait cost toggle) */
+  rowExtra?: unknown;
 }
 
 export function StatusBar({
@@ -24,6 +26,7 @@ export function StatusBar({
   history,
   onOpenHistory,
   compact,
+  rowExtra,
 }: StatusBarProps) {
   const last = history.length ? history[history.length - 1]! : null;
   const sign = session > 0 ? 'up' : session < 0 ? 'down' : 'even';
@@ -50,6 +53,7 @@ export function StatusBar({
         </span>
         <span class="sim-last">{last ? <Dice dice={last.dice} size="sm" /> : null}</span>
         {compact ? null : <HistoryStrip history={history} onOpenAll={onOpenHistory} />}
+        {rowExtra as never}
       </div>
     </div>
   );

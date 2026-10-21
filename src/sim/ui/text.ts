@@ -10,6 +10,7 @@ import {
 import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
 import { maxOddsAmount } from '../engine/validate';
 import { betEdge, betEV, betStdDev, edgeTier as tierOf, pointWinProb, toNumber } from '../math';
+import { edgeOfBet } from '../math/ev';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -673,4 +674,74 @@ export function workingCopy(c: WorkingCopyInput): string | undefined {
     return `${cost}. Hard ${n} loses on ${6 + easy} of 36 rolls (6 sevens and ${easy} easy ways).`;
   }
   return `${cost}.`;
+}
+
+/** Units the Roll-button cost cycles through: per roll, per hour, per $100 of action on the table. */
+export type CostUnit = 'roll' | 'hour' | 'bet100';
+export const COST_UNIT_LABEL: Record<CostUnit, string> = {
+  roll: 'per roll',
+  hour: 'per hour',
+  bet100: 'per $100 bet',
+};
+const COST_UNIT_NEXT: Record<CostUnit, CostUnit> = { roll: 'hour', hour: 'bet100', bet100: 'roll' };
+
+export function nextCostUnit(u: CostUnit): CostUnit {
+  return COST_UNIT_NEXT[u];
+}
+
+/**
+ * Edge on action: the house's expected take over every dollar on the table, as a fraction.
+ * Odds bets count 0 in the numerator (no house edge) but stay in the denominator.
+ */
+export function edgeOnAction(
+  state: Pick<GameState, 'bets' | 'phase' | 'point' | 'rules'>,
+): number | null {
+  let weighted = 0;
+  let total = 0;
+  for (const b of state.bets) {
+    total += b.amount;
+    if (BET_TYPES[b.type].category === 'odds') continue;
+    // line and come bets carry their own house edge (pass 1.41%, come 1.41%, don't come 1.36%),
+    // whatever the table point or the number they travelled to
+    const category = BET_TYPES[b.type].category;
+    const e =
+      category === 'line' || category === 'come'
+        ? edgeOfBet({ ...b, point: null }, { phase: 'come-out', point: null, rules: state.rules })
+        : edgeOfBet(b, { phase: state.phase, point: state.point, rules: state.rules });
+    weighted += b.amount * fracToNumber(e.perResolved);
+  }
+  return total > 0 ? weighted / total : null;
+}
+
+/** Expected cost in the chosen unit, e.g. "Expected cost: $1.41 per $100 bet"; undefined when it has no meaning. */
+export function rollCostText(
+  unit: CostUnit,
+  perRollCents: number,
+  rollsPerHour: number,
+  edgeOnActionFraction: number | null,
+): string | undefined {
+  const value =
+    unit === 'roll'
+      ? perRollCents
+      : unit === 'hour'
+        ? perRollCents * rollsPerHour
+        : edgeOnActionFraction === null
+          ? null
+          : edgeOnActionFraction * 10_000;
+  if (value === null) return undefined;
+  const amount = value > 0 && value < 1 ? '<1¢' : fmtMoney(Math.round(value), { exact: true });
+  return `Expected cost: ${amount} ${COST_UNIT_LABEL[unit]}`;
+}
+
+/** The compact two-line cost label on the Roll row: value ("$4.19") and unit ("/hr"). */
+export function costShort(
+  unit: CostUnit,
+  perRollCents: number,
+  rollsPerHour: number,
+  edgeOnActionFraction: number | null,
+): { value: string; unit: string } | undefined {
+  const full = rollCostText(unit, perRollCents, rollsPerHour, edgeOnActionFraction);
+  if (!full) return undefined;
+  const value = full.replace(/^Expected cost: /, '').replace(` ${COST_UNIT_LABEL[unit]}`, '');
+  return { value, unit: unit === 'roll' ? '/roll' : unit === 'hour' ? '/hr' : '/$100' };
 }

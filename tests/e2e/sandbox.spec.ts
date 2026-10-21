@@ -262,6 +262,95 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
+  test('wide status values at 360x740 keep the status height and Roll y of the no-toggle layout', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto(url('seed=1&dice=3-4&bankroll=250&bets=pass-line:100'));
+    await expect(page.locator('.sim-cost-toggle')).toHaveCount(1);
+    const status = await page.locator('.sim-status').first().boundingBox();
+    const roll = await page.locator('.sim-roll').boundingBox();
+    const cost = await page.locator('.sim-cost-toggle').boundingBox();
+    await page.addStyleTag({ content: '.sim-cost-toggle { display: none !important; }' });
+    const statusBase = await page.locator('.sim-status').first().boundingBox();
+    const rollBase = await page.locator('.sim-roll').boundingBox();
+    expect(Math.abs(status!.height - statusBase!.height), 'wide status height').toBeLessThanOrEqual(
+      1,
+    );
+    expect(Math.abs(roll!.y - rollBase!.y), 'wide roll y').toBeLessThanOrEqual(1);
+    expect(cost!.height, 'wide toggle 44px').toBeGreaterThanOrEqual(44);
+  });
+
+  test('cost toggle sits in the status line; Roll does not move or get covered', async ({
+    page,
+  }) => {
+    type Box = { x: number; y: number; width: number; height: number };
+    const overlaps = (a: Box, b: Box) =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    for (const { width, height } of [
+      { width: 390, height: 844 },
+      { width: 360, height: 740 },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto(url('seed=1&dice=3-4'));
+      const rollBefore = await page.locator('.sim-roll').boundingBox();
+      await page.locator('[data-region="pass"]').click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+      expect(await page.evaluate<number>('window.scrollY')).toBe(0);
+      const cost = await page.locator('.sim-cost-toggle').boundingBox();
+      const status = await page.locator('.sim-status').first().boundingBox();
+      const roll = await page.locator('.sim-roll').boundingBox();
+      expect(cost, `${width}x${height} cost toggle`).not.toBeNull();
+      expect(status, `${width}x${height} status line`).not.toBeNull();
+      // (a) the toggle starts inside the status line, at its top-right
+      expect(cost!.y, `${width}x${height} toggle top in status line`).toBeGreaterThanOrEqual(
+        status!.y,
+      );
+      expect(
+        cost!.x + cost!.width,
+        `${width}x${height} toggle right in status line`,
+      ).toBeLessThanOrEqual(status!.x + status!.width + 1);
+      expect(cost!.height, `${width}x${height} toggle hit area`).toBeGreaterThanOrEqual(44);
+      // (b) the toggle does not cover the status text
+      const texts = await page.evaluate<{ boxes: Box[]; clipped: string[] }>(`(() => {
+        const boxes = [];
+        const clipped = [];
+        for (const sel of ['.sim-status-money > *', '.sim-point', '.sim-last']) {
+          for (const e of document.querySelectorAll(sel)) {
+            const r = e.getBoundingClientRect();
+            boxes.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+            if (e.scrollWidth > e.clientWidth + 1) clipped.push(sel);
+          }
+        }
+        return { boxes, clipped };
+      })()`);
+      expect(texts.clipped, `${width}x${height} status text clipped`).toEqual([]);
+      for (const box of texts.boxes) {
+        expect(overlaps(cost!, box), `${width}x${height} toggle over status text`).toBe(false);
+      }
+      // Roll grows once a bet shows its cost inside the button, on main too; rev-i compares Roll with main
+      void rollBefore;
+      // (d) Roll does not intersect the rack or the toggle, and a plain click reaches it
+      // the status line and Roll sit exactly where they do with the toggle hidden (no-toggle baseline)
+      await page.addStyleTag({ content: '.sim-cost-toggle { display: none !important; }' });
+      const statusBase = await page.locator('.sim-status').first().boundingBox();
+      const rollBase = await page.locator('.sim-roll').boundingBox();
+      // remove the baseline style: a hash-only goto keeps the page, so it would hide the toggle at the next width
+      await page.evaluate(
+        `document.querySelectorAll('style').forEach((s) => { if (s.textContent?.includes('sim-cost-toggle { display: none')) s.remove(); })`,
+      );
+      expect(
+        Math.abs(status!.height - statusBase!.height),
+        `${width}x${height} status height`,
+      ).toBeLessThanOrEqual(1);
+      expect(Math.abs(roll!.y - rollBase!.y), `${width}x${height} roll y`).toBeLessThanOrEqual(1);
+      const chips = await page.locator('.sim-rack').boundingBox();
+      if (chips) expect(overlaps(roll!, chips), `${width}x${height} roll vs chip rack`).toBe(false);
+      expect(overlaps(roll!, cost!), `${width}x${height} roll vs cost toggle`).toBe(false);
+      await page.locator('.sim-roll').click({ timeout: 5_000 });
+    }
+  });
+
   test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

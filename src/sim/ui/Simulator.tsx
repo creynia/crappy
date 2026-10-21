@@ -18,6 +18,7 @@ import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
+import { CostToggle } from './CostToggle';
 import { SimMenu } from './SimMenu';
 import { PanelSheet, type PanelId, type PanelTab } from './PanelSheet';
 import {
@@ -508,9 +509,10 @@ export function Simulator(props: SimulatorInternalProps) {
       hidden={winShown}
     />
   );
-  const status = (compact: boolean) => (
+  const status = (compact: boolean, rowExtra?: unknown) => (
     <StatusBar
       {...(compact ? { compact } : {})}
+      {...(rowExtra ? { rowExtra } : {})}
       bankroll={game.bankroll}
       onTable={onTable}
       session={session}
@@ -570,7 +572,11 @@ export function Simulator(props: SimulatorInternalProps) {
 
       <div class="sim-main">
         <div class="sim-felt" {...(watching ? { inert: true } : {})}>
-          {!landscape ? status(false) : null}
+          {!landscape ? (
+            <div class="sim-status-wrap sim-status-wrap-cost">
+              {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
+            </div>
+          ) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (
               <CenterPanel {...tableProps} />

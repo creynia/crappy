@@ -75,6 +75,15 @@ export interface SceneConfig {
   challenge?: { rolls: number; scoring: { minResolved: Cents } };
 }
 
+/** One scripted action of a demo step, played by the runner with an optional caption. */
+export interface PlayFrame {
+  action: Action;
+  /** caption shown as a toast while this action plays */
+  say?: string;
+  /** ms to wait before the next frame (default depends on speed; 0 at instant speed) */
+  pauseMs?: number;
+}
+
 export interface SceneStep {
   id: string;
   text: string;
@@ -97,6 +106,12 @@ export interface SceneStep {
   completeWhen: Condition;
   advance?: 'auto' | 'button';
   showEV?: boolean;
+  /**
+   * Demo: when the step starts, these actions are played one at a time (bets, rolls with forced dice)
+   * with captions, then control is handed back. The learner can Replay or tap to skip to the end.
+   * Scripted actions skip the step's allowed-action gate but are counted toward `completeWhen`.
+   */
+  play?: PlayFrame[];
 }
 
 export interface StepAsk {

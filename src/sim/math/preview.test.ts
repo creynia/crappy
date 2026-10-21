@@ -262,14 +262,14 @@ describe('explainBet tree', () => {
       expect(tree!.points.map((p) => p.point)).toEqual([4, 5, 6, 8, 9, 10]);
     });
   }
-  it('pass line wins 244/495 overall and comes out 4/36, 8/36, 24/36', () => {
+  it('pass line wins 244/495 overall and comes out 8/36, 4/36, 24/36', () => {
     const s = comeOut();
     const t = explainBet({ type: 'pass-line', amount: 1000, point: null }, ctx(s)).tree!;
     const win = [...t.comeOut, ...t.points.flatMap((p) => p.leaves)]
       .filter((l) => l.label.startsWith('Win'))
       .reduce((a, l) => add(a, l.probability), ZERO);
     expect(eq(win, frac(244, 495))).toBe(true);
-    expect(t.comeOut.map((l) => fracText(l.probability))).toEqual(['1/9', '2/9']);
+    expect(t.comeOut.map((l) => fracText(l.probability))).toEqual(['2/9', '1/9']);
     expect(
       eq(
         t.points.reduce((a, p) => add(a, p.probability), ZERO),
@@ -280,5 +280,38 @@ describe('explainBet tree', () => {
   it('has no tree for one-state bets', () => {
     const s = comeOut();
     expect(explainBet({ type: 'field', amount: 500, point: null }, ctx(s)).tree).toBeUndefined();
+  });
+  it('point 4 branch: 1/12 to set, win leaf 1/36 given 3/9', () => {
+    const t = explainBet({ type: 'pass-line', amount: 1000, point: null }, ctx(comeOut())).tree!;
+    const p4 = t.points.find((p) => p.point === 4)!;
+    expect(fracText(p4.probability)).toBe('1/12');
+    expect(p4.ways).toBe(3);
+    const win = p4.leaves[0]!;
+    expect(win.label).toBe('Win on 4');
+    expect(fracText(win.probability)).toBe('1/36');
+    expect(eq(win.given!, frac(1, 3))).toBe(true);
+    expect(p4.leaves.map((l) => l.kind)).toEqual(['win', 'lose']);
+  });
+  it("don't pass pushes on 12 with net 0 (1/36) and totals add to 1", () => {
+    const t = explainBet({ type: 'dont-pass', amount: 1000, point: null }, ctx(comeOut())).tree!;
+    const push = t.comeOut.find((l) => l.kind === 'push')!;
+    expect(fracText(push.probability)).toBe('1/36');
+    expect(push.net.n).toBe(0n);
+    expect(eq(add(add(t.totals.win, t.totals.lose), t.totals.push), ONE)).toBe(true);
+    expect(fracText(t.totals.win)).toBe('949/1980');
+  });
+  it('a come bet during a point gets a tree; pass on a point and odds bets do not', () => {
+    const s = createGame({ seed: 1, phase: 'point', point: 6 });
+    expect(explainBet({ type: 'come', amount: 1000, point: null }, ctx(s)).tree).toBeDefined();
+    expect(explainBet({ type: 'pass-line', amount: 1000, point: 6 }, ctx(s)).tree).toBeUndefined();
+    expect(explainBet({ type: 'pass-odds', amount: 1000, point: 6 }, ctx(s)).tree).toBeUndefined();
+  });
+  it('rows carry the point they went through', () => {
+    const rows = explainBet({ type: 'pass-line', amount: 1000, point: null }, ctx(comeOut())).rows;
+    expect(rows.filter((r) => r.via === undefined).map((r) => r.label)).toEqual([
+      'Lose on 2, 3 or 12',
+      'Win on 7 or 11',
+    ]);
+    expect(rows.find((r) => r.via === 4)?.label).toBe('Point 4, then Win on 4');
   });
 });

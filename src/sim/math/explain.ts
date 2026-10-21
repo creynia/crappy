@@ -1,38 +1,51 @@
 import { BET_TYPES } from '../engine/bets';
-import { betEV } from './ev';
-import { fracText, money } from './format';
-import { neg } from './fraction';
-import { betOutcomes } from './ev';
-import { add, ZERO } from './fraction';
-import type { BetCtx, BetLike, Explanation, OutcomeTree, TreeLeaf } from './types';
 import type { PointNumber } from '../engine/types';
+import { pointWinProb, ways } from './dice';
+import { betEV, betOutcomes } from './ev';
+import { fracText, money } from './format';
+import { add, div, neg, ZERO, type Fraction } from './fraction';
+import { rollEffectGrid, worksNow } from './outcomes';
+import type { BetCtx, BetLike, Explanation, Outcome, OutcomeTree, TreeLeaf } from './types';
 
-const POINT_PREFIX = /^Point (\d+), then (.*)$/;
+const KIND_ORDER: Record<TreeLeaf['kind'], number> = { win: 0, lose: 1, push: 2 };
 
-/** Group the flat rows by the point they went through; null when no row passes through a point. */
-export function buildTree(rows: ReturnType<typeof betOutcomes>): OutcomeTree | null {
+/** Row labels read "Win on 4", "Point 4, then Lose on 7": only the stem is shown under a point. */
+function leafOf(r: Outcome): TreeLeaf {
+  const label = r.label.replace(/^Point \d+, then /, '');
+  const kind = label.startsWith('Win') ? 'win' : label.startsWith('Lose') ? 'lose' : 'push';
+  return { label, kind, probability: r.probability, net: r.net };
+}
+const byKind = (a: TreeLeaf, b: TreeLeaf) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
+
+/** Group the rows by the point they went through (`via`); null when no row passes through a point. */
+export function buildTree(rows: readonly Outcome[]): OutcomeTree | null {
   const comeOut: TreeLeaf[] = [];
-  const byPoint = new Map<number, TreeLeaf[]>();
+  const byPoint = new Map<PointNumber, TreeLeaf[]>();
   for (const r of rows) {
-    const m = POINT_PREFIX.exec(r.label);
-    const leaf = { label: m ? (m[2] as string) : r.label, probability: r.probability, net: r.net };
-    if (m) byPoint.set(Number(m[1]), [...(byPoint.get(Number(m[1])) ?? []), leaf]);
-    else comeOut.push(leaf);
+    const leaf = leafOf(r);
+    if (r.via === undefined) comeOut.push(leaf);
+    else byPoint.set(r.via, [...(byPoint.get(r.via) ?? []), leaf]);
   }
   if (byPoint.size === 0) return null;
   const points = [...byPoint.keys()]
-    .sort((a, b) => a - b)
-    .map((n) => {
-      const leaves = byPoint.get(n) as TreeLeaf[];
-      return {
-        point: n as PointNumber,
-        probability: leaves.reduce((acc, l) => add(acc, l.probability), ZERO),
-        leaves,
-      };
+    .sort((x, y) => x - y)
+    .map((point) => {
+      const leaves = (byPoint.get(point) as TreeLeaf[]).sort(byKind);
+      const probability = leaves.reduce((acc, l) => add(acc, l.probability), ZERO);
+      for (const l of leaves) l.given = div(l.probability, probability);
+      return { point, probability, ways: ways(point), pMake: pointWinProb(point), leaves };
     });
-  return { comeOut, points };
+  comeOut.sort(byKind);
+  const total = (k: TreeLeaf['kind']): Fraction =>
+    [...comeOut, ...points.flatMap((p) => p.leaves)]
+      .filter((l) => l.kind === k)
+      .reduce((acc, l) => add(acc, l.probability), ZERO);
+  return {
+    comeOut,
+    points,
+    totals: { win: total('win'), lose: total('lose'), push: total('push') },
+  };
 }
-import { rollEffectGrid, worksNow } from './outcomes';
 
 export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   const rows = betOutcomes(bet, ctx);

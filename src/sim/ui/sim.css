@@ -779,10 +779,25 @@
   overflow-wrap: anywhere;
 }
 .sim-tree summary {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   cursor: pointer;
-  min-height: 32px;
+  min-height: 44px;
   align-items: center;
+  list-style: none;
+}
+.sim-tree summary::-webkit-details-marker {
+  display: none;
+}
+.sim-tree summary::before {
+  content: '▸';
+}
+.sim-tree details[open] > summary::before {
+  content: '▾';
+}
+.sim-tree-total {
+  margin: 4px 2px 0;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 .sim-tree-net {
   text-align: right;

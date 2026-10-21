@@ -294,6 +294,15 @@ test.describe('sandbox', () => {
       // Roll grows once a bet shows its cost inside the button, on main too; rev-i compares Roll with main
       void rollBefore;
       // (d) Roll does not intersect the rack or the toggle, and a plain click reaches it
+      // the status line and Roll sit exactly where they do with the toggle hidden (no-toggle baseline)
+      await page.addStyleTag({ content: '.sim-cost-toggle { display: none !important; }' });
+      const statusBase = await page.locator('.sim-status').first().boundingBox();
+      const rollBase = await page.locator('.sim-roll').boundingBox();
+      expect(
+        Math.abs(status!.height - statusBase!.height),
+        `${width}x${height} status height`,
+      ).toBeLessThanOrEqual(1);
+      expect(Math.abs(roll!.y - rollBase!.y), `${width}x${height} roll y`).toBeLessThanOrEqual(1);
       const chips = await page.locator('.sim-rack').boundingBox();
       if (chips) expect(overlaps(roll!, chips), `${width}x${height} roll vs chip rack`).toBe(false);
       expect(overlaps(roll!, cost!), `${width}x${height} roll vs cost toggle`).toBe(false);

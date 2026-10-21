@@ -43,6 +43,8 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** ask Press / Same / Regress / Take down after a place or buy bet wins (off in scenes unless true) */
+    winPrompt?: boolean;
   };
   autoRoll?: {
     enabled: boolean;

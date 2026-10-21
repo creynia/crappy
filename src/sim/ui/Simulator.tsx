@@ -18,6 +18,14 @@ import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
+import { WinPrompt } from './WinPrompt';
+import {
+  saveAskAfterWin,
+  winChoices,
+  winPromptTarget,
+  type WinChoice,
+  type WinPromptTarget,
+} from './winPrompt';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
@@ -92,6 +100,8 @@ export function Simulator(props: SimulatorInternalProps) {
   };
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
+  // the place/buy bet that just won (cleared on the next roll, a choice, or a reset)
+  const [winTarget, setWinTarget] = useState<WinPromptTarget | null>(null);
   const landscape = useLandscape(scene);
 
   const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
@@ -118,7 +128,10 @@ export function Simulator(props: SimulatorInternalProps) {
       pushToast(message, 'info');
       announce(message);
     },
-    onRolled: anim.run,
+    onRolled: (pre, post, events) => {
+      anim.run(pre, post, events);
+      setWinTarget(winPromptTarget(post, events));
+    },
   });
 
   const { game: liveGame, rt } = core;
@@ -176,6 +189,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const roll = () => {
     if (anim.busy || sheet || lock) return;
+    setWinTarget(null);
     doAction({ type: 'roll' });
   };
 
@@ -189,6 +203,7 @@ export function Simulator(props: SimulatorInternalProps) {
     startedRef.current = -1;
     startEquity.current = equity(init.game);
     setToasts([]);
+    setWinTarget(null);
     setLog([]);
     setLogFocus(null);
     setCore({ game: init.game, rt: init.runtime });
@@ -216,6 +231,33 @@ export function Simulator(props: SimulatorInternalProps) {
       },
     });
   }, []);
+
+  // ---------- win prompt ----------
+  useEffect(() => {
+    if (sandbox) saveAskAfterWin(settings.winPrompt);
+  }, [settings.winPrompt, sandbox]);
+  const winBet = winTarget ? liveGame.bets.find((b) => b.id === winTarget.betId) : undefined;
+  const winOptions = useMemo(
+    () => (winBet && settings.winPrompt ? winChoices(liveGame, winBet) : []),
+    [liveGame, winBet, settings.winPrompt],
+  );
+  const chooseWin = (c: WinChoice) => {
+    setWinTarget(null);
+    if (c.action) doAction(c.action);
+  };
+  const winPromptEl =
+    winBet && settings.winPrompt && !anim.busy && !sheet && winOptions.length > 0 ? (
+      <WinPrompt
+        bet={winBet}
+        choices={winOptions}
+        onChoose={chooseWin}
+        onAlwaysSame={() => {
+          setSettings({ ...settings, winPrompt: false });
+          setWinTarget(null);
+        }}
+        onDismiss={() => setWinTarget(null)}
+      />
+    ) : null;
 
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
@@ -332,6 +374,7 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            {winPromptEl}
           </div>
         </div>
         {landscape ? (

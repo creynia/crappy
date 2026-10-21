@@ -20,6 +20,8 @@ export interface ResolvedSimSettings {
   sound: boolean;
   rollsPerHour: number;
   confirmSuckerBets: boolean;
+  /** ask Press / Same / Regress / Take down after a place or buy bet wins */
+  winPrompt: boolean;
 }
 
 export function resolveSettings(
@@ -43,5 +45,6 @@ export function resolveSettings(
     sound: false,
     rollsPerHour: typeof rph === 'number' && rph > 0 ? Math.round(rph) : 100,
     confirmSuckerBets: i.confirmSuckerBets ?? true,
+    winPrompt: i.winPrompt ?? false,
   };
 }

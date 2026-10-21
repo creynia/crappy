@@ -367,6 +367,16 @@
   top: 0;
   bottom: auto;
   gap: 2px;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-land .sim-toast > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .sim-land .sim-toast {
   font-size: 0.75rem;

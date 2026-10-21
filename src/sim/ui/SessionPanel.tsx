@@ -1,14 +1,19 @@
 import type { BetTypeId, SessionStats } from '../engine/types';
 import { luckOf, luckText } from '../math/luck';
+import { bankrollNote } from './bankrollNote';
 import { betLabel, fmtMoney, fmtPct } from './text';
 
 export interface SessionPanelProps {
   stats: SessionStats;
   rollCount: number;
+  /** worst-case exposure per decision of the layout on the table, cents (I057) */
+  exposure?: number;
+  /** current equity (bankroll plus chips on the table), cents */
+  bankroll?: number;
 }
 
 /** Curriculum 6.4: total bet, expected, actual, luck, edge per dollar, and the per-bet breakdown. */
-export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
+export function SessionPanel({ stats, rollCount, exposure, bankroll }: SessionPanelProps) {
   const actual = stats.totalWon - stats.totalLost;
   const expected = -stats.expectedLoss;
   const luck = actual - expected;
@@ -59,6 +64,9 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
       <p class={`sim-luck-text is-${band.verdict}`} data-k="luck-band">
         Luck: {fmtMoney(luck, { sign: true })} — {luckText(band)}
       </p>
+      {exposure !== undefined && bankroll !== undefined && bankrollNote(exposure, bankroll) ? (
+        <p class="sim-session-note">{bankrollNote(exposure, bankroll)}</p>
+      ) : null}
       {band.z !== null ? (
         <div class="sim-luck-scale">
           <div

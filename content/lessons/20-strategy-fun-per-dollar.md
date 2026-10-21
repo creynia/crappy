@@ -13,7 +13,7 @@ Here are some popular ways to play a $10-ish table, priced honestly (about 100 r
 | Strategy | What it is | Expected cost/hour | Hourly swing | Fun per $ (swing ÷ cost) |
 |---|---|---|---|---|
 | **Pass + max odds** | $10 Pass, 3-4-5× odds | $4.19 | ±$265 | **63** |
-| **3-point Molly** | $10 Pass + up to two $10 Come bets, all with max odds | ~$10.10 | ±$470 | **46** |
+| **3-point Molly** | $10 Pass + up to two $10 Come bets, all with max odds | $10.11 | ±$470 | **46** |
 | **Place 6 & 8** | $6 each, after the point | $3.91 | ±$50 | 13 |
 | Flat Pass | $10 Pass, no odds | $4.19 | ±$55 | 13 |
 | $1 Hard 6 & Hard 8 | kept up after the point | $3.91 | ±$20 | 5 |

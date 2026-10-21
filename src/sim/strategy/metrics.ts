@@ -60,8 +60,12 @@ const mollyCache = new Map<boolean, MollyRates>();
 function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
   const cached = mollyCache.get(comeOddsOnComeOut);
   if (cached) return cached;
-  type S = { p: number; cs: number[]; box: boolean };
-  const key = (x: S) => `${x.p}|${x.cs.join(',')}|${x.box ? 1 : 0}`;
+  // come bets are { number, has odds }: odds are laid at a decision in the point phase, so a come bet
+  // that travels on the roll that ends the hand has none until the next point is set
+  type C = { n: number; f: boolean };
+  type S = { p: number; cs: C[]; box: boolean };
+  const key = (x: S) =>
+    `${x.p}|${x.cs.map((c) => `${c.n}${c.f ? 'o' : ''}`).join(',')}|${x.box ? 1 : 0}`;
   const index = new Map<string, number>();
   const states: S[] = [];
   const add = (x: S): number => {
@@ -82,17 +86,17 @@ function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
     for (let t = 2; t <= 12; t++) {
       const odds = [0, 0, 0, 0, 0, 0]; // by POINTS index
       let flat = 0;
-      const cs: number[] = [];
-      for (const n of x.cs) {
-        if (t === 7 || t === n) {
+      const cs: C[] = [];
+      for (const c of x.cs) {
+        if (t === 7 || t === c.n) {
           flat++;
-          if (x.p !== 0 || comeOddsOnComeOut) odds[POINTS.indexOf(n as PointNumber)]!++;
-        } else cs.push(n);
+          if (c.f && (x.p !== 0 || comeOddsOnComeOut)) odds[POINTS.indexOf(c.n as PointNumber)]!++;
+        } else cs.push({ ...c });
       }
       let box = x.box;
       if (box) {
         if (NON_POINT_ROLLS.includes(t)) flat++;
-        else cs.push(t);
+        else cs.push({ n: t, f: false });
         box = false;
       }
       let p = x.p;
@@ -104,8 +108,10 @@ function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
         odds[POINTS.indexOf(x.p as PointNumber)]!++;
         p = 0;
       }
+      // the next decision is in the point phase: odds go behind every come bet on a number
+      if (p !== 0) for (const c of cs) c.f = true;
       if (p !== 0 && cs.length < 2 && !box) box = true;
-      cs.sort((a, b) => a - b);
+      cs.sort((a, b) => a.n - b.n || Number(a.f) - Number(b.f));
       out.push({ to: add({ p, cs, box }), pr: WAYS[t]! / 36, flat, odds });
     }
     edges.push(out);
@@ -183,7 +189,15 @@ const ONE_ROLL: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
 ]);
 
 /** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
-const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-regress']);
+// NOTE: dont-come-molly is priced as a steady layout of its bets (about $12.12 an hour at $10 against
+// about $9.73 simulated, because the layout is not always full); it needs its own chain (see I091).
+// martingale-pass changes its bet size with results, so its numbers describe the starting bet.
+const APPROXIMATE: ReadonlySet<string> = new Set([
+  'place-6-8-press',
+  'inside-regress',
+  'dont-come-molly',
+  'martingale-pass',
+]);
 
 /** The strategy's steady-state layout in the point phase (point 6), built via its own `decide`. */
 function steadyState(
@@ -264,9 +278,11 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const line = isLineLike(b.type);
     const bctx = line ? { phase: 'come-out' as const, point: null, rules: r } : ctx;
     const e = betEdge(b.type, b.amount, bctx);
-    // bets placed only after a point, or off on the come-out, work 392/557 of rolls
+    // Bets that are off on the come-out work 392/557 of rolls, and so do one-roll bets the strategy
+    // only puts up after a point (the field in an iron cross). Bets that stay up through a come-out
+    // (lay bets) are not scaled even when the strategy only re-places them in the point phase.
     const share =
-      !line && (!comeOutTypes.has(b.type) || offOnComeOut(b.type, r))
+      !line && (offOnComeOut(b.type, r) || (ONE_ROLL.has(b.type) && !comeOutTypes.has(b.type)))
         ? toNumber(POINT_PHASE_SHARE)
         : 1;
     lossCents += toNumber(lossPerRoll(b, ctx)) * share;

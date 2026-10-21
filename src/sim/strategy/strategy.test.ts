@@ -304,7 +304,7 @@ describe('strategyMetrics odds edges and Molly', () => {
       { id: 'three-point-molly', unit: 1000 },
       resolveRules({ ...rules, comeOddsWorkOnComeOut: true }),
     );
-    expect(on.edgeOnAction * 100).toBeCloseTo(0.3743, 3);
+    expect(on.edgeOnAction * 100).toBeCloseTo(0.38453, 4);
   });
 });
 
@@ -344,8 +344,9 @@ describe('more presets (I012)', () => {
   it('lay 4/10: $40 laid, loss per resolution is $40 x 1/60 on the amount laid', () => {
     // lay $40 wins $20 on 7 before the number (2/3): vig $1; loss per resolution = 2/3 x $1
     expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
-    // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of point-phase rolls
-    expect(m('lay-4-10').expectedLossPerRoll).toBeCloseTo(2 * (2 / 3) * (9 / 36) * (392 / 557), 6);
+    // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of rolls; lay bets stay up through
+    // come-outs, so there is no 392/557 scaling
+    expect(m('lay-4-10').expectedLossPerRoll).toBeCloseTo(2 * (2 / 3) * (9 / 36), 6);
   });
   it('point-phase-only presets are scaled once by 392/557; always-on ones are not', () => {
     const press = m('place-6-8-press');

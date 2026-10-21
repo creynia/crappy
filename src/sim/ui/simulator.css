@@ -453,6 +453,9 @@
 .sim-st-table thead th:first-child {
   text-align: left;
 }
+.sim-st-run .sim-ar-btn {
+  white-space: nowrap;
+}
 .sim-st-sort {
   font: inherit;
   font-weight: 600;

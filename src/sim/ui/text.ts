@@ -593,9 +593,11 @@ export function edgeOnAction(
   for (const b of state.bets) {
     total += b.amount;
     if (BET_TYPES[b.type].category === 'odds') continue;
-    // line bets carry their own house edge (pass 1.41%), whatever the table point
+    // line and come bets carry their own house edge (pass 1.41%, come 1.41%, don't come 1.36%),
+    // whatever the table point or the number they travelled to
+    const category = BET_TYPES[b.type].category;
     const e =
-      BET_TYPES[b.type].category === 'line'
+      category === 'line' || category === 'come'
         ? edgeOfBet({ ...b, point: null }, { phase: 'come-out', point: null, rules: state.rules })
         : edgeOfBet(b, { phase: state.phase, point: state.point, rules: state.rules });
     weighted += b.amount * fracToNumber(e.perResolved);

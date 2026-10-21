@@ -79,29 +79,29 @@ export function SimControls(p: SimControlsProps) {
         />
       ) : null}
       {ui.showRoll !== false ? (
-        <RollButton
-          onRoll={p.onRoll}
-          disabled={p.rollDisabled}
-          {...(p.lock ? { describedBy: lockId } : {})}
-          rolling={p.busy}
-        />
-      ) : null}
-      {ui.showRoll !== false ? (
-        <div class="sim-cost-slot">
-          {costText ? (
-            <button
-              type="button"
-              class="sim-cost-cycle"
-              aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
-              onClick={() => {
-                setCostUnit(next);
-                writeCostUnit(next);
-              }}
-            >
-              {costText}
-            </button>
-          ) : null}
-        </div>
+        <>
+          <div class="sim-cost-slot">
+            {costText ? (
+              <button
+                type="button"
+                class="sim-cost-cycle"
+                aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
+                onClick={() => {
+                  setCostUnit(next);
+                  writeCostUnit(next);
+                }}
+              >
+                {costText}
+              </button>
+            ) : null}
+          </div>
+          <RollButton
+            onRoll={p.onRoll}
+            disabled={p.rollDisabled}
+            {...(p.lock ? { describedBy: lockId } : {})}
+            rolling={p.busy}
+          />
+        </>
       ) : null}
       {p.lock && ui.showRoll !== false ? (
         <p class="sim-lock" id={lockId}>

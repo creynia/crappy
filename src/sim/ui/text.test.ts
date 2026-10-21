@@ -262,6 +262,27 @@ describe('roll cost units (I043)', () => {
     const e = edgeOnAction(g);
     expect(rollCostText('bet100', 14.1, 100, e)).toBe('Expected cost: $0.24 per $100 bet');
   });
+  it("a travelled come $10 on 8 is $1.41, a don't come $10 on 8 is $1.36, pass + come on 8 is $1.41", () => {
+    const point = { phase: 'point' as const, point: 6 as const, bankroll: 100000 };
+    const come = createGame({ ...point, bets: [{ type: 'come', amount: 1000, point: 8 }] });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(come))).toBe(
+      'Expected cost: $1.41 per $100 bet',
+    );
+    const dc = createGame({ ...point, bets: [{ type: 'dont-come', amount: 1000, point: 8 }] });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(dc))).toBe(
+      'Expected cost: $1.36 per $100 bet',
+    );
+    const both = createGame({
+      ...point,
+      bets: [
+        { type: 'pass-line', amount: 1000 },
+        { type: 'come', amount: 1000, point: 8 },
+      ],
+    });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(both))).toBe(
+      'Expected cost: $1.41 per $100 bet',
+    );
+  });
   it('place 6 $12 is $1.52 and field $5 is $5.56 per $100 bet', () => {
     expect(rollCostText('bet100', 18.2, 100, edgeOf([{ type: 'place-6', amount: 1200 }]))).toBe(
       'Expected cost: $1.52 per $100 bet',

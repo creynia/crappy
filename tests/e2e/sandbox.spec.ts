@@ -197,6 +197,27 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
+  test('expected-cost button is visible above the tab bar in portrait phones', async ({ page }) => {
+    for (const { width, height } of [
+      { width: 390, height: 844 },
+      { width: 360, height: 740 },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto(url('seed=1&dice=3-4'));
+      await page.locator('[data-region="pass"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('button', { name: 'Confirm' }).click();
+      const cost = page.locator('.sim-cost-cycle');
+      await expect(cost).toBeVisible();
+      const box = await cost.boundingBox();
+      expect(box, `${width}x${height}`).not.toBeNull();
+      expect(box!.y + box!.height, `${width}x${height} in viewport`).toBeLessThanOrEqual(height);
+      const bar = await page.locator('.tabbar').boundingBox();
+      if (bar)
+        expect(box!.y + box!.height, `${width}x${height} clears tabbar`).toBeLessThanOrEqual(bar.y);
+    }
+  });
+
   test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

@@ -372,7 +372,7 @@ export function Simulator(props: SimulatorInternalProps) {
         <SessionPanel
           stats={liveGame.stats}
           rollCount={liveGame.rollCount}
-          exposure={exposureOf(liveGame.bets, liveGame.rules)}
+          exposure={exposureOf(liveGame.bets)}
           bankroll={equity(liveGame)}
         />
       ) : null}

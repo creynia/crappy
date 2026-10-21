@@ -3,10 +3,16 @@
  * decisions at full size), say how many decisions the bankroll covers. Shared by the auto-roll panel and the
  * session panel.
  */
-export function bankrollNote(exposure: number, bankroll: number): string | null {
+export function bankrollNote(
+  exposure: number,
+  bankroll: number,
+  approximate = false,
+): string | null {
   if (!(exposure > 0) || !(exposure > bankroll * 0.25)) return null;
   const decisions = Math.floor(bankroll / exposure);
-  return decisions >= 1
-    ? `Your bankroll covers about ${decisions} decisions at this size; expect a high bust rate.`
-    : 'Your bankroll does not cover one decision at this size; expect a high bust rate.';
+  const base =
+    decisions >= 1
+      ? `Your bankroll covers about ${decisions} decisions at this size; expect a high bust rate.`
+      : 'Your bankroll does not cover one decision at this size; expect a high bust rate.';
+  return approximate ? `${base} (Approximate: this counts the starting bet only.)` : base;
 }

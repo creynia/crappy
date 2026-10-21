@@ -6,6 +6,7 @@ import {
   edgeFunnelSigma,
   peekEdgeFunnelSigma,
   listStrategies,
+  exposureIsApproximate,
   maxExposure,
   simulateCompare,
   simulateMany,
@@ -288,11 +289,17 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   // I057: when the worst-case exposure of a selected strategy per decision is over a quarter of the
   // bankroll (fewer than four decisions at full size), say so before the run.
-  const worstExposure = Math.max(
-    0,
-    ...(fixedSpecs ?? strategyIds.map(specFor)).map((sp) => maxExposure(sp, rules)),
-  );
-  const exposureNote = bankrollNote(worstExposure, bankroll);
+  const exposureNote = useMemo(() => {
+    const planned = fixedSpecs ?? strategyIds.map(specFor);
+    let worst: StrategySpec | null = null;
+    let worstCents = 0;
+    for (const sp of planned) {
+      const c = maxExposure(sp, rules);
+      if (c > worstCents) [worst, worstCents] = [sp, c];
+    }
+    return worst ? bankrollNote(worstCents, bankroll, exposureIsApproximate(worst)) : null;
+    // specFor reads the unit, odds and layout state; list those so the note follows them
+  }, [fixedSpecs, strategyIds, effUnit, oddsMultiple, layout, rules, bankroll]);
 
   const run = async (): Promise<void> => {
     setError(null);

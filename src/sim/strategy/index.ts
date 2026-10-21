@@ -1,6 +1,7 @@
 import { resolveRules } from '../engine';
 import type { TableRules } from '../engine';
 import {
+  exposureIsApproximate,
   exposureOf,
   maxExposure,
   oddsMultiplePerDecision,
@@ -9,7 +10,7 @@ import {
 import type { StrategyMetrics, StrategySpec } from './types';
 
 export * from './types';
-export { exposureOf, maxExposure, oddsMultiplePerDecision };
+export { exposureIsApproximate, exposureOf, maxExposure, oddsMultiplePerDecision };
 export { getStrategy, listStrategies } from './presets';
 export { edgeFunnelSigma, peekEdgeFunnelSigma } from './funnel';
 export {

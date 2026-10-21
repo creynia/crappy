@@ -196,27 +196,21 @@ export function lineOddsEdge(
 }
 
 /**
- * Worst-case money on the table for one decision with these bets, cents: the flat bets plus the largest odds
- * the table allows on each line or come bet (the table maximum at the worst point). I057.
+ * Money on the table for one decision with these bets, cents: every bet's amount, odds included at the amount
+ * actually placed (I057). On a live layout that is the real chips out; a preset's steady layout puts its odds at
+ * the amount it would take at the point, e.g. Pass + 2x is 3 units and pass-max-odds is 6 units under 3-4-5x.
  */
-export function exposureOf(bets: readonly Bet[], rules: TableRules): number {
-  let total = 0;
-  for (const b of bets) {
-    if (b.type.endsWith('-odds')) {
-      const parent = bets.find((x) => x.id === b.parentId);
-      if (!parent) continue;
-      const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
-      const caps = Object.values(lay ? rules.maxLayOdds : rules.maxOdds);
-      total += parent.amount * Math.max(0, ...caps);
-      continue;
-    }
-    total += b.amount;
-  }
-  return total;
+export function exposureOf(bets: readonly Bet[]): number {
+  return bets.reduce((t, b) => t + b.amount, 0);
 }
 
-/** Worst-case exposure of a strategy's steady layout, cents (see exposureOf). */
+/** Exposure per decision of a strategy's steady layout, cents (see exposureOf). */
 export function maxExposure(spec: StrategySpec, rules: TableRules): number {
   const { state, comeOutOnly } = steadyState(spec, rules);
-  return exposureOf(state.bets, rules) + comeOutOnly.reduce((t, b) => t + b.amount, 0);
+  return exposureOf(state.bets) + comeOutOnly.reduce((t, b) => t + b.amount, 0);
+}
+
+/** True when the strategy's exposure counts only its starting layout (it changes over time). */
+export function exposureIsApproximate(spec: StrategySpec): boolean {
+  return APPROXIMATE.has(spec.id) || spec.id === 'martingale-pass';
 }

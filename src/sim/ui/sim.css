@@ -1098,98 +1098,16 @@
   transform: translateX(-50%);
 }
 
-/* ---------- win prompt (I039) ---------- */
-/* An overlay like the toasts: it never changes layout height. Portrait: just above the felt, over the
-   status row. Landscape: over the top of the side rail. */
-.sim-winprompt {
-  position: absolute;
-  z-index: 25;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 4px);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: var(--sim-surface);
-  color: var(--sim-text);
-  border: 2px solid var(--sim-accent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  font-size: 0.8rem;
-}
-.sim-land .sim-winprompt {
-  left: calc(100% + 8px);
-  right: auto;
-  top: 0;
-  bottom: auto;
-  width: min(300px, 29vw);
-  padding: 3px 6px;
+.sim-demo-captions {
+  margin: 4px 0;
+  padding-left: 1.3rem;
+  font-size: 0.9rem;
+  display: grid;
   gap: 2px;
 }
-/* The rail's status block is short and narrow: one row of five cells (the heading line goes, the
-   detail line moves to the aria-label), with one-word labels. */
-.sim-land .sim-winprompt {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: stretch;
-}
-.sim-land .sim-winprompt-head,
-.sim-land .sim-winprompt-row {
-  display: contents;
-}
-.sim-land .sim-winprompt-head > span:first-child,
-.sim-land .sim-winprompt-btn small:first-of-type {
-  display: none;
-}
-.sim-land .sim-winprompt-x {
-  order: 5;
-  padding: 0 2px;
-  font-size: 0.65rem;
-  line-height: 1.05;
-}
-.sim-wp-short {
-  display: none;
-}
-.sim-land .sim-wp-short {
-  display: inline;
-}
-.sim-land .sim-wp-long {
-  display: none;
-}
-.sim-land .sim-winprompt-btn {
-  min-width: 0;
-  padding: 2px 1px;
-}
-.sim-land .sim-winprompt-btn span {
-  font-size: 0.68rem;
-}
-.sim-land .sim-winprompt-btn small {
-  font-size: 0.62rem;
-}
-.sim-winprompt-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.sim-step .sim-replay {
   min-height: 44px;
-  padding: 2px 4px;
-  border: 1px solid var(--sim-border);
-  border-radius: 8px;
-  background: var(--sim-surface-2);
-  color: inherit;
-  cursor: pointer;
-  line-height: 1.1;
-}
-.sim-winprompt-btn span {
-  font-weight: 700;
-}
-.sim-winprompt-btn small {
-  font-size: 0.68rem;
-}
-.sim-winprompt-btn:focus-visible,
-.sim-winprompt-x:focus-visible {
-  outline: 3px solid var(--sim-focus);
-  outline-offset: 2px;
+  min-width: 44px;
 }
 
 /* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
@@ -1223,4 +1141,76 @@
 .sim-call.is-right text,
 .sim-call.is-wrong text {
   fill: #fff;
+}
+
+/* ---------- win prompt (I039) ---------- */
+/* One compact row of 44px cells in the same overlay layer as the toasts (it replaces them while it is
+   up): above the felt in portrait, over the rail's status block in landscape. It never covers the
+   table, the chips or Roll, and never changes layout height. */
+.sim-winprompt {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  border: 2px solid var(--sim-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-size: 0.8rem;
+}
+.sim-land .sim-winprompt {
+  bottom: auto;
+  top: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-winprompt-btn {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 1px;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  background: var(--sim-surface-2);
+  color: inherit;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.sim-winprompt-btn span {
+  font-weight: 700;
+  font-size: 0.74rem;
+}
+.sim-winprompt-btn small {
+  font-size: 0.66rem;
+}
+.sim-winprompt-btn:focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+/* phones on their side: the rail is narrow, so the "always same bet" cell is left to the Menu toggle */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sim-winprompt-x {
+    display: none;
+  }
+}
+.sim-toasts[hidden] {
+  display: none;
+}
+.sim-winprompt[data-inside] {
+  position: fixed;
+  bottom: auto;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  max-width: 420px;
+  margin: 0 auto;
 }

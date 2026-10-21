@@ -110,11 +110,19 @@ export function winChoices(game: GameState, bet: Bet): WinChoice[] {
   return out;
 }
 
-/** "+$0.06/roll", "-$0.06/roll" or "no change" */
-export function fmtDelta(cents: number): string {
+/** "+$0.06/roll", "-$0.06/roll" or "no change"; `short` drops "/roll" for tight cells ("+$0.06") */
+export function fmtDelta(cents: number, short = false): string {
   const r = Math.round(cents);
-  if (r === 0) return 'no change';
-  return `${r > 0 ? '+' : '-'}$${(Math.abs(r) / 100).toFixed(2)}/roll`;
+  if (r === 0) return short ? '±$0' : 'no change';
+  return `${r > 0 ? '+' : '-'}$${(Math.abs(r) / 100).toFixed(2)}${short ? '' : '/roll'}`;
+}
+
+/** The prompt as one sentence for the screen-reader announcement. */
+export function winAnnouncement(betName: string, choices: readonly WinChoice[]): string {
+  const parts = choices.map(
+    (c) => `${c.label}, ${c.detail}, ${fmtDelta(c.deltaPerRoll)} expected loss`,
+  );
+  return `${betName} won. What now? ${parts.join('. ')}.`;
 }
 
 const KEY = 'crappy:sim:winPrompt:v1';

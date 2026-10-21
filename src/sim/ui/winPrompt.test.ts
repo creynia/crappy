@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyAction, createGame } from '../engine';
+import type { Action, BetTypeId, PointNumber } from '../engine';
+import { tableExpectedLossPerRoll, toNumber } from '../math';
 import {
   fmtDelta,
   loadAskAfterWin,
   saveAskAfterWin,
+  winAnnouncement,
   winChoices,
   winPromptTarget,
 } from './winPrompt';
@@ -83,5 +86,70 @@ describe('win prompt logic', () => {
     expect(loadAskAfterWin()).toBe(false);
     saveAskAfterWin(true);
     expect(loadAskAfterWin()).toBe(true);
+  });
+
+  describe('sweep: every place and buy bet', () => {
+    const cases: Array<[BetTypeId, PointNumber, number]> = [
+      ['place-4', 6, 1000],
+      ['place-5', 6, 1000],
+      ['place-6', 4, 1200],
+      ['place-8', 4, 1200],
+      ['place-9', 6, 1000],
+      ['place-10', 6, 1000],
+      ['buy-4', 6, 2000],
+      ['buy-10', 6, 2000],
+    ];
+    for (const [type, point, amount] of cases) {
+      it(`${type} $${amount / 100}: press doubles, regress halves, take down removes; deltas match the engine`, () => {
+        const g = createGame({
+          bankroll: 100_000,
+          seed: 1,
+          phase: 'point',
+          point,
+          bets: [{ type, amount }],
+        });
+        const bet = g.bets[0]!;
+        const c = Object.fromEntries(winChoices(g, bet).map((x) => [x.id, x]));
+        const base = toNumber(tableExpectedLossPerRoll(g));
+        const after = (a: Action) => {
+          const r = applyAction(g, a);
+          if (!r.ok) throw new Error(r.error.message);
+          return toNumber(tableExpectedLossPerRoll(r.state)) - base;
+        };
+        expect(c.press!.action).toEqual({ type: 'set-amount', betId: bet.id, amount: amount * 2 });
+        expect(c.press!.deltaPerRoll).toBeCloseTo(after(c.press!.action!), 9);
+        expect(c.press!.deltaPerRoll).toBeGreaterThanOrEqual(0);
+        expect(c['take-down']!.deltaPerRoll).toBeCloseTo(-base, 9);
+        expect(c.same!.deltaPerRoll).toBe(0);
+        if (c.regress) {
+          expect(c.regress.action).toEqual({
+            type: 'set-amount',
+            betId: bet.id,
+            amount: amount / 2,
+          });
+          expect(c.regress.deltaPerRoll).toBeLessThanOrEqual(0);
+        }
+        // every offered action is one the table accepts
+        for (const x of Object.values(c))
+          if (x.action) expect(applyAction(g, x.action).ok).toBe(true);
+      });
+    }
+
+    it('a buy that is already at the minimum vig: pressing shows its real cost, and a flat vig reads as no change', () => {
+      // buy $20 and buy $39 both pay a $1 vig on a win (the vig is floored to whole dollars), so
+      // the choice between them costs nothing extra; the prompt must say "no change", not "+$0.00"
+      expect(fmtDelta(0)).toBe('no change');
+      expect(fmtDelta(0.4)).toBe('no change');
+      expect(fmtDelta(0, true)).toBe('±$0');
+    });
+  });
+
+  it('announces the choices as one sentence', () => {
+    const { g } = won('place-6', 1200);
+    const text = winAnnouncement('Place 6', winChoices(g, g.bets[0]!));
+    expect(text).toMatch(
+      /^Place 6 won\. What now\? Press, \+\$12 to \$24, \+\$0\.06\/roll expected loss\./,
+    );
+    expect(text).toContain('Same bet, keep $12, no change expected loss');
   });
 });

@@ -24,9 +24,11 @@ export function layoutBadges(
   items: readonly BadgeItem[],
   r: number,
   viewBox: { w: number; h: number },
+  /** smallest font size in viewBox units (e.g. 12 CSS px at the rendered scale) */
+  minFont = 0,
 ): Map<string, BadgeBox> {
-  const fontSize = r * 0.78;
-  const h = r * 1.15;
+  const fontSize = Math.max(r * 0.78, minFont);
+  const h = Math.max(r * 1.15, fontSize * 1.45);
   const gap = r * 0.12;
   const placed: Rect[] = [];
   const out = new Map<string, BadgeBox>();

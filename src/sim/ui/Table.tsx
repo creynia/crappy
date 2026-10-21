@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useId, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
 import { ChipStack } from './ChipStack';
 import { Dice } from './Dice';
@@ -140,6 +140,23 @@ export function Table({
   class: cls,
 }: TableProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Rendered CSS px per viewBox unit, measured only for annotated (drill) tables, so their stack
+  // targets and badge text can be sized in screen pixels.
+  const [pxPerUnit, setPxPerUnit] = useState(0);
+  const annotated = annotate !== undefined;
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!annotated || !el) return;
+    const measure = () => {
+      const b = el.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0)
+        setPxPerUnit(Math.min(b.width / layout.viewBox.w, b.height / layout.viewBox.h));
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [annotated, layout]);
   const feltId = `felt-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
@@ -163,9 +180,10 @@ export function Table({
             }),
             layout.chipRadius,
             layout.viewBox,
+            pxPerUnit > 0 ? 12 / pxPerUnit : 0,
           )
         : null,
-    [annotate, stacks, layout],
+    [annotate, stacks, layout, pxPerUnit],
   );
   // bonus side bets draw their collected numbers as pips inside the cell
   const progressFor = (region: RegionDef): readonly number[] | undefined => {
@@ -306,7 +324,12 @@ export function Table({
               >
                 {note ? (
                   // drill stacks are the only targets: give them a 44px+ hit area
-                  <circle class="sim-stack-target" cx={s.x} cy={s.y} r={r * 1.5} />
+                  <circle
+                    class="sim-stack-target"
+                    cx={s.x}
+                    cy={s.y}
+                    r={Math.max(r * 1.5, pxPerUnit > 0 ? 22 / pxPerUnit : 0)}
+                  />
                 ) : null}
                 <ChipStack
                   x={s.x}

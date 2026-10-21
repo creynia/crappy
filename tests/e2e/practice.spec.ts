@@ -42,3 +42,26 @@ test('practice: call the bet, call every stack on the table and check', async ({
   await expect(page.locator('.pr-call-why li')).toHaveCount(n);
   await expect(page.locator('.sim-call.is-right, .sim-call.is-wrong')).toHaveCount(n);
 });
+
+for (const [w, h] of [
+  [390, 844],
+  [844, 390],
+] as const) {
+  test(`practice: call the bet stack targets are at least 44px at ${w}x${h}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/#/practice/call-the-bet');
+    const targets = page.locator('.pr-call .sim-stack-target');
+    await expect(targets.first()).toBeAttached();
+    // measured after the table has laid out (the radius is set in screen px)
+    await expect
+      .poll(async () => {
+        const sizes: number[] = [];
+        for (let i = 0; i < (await targets.count()); i++) {
+          const b = await targets.nth(i).boundingBox();
+          sizes.push(b ? Math.min(b.width, b.height) : 0);
+        }
+        return Math.min(...sizes);
+      })
+      .toBeGreaterThanOrEqual(44);
+  });
+}

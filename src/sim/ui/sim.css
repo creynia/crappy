@@ -1310,3 +1310,84 @@
 .sim-call.is-wrong text {
   fill: #fff;
 }
+
+/* ---------- win prompt (I039) ---------- */
+/* One compact row of 44px cells in the same overlay layer as the toasts (it replaces them while it is
+   up): above the felt in portrait, over the rail's status block in landscape. It never covers the
+   table, the chips or Roll, and never changes layout height. */
+.sim-winprompt {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  border: 2px solid var(--sim-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-size: 0.8rem;
+}
+.sim-land .sim-winprompt {
+  bottom: auto;
+  top: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-winprompt-btn {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 1px;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  background: var(--sim-surface-2);
+  color: inherit;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.sim-winprompt-btn span {
+  font-weight: 700;
+  font-size: 0.74rem;
+}
+.sim-winprompt-btn small {
+  font-size: 0.66rem;
+}
+.sim-winprompt-btn:focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}
+/* phones on their side: the rail is narrow, so the "always same bet" cell is left to the Menu toggle */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sim-winprompt-x {
+    display: none;
+  }
+}
+.sim-toasts[hidden] {
+  display: none;
+}
+.sim-winprompt[data-inside] {
+  /* The status row above the felt is scrolled off screen, and anything near the top of the screen is
+     table. So the bar goes over the app's bottom tab bar, which is not a betting region (it is
+     visible again as soon as a choice is made, Escape is pressed or the next roll starts). */
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  top: auto;
+  left: 8px;
+  right: 8px;
+  max-width: 420px;
+  margin: 0 auto;
+  z-index: 60;
+}
+
+.sim-vig-list {
+  margin: 4px 0 0;
+  padding-left: 1.2em;
+}

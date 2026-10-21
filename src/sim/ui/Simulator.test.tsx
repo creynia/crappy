@@ -438,6 +438,95 @@ describe('ask step announcer', () => {
   });
 });
 
+describe('win prompt (I039)', () => {
+  const scene: SceneConfig = {
+    id: 'wp',
+    version: 1,
+    bankroll: 50000,
+    phase: 'point',
+    point: 4,
+    bets: [{ type: 'place-6', amount: 1200 }],
+    ui: { winPrompt: true },
+    forcedDice: [
+      [3, 3],
+      [1, 2],
+      [3, 3],
+    ],
+  };
+  const press = async (container: Element) => {
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    return waitFor(() => {
+      const p = container.querySelector('[data-testid="win-prompt"]');
+      expect(p).not.toBeNull();
+      return p!;
+    });
+  };
+
+  it('a place-6 win offers four choices with per-roll costs; Press makes it $24 and costs $12', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    const choices = [...prompt.querySelectorAll('[data-choice]')].map((b) =>
+      b.getAttribute('data-choice'),
+    );
+    expect(choices).toEqual(['press', 'same', 'regress', 'take-down']);
+    const label = (id: string) =>
+      prompt.querySelector(`[data-choice="${id}"]`)!.getAttribute('aria-label')!;
+    expect(label('press')).toContain('+$12 to $24');
+    expect(label('press')).toContain('+$0.06/roll');
+    expect(label('regress')).toContain('-$0.03/roll');
+    expect(label('take-down')).toContain('-$0.06/roll');
+    expect(label('same')).toContain('no change');
+    // the visible cell is compact: a short name and the short delta
+    expect(prompt.querySelector('[data-choice="press"]')!.textContent).toBe('Press+$0.06');
+    const pressBtn = prompt.querySelector('[data-choice="press"]')!;
+    const bankBefore = container.textContent.match(/Bankroll \$([\d,]+)/)![1];
+    fireEvent.click(pressBtn);
+    await waitFor(() => expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull());
+    expect(container.textContent).toContain('On table $24');
+    expect(container.textContent.match(/Bankroll \$([\d,]+)/)![1]).toBe(
+      String(Number(bankBefore!.replace(/,/g, '')) - 12),
+    );
+  });
+
+  it('announces the choices with the roll and replaces the win toast while it is up', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    await press(container);
+    const live = container.querySelector('[data-testid="roll-announcer"]')!;
+    await waitFor(() => expect(live.textContent).toContain('What now?'));
+    expect(live.textContent).toContain('Rolled');
+    expect(live.textContent).toContain('Press, +$12 to $24');
+    expect((container.querySelector('.sim-toasts') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('is dismissed by the next roll, and "Same bet" changes nothing', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    fireEvent.click(prompt.querySelector('[data-choice="same"]')!);
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+    expect(container.textContent).toContain('On table $12');
+    // a miss rolls, then another hit asks again; rolling in between dismisses
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(container.textContent).toContain('Rolled'));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+  });
+
+  it('is off in a scene unless ui.winPrompt is true', async () => {
+    const off: SceneConfig = { ...scene, ui: {} };
+    const { container } = render(<Simulator scene={off} initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(container.textContent).toContain('Rolled'));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+  });
+
+  it('"Always same bet" stops the prompt and is remembered', async () => {
+    const { container } = render(<Simulator scene={scene} initialSettings={instant} />);
+    const prompt = await press(container);
+    fireEvent.click(screen.getByRole('button', { name: /^Always same bet/ }));
+    expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
+    expect(prompt.isConnected).toBe(false);
+  });
+});
+
 describe('sandbox panel sheet (I064)', () => {
   const openSandbox = () => render(<Simulator mode="sandbox" initialSettings={instant} />);
 

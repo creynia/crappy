@@ -53,6 +53,8 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** ask Press / Same / Regress / Take down after a place or buy bet wins (off in scenes unless true) */
+    winPrompt?: boolean;
     /** hide the step panel's Restart (default shown); a challenge keeps its seed */
     showRestart?: boolean;
     /** accessible name of the step panel (default "Lesson step") */

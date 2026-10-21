@@ -121,6 +121,14 @@ export function SimMenu({
         />
         Skip EV preview (tap to bet)
       </label>
+      <label class="sim-menu-check">
+        <input
+          type="checkbox"
+          checked={settings.winPrompt}
+          onChange={(e) => setSettings({ ...settings, winPrompt: e.currentTarget.checked })}
+        />
+        Ask what to do after a place or buy bet wins
+      </label>
     </section>
   );
 }

@@ -23,6 +23,7 @@ import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
+import { luckFrom } from '../math/luck';
 import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
@@ -644,6 +645,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         [
           'Luck (actual minus expected)',
           rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
+        ],
+        [
+          'Luck in typical swings',
+          rs.map((r) => {
+            const l = luckFrom(r.finalEquity - bankroll, r.expectedLoss, r.variance);
+            return l.z === null ? 'n/a' : `${l.z > 0 ? '+' : ''}${l.z.toFixed(1)} (${l.verdict})`;
+          }),
         ],
         ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],

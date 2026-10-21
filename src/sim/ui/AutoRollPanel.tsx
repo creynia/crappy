@@ -16,9 +16,11 @@ import type {
   SessionResult,
   StrategyId,
   StrategySpec,
+  SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
@@ -53,6 +55,8 @@ export interface AutoRollPanelProps {
     compareMode?: boolean;
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** show the odds-multiple sweep table instead of the run form */
+    sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
   /** the player's current layout, for the `my-layout` strategy */
   layout?: LayoutBet[];
@@ -64,6 +68,8 @@ export interface AutoRollPanelProps {
     all?: (SessionResult | ManyResult)[],
     specs?: StrategySpec[],
   ): void;
+  /** The odds sweep finished (config.sweep); `rolls` is the length of each swept session. */
+  onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
 }
@@ -234,6 +240,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       {label}
     </button>
   );
+
+  if (config?.sweep)
+    return (
+      <SweepPanel
+        config={config.sweep}
+        rules={props.rules}
+        bankroll={bankroll}
+        onCompleted={() => props.onSweepCompleted?.(100)}
+        initialSeed={props.initialSeed}
+        unit={config.defaultStrategy?.unit}
+      />
+    );
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">

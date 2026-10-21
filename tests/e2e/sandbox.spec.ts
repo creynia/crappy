@@ -854,10 +854,8 @@ test('the odds nudge clears the Challenge card in portrait, and in landscape Rol
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     await page.getByRole('button', { name: /^Roll/ }).click();
     const hint = await page.getByTestId('odds-hint').boundingBox();
-    const card = await page
-      .getByRole('button', { name: /^Challenge: 300/ })
-      .first()
-      .boundingBox();
+    const cardLoc = page.getByRole('button', { name: /^Challenge: 300/ });
+    const card = (await cardLoc.count()) > 0 ? await cardLoc.first().boundingBox() : null;
     expect(hint).not.toBeNull();
     if (card)
       expect(

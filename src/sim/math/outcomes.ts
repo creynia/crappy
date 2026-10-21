@@ -1,4 +1,4 @@
-import { BET_TYPES, upfrontVig } from '../engine/bets';
+import { BET_TYPES, isToggleable, upfrontVig } from '../engine/bets';
 import type {
   Bet,
   BetTypeId,
@@ -278,6 +278,9 @@ export type RollEffect = 'win' | 'lose' | 'push' | 'none' | 'travel';
 
 /** Whether the bet can win or lose on the next roll in this situation (mirrors engine isWorking). */
 export function worksNow(bet: BetLike, ctx: BetCtx): boolean {
+  if (!isToggleable(bet.type)) return true;
+  if (bet.working === 'on') return true;
+  if (bet.working === 'off') return false;
   if (ctx.phase === 'point') return true;
   const cat = BET_TYPES[bet.type].category;
   if (cat === 'place' || cat === 'buy') return ctx.rules.placeBetsWorkOnComeOut;
@@ -305,7 +308,7 @@ export function rollEffectGrid(bet: BetLike, ctx: BetCtx): RollEffect[] {
       case 'travel':
         return res.kind;
       case 'return':
-        return 'push';
+        return working ? 'push' : 'none';
       default:
         // A line bet on the come-out: a point number establishes the point.
         return working &&

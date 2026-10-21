@@ -55,7 +55,10 @@ export function DiceGrid({ grid, note }: DiceGridProps) {
       <table aria-label={`The 36 dice combinations. ${caption}`}>
         <thead>
           <tr>
-            <td aria-hidden="true" class="sim-dg-corner" />
+            <td aria-hidden="true" class="sim-dg-corner">
+              1st die ↓<br />
+              2nd die →
+            </td>
             {DIE_FACES.map((b) => (
               <th key={b} scope="col" aria-label={`second die ${b}`}>
                 {b}

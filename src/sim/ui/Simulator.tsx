@@ -38,12 +38,21 @@ import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
+import { WinPrompt } from './WinPrompt';
+import {
+  saveAskAfterWin,
+  winAnnouncement,
+  winChoices,
+  winPromptTarget,
+  type WinChoice,
+  type WinPromptTarget,
+} from './winPrompt';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
 import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
-import { fmtMoney } from './text';
+import { betLabel, fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
 import { useDemoPlayback } from './useDemoPlayback';
@@ -123,13 +132,19 @@ export function Simulator(props: SimulatorInternalProps) {
   const closePanels = () => setPanels(CLOSED);
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
+  // the place/buy bet that just won (cleared on the next roll, a choice, or a reset)
+  const [winTarget, setWinTarget] = useState<WinPromptTarget | null>(null);
   const landscape = useLandscape(scene);
 
   const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
     const id = `t${++toastN.current}`;
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
-  const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
+  const lastRollText = useRef('');
+  const announce = useCallback((text: string) => {
+    lastRollText.current = text;
+    setLive((l) => ({ text, n: l.n + 1 }));
+  }, []);
 
   const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
@@ -151,7 +166,10 @@ export function Simulator(props: SimulatorInternalProps) {
       pushToast(message, 'info');
       announce(message);
     },
-    onRolled: anim.run,
+    onRolled: (pre, post, events) => {
+      anim.run(pre, post, events);
+      setWinTarget(winPromptTarget(post, events));
+    },
   });
 
   const { game: liveGame, rt } = core;
@@ -230,6 +248,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const roll = () => {
     if (anim.busy || sheet || lock || demo.playing) return;
+    setWinTarget(null);
     doAction({ type: 'roll' });
   };
 
@@ -244,6 +263,7 @@ export function Simulator(props: SimulatorInternalProps) {
     demo.reset();
     startEquity.current = equity(init.game);
     setToasts([]);
+    setWinTarget(null);
     setLog([]);
     setLogFocus(null);
     setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
@@ -314,6 +334,42 @@ export function Simulator(props: SimulatorInternalProps) {
       },
     });
   }, []);
+
+  // ---------- win prompt ----------
+  useEffect(() => {
+    if (sandbox) saveAskAfterWin(settings.winPrompt);
+  }, [settings.winPrompt, sandbox]);
+  const winBet = winTarget ? liveGame.bets.find((b) => b.id === winTarget.betId) : undefined;
+  const winOptions = useMemo(
+    () => (winBet && settings.winPrompt ? winChoices(liveGame, winBet) : []),
+    [liveGame, winBet, settings.winPrompt],
+  );
+  const chooseWin = (c: WinChoice) => {
+    setWinTarget(null);
+    if (c.action) doAction(c.action);
+  };
+  const winShown = !!winBet && settings.winPrompt && !anim.busy && !sheet && winOptions.length > 0;
+  // the prompt joins the roll's announcement, so a screen-reader user hears the choices too
+  useEffect(() => {
+    if (winShown && winBet)
+      setLive((l) => ({
+        text: `${lastRollText.current} ${winAnnouncement(betLabel(winBet.type), winOptions)}`.trim(),
+        n: l.n + 1,
+      }));
+  }, [winShown, winBet?.id]);
+  const winPromptEl =
+    winShown && winBet ? (
+      <WinPrompt
+        bet={winBet}
+        choices={winOptions}
+        onChoose={chooseWin}
+        onAlwaysSame={() => {
+          setSettings({ ...settings, winPrompt: false });
+          setWinTarget(null);
+        }}
+        onDismiss={() => setWinTarget(null)}
+      />
+    ) : null;
 
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
@@ -404,6 +460,7 @@ export function Simulator(props: SimulatorInternalProps) {
       toasts={toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
+      hidden={winShown}
     />
   );
   const status = (compact: boolean) => (
@@ -470,6 +527,7 @@ export function Simulator(props: SimulatorInternalProps) {
               </button>
             ) : null}
             {landscape ? null : toastsEl}
+            {landscape ? null : winPromptEl}
           </div>
         </div>
         {landscape ? (
@@ -478,6 +536,7 @@ export function Simulator(props: SimulatorInternalProps) {
             <div class="sim-status-wrap">
               {status(true)}
               {toastsEl}
+              {landscape ? winPromptEl : null}
             </div>
             {controls}
           </div>

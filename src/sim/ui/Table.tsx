@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useId, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
 import { ChipStack } from './ChipStack';
 import { Dice } from './Dice';
@@ -8,6 +8,7 @@ import { hopText } from '../engine/bets';
 import { hopSpot, regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
 import { Puck } from './Puck';
+import { layoutBadges } from './stackBadges';
 import { RegionArt } from './regionArt';
 import { betLabel, fmtMoney, regionAriaLabel } from './text';
 import './sim.css';
@@ -38,7 +39,22 @@ export interface TableProps {
   onRegionTap?: (id: RegionId) => void;
   /** `betId` is the first bet of that type at the spot; `allIds` lists every bet merged into the stack. */
   onStackTap?: (betId: string, allIds: readonly string[]) => void;
+  /**
+   * Read-only drill overlay, keyed by a stack's first bet id: a badge under the stack whose text
+   * also ends the stack's accessible name (e.g. a learner's "Wins" call, marked right or wrong).
+   */
+  annotate?: ReadonlyMap<string, StackAnnotation>;
   class?: string;
+}
+
+export interface StackAnnotation {
+  /** the short badge text, e.g. "Wins" */
+  text: string;
+  tone: 'pending' | 'selected' | 'right' | 'wrong';
+  /** what a screen reader hears after the bet, e.g. "Wins, right" (default: text) */
+  spoken?: string;
+  /** the bet's name, e.g. "Come on 8" (default: the bet type's label) */
+  name?: string;
 }
 
 const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', 'tall', 'small']);
@@ -139,9 +155,27 @@ export function Table({
   selectedRegion,
   onRegionTap,
   onStackTap,
+  annotate,
   class: cls,
 }: TableProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Rendered CSS px per viewBox unit, measured only for annotated (drill) tables, so their stack
+  // targets and badge text can be sized in screen pixels.
+  const [pxPerUnit, setPxPerUnit] = useState(0);
+  const annotated = annotate !== undefined;
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!annotated || !el) return;
+    const measure = () => {
+      const b = el.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0)
+        setPxPerUnit(Math.min(b.width / layout.viewBox.w, b.height / layout.viewBox.h));
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [annotated, layout]);
   const feltId = `felt-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
@@ -155,6 +189,21 @@ export function Table({
   const hasPuck = layout.puckRadius > 0;
   const puckPos = point ? layout.puck[point] : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
+  const badges = useMemo(
+    () =>
+      annotate
+        ? layoutBadges(
+            stacks.flatMap((s) => {
+              const note = annotate.get(s.betIds[0]!);
+              return note ? [{ key: s.key, x: s.x, y: s.y, text: note.text }] : [];
+            }),
+            layout.chipRadius,
+            layout.viewBox,
+            pxPerUnit > 0 ? 12 / pxPerUnit : 0,
+          )
+        : null,
+    [annotate, stacks, layout, pxPerUnit],
+  );
   // bonus side bets draw their collected numbers as pips inside the cell
   const progressFor = (region: RegionDef): readonly number[] | undefined => {
     if (!BONUS_REGIONS.has(region.id)) return undefined;
@@ -263,13 +312,21 @@ export function Table({
         >
           {stacks.map((s) => {
             const nums = s.betIds.length;
+            const note = annotate?.get(s.betIds[0]!);
+            const r = layout.chipRadius;
+            const name = note?.name ?? `${betLabel(s.type)}${s.caption ? ` ${s.caption}` : ''}`;
             return (
               <g
                 key={s.key}
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet${s.point ? ` on ${s.point}` : ''}, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`}
+                aria-label={
+                  note
+                    ? `${name}, ${fmtMoney(s.amount)}: ${note.spoken ?? note.text}`
+                    : `Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet${s.point ? ` on ${s.point}` : ''}, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`
+                }
+                aria-pressed={note ? note.tone === 'selected' : undefined}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);
@@ -284,11 +341,20 @@ export function Table({
                 data-stack={s.betIds[0]}
                 data-count={nums}
               >
+                {note ? (
+                  // drill stacks are the only targets: give them a 44px+ hit area
+                  <circle
+                    class="sim-stack-target"
+                    cx={s.x}
+                    cy={s.y}
+                    r={Math.max(r * 1.5, pxPerUnit > 0 ? 22 / pxPerUnit : 0)}
+                  />
+                ) : null}
                 <ChipStack
                   x={s.x}
                   y={s.y}
                   amount={s.amount}
-                  r={layout.chipRadius}
+                  r={r}
                   off={s.off}
                   on={s.on}
                   marker={markerFor(s.type)}
@@ -297,6 +363,28 @@ export function Table({
               </g>
             );
           })}
+          {badges ? (
+            <g class="sim-calls" aria-hidden="true">
+              {stacks.map((s) => {
+                const note = annotate!.get(s.betIds[0]!);
+                const box = badges.get(s.key);
+                if (!note || !box) return null;
+                return (
+                  <g key={s.key} class={`sim-call is-${note.tone}`} data-call={s.betIds[0]}>
+                    <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={box.h * 0.28} />
+                    <text
+                      x={box.x + box.w / 2}
+                      y={box.y + box.h / 2 + box.fontSize * 0.35}
+                      font-size={box.fontSize}
+                      text-anchor="middle"
+                    >
+                      {note.text}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          ) : null}
           {travelling.map((b) => {
             // from the come / don't-come box to the number the bet now sits on
             const from = ghostPos({ ...b, point: null });

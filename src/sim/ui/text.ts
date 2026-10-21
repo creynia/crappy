@@ -7,8 +7,8 @@ import {
   isBonusType,
   isHardHop,
 } from '../engine/bets';
-import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge } from '../math';
+import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
+import { betEdge, betStdDev, edgeTier as tierOf } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -126,6 +126,8 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
+  swingCents?: number | null;
 }
 
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
@@ -286,7 +288,44 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    swingCents: swingOf(
+      type,
+      amount,
+      bet?.point ?? state.point,
+      state,
+      a.type === 'place-bet' ? a.hop : bet?.hop,
+    ),
   };
+}
+
+function swingOf(
+  type: BetTypeId,
+  amount: Cents,
+  point: GameState['point'],
+  state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+  hop?: Dice,
+): number | null {
+  try {
+    return betStdDev(
+      { type, amount, point, ...(hop ? { hop } : {}) },
+      { phase: state.phase, point: state.point, rules: state.rules },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** "Typical swing" line under the expected loss; odds bets have no edge, so they say so. */
+export function swingCopy(
+  swingCents: number,
+  edge: number | null,
+  expectedLossCents: number,
+): string {
+  const swing = fmtMoney(swingCents, { exact: true });
+  if (edge === null) return `Typical swing per decision: ±${swing}.`;
+  if (edge === 0) return `No edge, but it adds ±${swing} of swing.`;
+  if (edge < 0) return `Typical swing per decision: ±${swing}.`;
+  return `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`;
 }
 
 // ---------- roll descriptions ----------
@@ -299,44 +338,64 @@ const NICKNAME: Record<number, string> = {
 };
 
 /** Bet results of a roll as sentences: "Pass line wins $5.", "Field loses $1.", ... */
-function betResultGroups(events: readonly GameEvent[]): string[] {
+function betResultGroups(events: readonly GameEvent[], bets?: readonly Bet[]): string[] {
+  // a hop bet is named by its pair, which only the bet itself knows
+  const label = (e: Extract<GameEvent, { betId: string; betType: BetTypeId }>): string => {
+    if (e.betType === 'hop') {
+      const hop = bets?.find((b) => b.id === e.betId)?.hop;
+      if (hop) return `Hop ${Math.min(hop[0], hop[1])}-${Math.max(hop[0], hop[1])}`;
+    }
+    return betLabel(e.betType);
+  };
   const wins: string[] = [];
   const losses: string[] = [];
   const pushes: string[] = [];
   const returned: string[] = [];
+  const travelled: string[] = [];
   const progressed: string[] = [];
   for (const e of events) {
     if (e.type === 'bet-progressed')
       progressed.push(
         `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
       );
-    else if (e.type === 'bet-won')
-      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
-    else if (e.type === 'bet-lost')
-      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
-    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
-    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
+    else if (e.type === 'bet-won') wins.push(`${label(e)} wins ${fmtMoney(e.profit - e.vig)}`);
+    else if (e.type === 'bet-lost') losses.push(`${label(e)} loses ${fmtMoney(e.amount)}`);
+    else if (e.type === 'bet-pushed') pushes.push(`${label(e)} pushes`);
+    else if (e.type === 'bet-returned') returned.push(`${label(e)} returned`);
+    else if (e.type === 'bet-travelled')
+      travelled.push(
+        e.betType === 'dont-come'
+          ? `${label(e)} goes behind the ${e.point}`
+          : `${label(e)} moves to the ${e.point}`,
+      );
   }
-  return [wins, losses, pushes, returned, progressed]
+  return [wins, losses, pushes, returned, travelled, progressed]
     .filter((g) => g.length)
-    .map((g) => g.join(', ') + '.');
+    .map(
+      (g) =>
+        g.map((x, i) => (i === 0 ? x : x.charAt(0).toLowerCase() + x.slice(1))).join(', ') + '.',
+    );
 }
 
 /**
  * The one live announcement per roll: dice, total, bet results with amounts, bankroll after the roll,
  * and the point state. Built from the roll's events and the state after it.
  */
-export function rollAnnouncement(events: readonly GameEvent[], post: GameState): string {
+export function rollAnnouncement(
+  events: readonly GameEvent[],
+  post: GameState,
+  bets?: readonly Bet[],
+): string {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
   );
-  if (!roll) return describeRoll(events);
+  if (!roll) return describeRoll(events, bets);
   const [a, b] = roll.roll.dice;
   const r = roll.roll;
   let total = String(r.total);
   if (r.hard && r.total >= 4 && r.total <= 10 && r.total % 2 === 0) total += ', the hard way';
   else if (NICKNAME[r.total]) total += `, ${NICKNAME[r.total]}`;
-  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events)];
+  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events, bets)];
   sentences.push(`Bankroll ${fmtMoney(equity(post))}.`);
   const ended = events.find((e) => e.type === 'point-made' || e.type === 'seven-out');
   if (post.point === null)
@@ -351,7 +410,7 @@ export function rollAnnouncement(events: readonly GameEvent[], post: GameState):
   return sentences.join(' ');
 }
 
-export function describeRoll(events: readonly GameEvent[]): string {
+export function describeRoll(events: readonly GameEvent[], bets?: readonly Bet[]): string {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
   );
@@ -382,7 +441,7 @@ export function describeRoll(events: readonly GameEvent[]): string {
         break;
     }
   }
-  parts.push(...betResultGroups(events));
+  parts.push(...betResultGroups(events, bets));
   if (roll) {
     const net = roll.roll.net;
     parts.push(net === 0 ? 'Net $0.' : `Net ${fmtMoney(net, { sign: true })}.`);
@@ -437,6 +496,25 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
 
 export function diceAriaLabel(d: readonly [number, number]): string {
   return `Rolled ${d[0]} and ${d[1]}, total ${d[0] + d[1]}`;
+}
+
+/**
+ * Edge shown under each bet-type option in the sheet's switcher: house edge per bet resolved at
+ * the sheet's current amount, plus its tier. Odds bets depend on a parent bet, so they get none.
+ */
+export function typeEdgeLabel(
+  type: BetTypeId,
+  amount: Cents,
+  state: Pick<GameState, 'phase' | 'point' | 'rules'>,
+): { edgeText: string; tier: EdgeTier } | null {
+  if (BET_TYPES[type].category === 'odds') return null;
+  try {
+    const e = betEdge(type, amount, { phase: state.phase, point: state.point, rules: state.rules });
+    const edge = Math.max(0, fracToNumber(e.perResolved));
+    return { edgeText: fmtPct(edge), tier: tierOf(e.perResolved) };
+  } catch {
+    return null;
+  }
 }
 
 export interface WorkingCopyInput {

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { bankrollNote } from './bankrollNote';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
+  edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   listStrategies,
+  exposureIsApproximate,
+  maxExposure,
   simulateCompare,
   simulateMany,
   simulateManyCompare,
@@ -21,6 +26,9 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { PlanPanel } from './PlanPanel';
+import { StrategyTable } from './StrategyTable';
+import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
 import { matchingPreset } from './customRules';
 import { RulesEditor } from './RulesEditor';
@@ -64,8 +72,12 @@ export interface AutoRollPanelProps {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** which chart a single session opens with (default 'bankroll') */
+    chart?: 'bankroll' | 'edge';
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** open on the all-presets comparison table instead of the run form */
+    table?: boolean;
     /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
     stopWin?: Cents;
     stopLoss?: Cents;
@@ -114,6 +126,8 @@ type Outcome =
       specs: StrategySpec[];
       cfg: SessionConfig;
       metrics: Metrics[];
+      /** spread of result per dollar wagered, only for a lone single-session run */
+      sigma?: number;
     }
   | {
       kind: 'many';
@@ -217,10 +231,26 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [seed, setSeed] = useState<number>(props.initialSeed ?? 1);
   const [progress, setProgress] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'run' | 'table' | 'plan'>(config?.table ? 'table' : 'run');
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // guided lessons script their own controls; the free planner is for the open sandbox
+  const planAvailable = !fixedSpecs && !config?.strategies && !config?.defaultStrategy;
+  // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
+  // paint, and never twice for the same strategy and rules (it is cached).
+  useEffect(() => {
+    if (chartKind !== 'edge' || outcome?.kind !== 'single' || outcome.sigma !== undefined) return;
+    if (outcome.specs.length !== 1) return;
+    const o = outcome;
+    const h = setTimeout(() => {
+      const sigma = edgeFunnelSigma(o.specs[0]!, o.cfg.rules);
+      setOutcome((cur) => (cur === o ? { ...o, sigma } : cur));
+    }, 30);
+    return () => clearTimeout(h);
+  }, [chartKind, outcome]);
 
   // I033: "Custom…" in the Rules select edits a rules object for the runs in this panel
   const [customRules, setCustomRules] = useState<TableRules | null>(null);
@@ -264,6 +294,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     return spec;
   };
 
+  // I057: when the worst-case exposure of a selected strategy per decision is over a quarter of the
+  // bankroll (fewer than four decisions at full size), say so before the run.
+  const exposureNote = useMemo(() => {
+    const planned = fixedSpecs ?? strategyIds.map(specFor);
+    let worst: StrategySpec | null = null;
+    let worstCents = 0;
+    for (const sp of planned) {
+      const c = maxExposure(sp, rules);
+      if (c > worstCents) [worst, worstCents] = [sp, c];
+    }
+    return worst ? bankrollNote(worstCents, bankroll, exposureIsApproximate(worst)) : null;
+    // specFor reads the unit, odds and layout state; list those so the note follows them
+  }, [fixedSpecs, strategyIds, effUnit, oddsMultiple, layout, rules, bankroll]);
+
   const run = async (): Promise<void> => {
     setError(null);
     if (bankrollError) return;
@@ -291,7 +335,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
+        const sigma = specs.length === 1 ? peekEdgeFunnelSigma(specs[0]!, cfg.rules) : undefined;
+        setOutcome({
+          kind: 'single',
+          results,
+          specs,
+          cfg,
+          metrics: metricsFor(specs),
+          ...(sigma !== undefined ? { sigma } : {}),
+        });
         props.onCompleted?.(results[0]!, results, specs);
       } else {
         const ac = new AbortController();
@@ -336,6 +388,65 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     </button>
   );
 
+  const unitControl = (
+    <div class="sim-ar-group" role="group" aria-label="Unit">
+      <span>Unit</span>
+      {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
+    </div>
+  );
+  const rulesControl = (
+    <>
+      {typeof props.rules !== 'object' && !fixedSpecs && (
+        <label class="sim-ar-group">
+          Rules
+          <select
+            value={editingRules || customRules ? 'custom' : preset}
+            disabled={running}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              if (v === 'custom') return setEditingRules(true);
+              setEditingRules(false);
+              setCustomRules(null);
+              setPreset(v as RulePresetId);
+            }}
+          >
+            {PRESET_IDS.map((id) => (
+              <option key={id} value={id}>
+                {PRESET_LABEL[id]}
+              </option>
+            ))}
+            <option value="custom">Custom…</option>
+          </select>
+        </label>
+      )}
+      {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+        <button
+          type="button"
+          class="sim-ar-btn"
+          disabled={running}
+          onClick={() => setEditingRules(true)}
+        >
+          Edit custom rules
+        </button>
+      ) : null}
+      {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+        <RulesEditor
+          initial={rules}
+          disabled={running}
+          onCancel={() => setEditingRules(false)}
+          onApply={(r) => {
+            setEditingRules(false);
+            // a form equal to a preset is that preset
+            const m = matchingPreset(r);
+            if (m) {
+              setPreset(m);
+              setCustomRules(null);
+            } else setCustomRules(r);
+          }}
+        />
+      ) : null}
+    </>
+  );
   if (config?.sweep)
     return (
       <SweepPanel
@@ -348,9 +459,45 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       />
     );
 
+  const viewTabs = !fixedSpecs ? (
+    <div class="sim-ar-group" role="group" aria-label="Auto-roll view">
+      {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
+      {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
+      {planAvailable && button(view === 'plan', 'Plan', () => setView('plan'), 'view-plan')}
+    </div>
+  ) : null;
+  if (planAvailable && view === 'plan')
+    return (
+      <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
+        {viewTabs}
+        <PlanPanel rules={props.rules} bankroll={bankroll} rollsPerHour={rollsPerHour} />
+      </section>
+    );
+
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
-      <div class="sim-ar-form">
+      {viewTabs}
+      {view === 'table' && !fixedSpecs && (
+        <>
+          {unitControl}
+          {rulesControl}
+        </>
+      )}
+      {view === 'table' && !fixedSpecs && (
+        <StrategyTable
+          unit={effUnit}
+          rules={rules}
+          rollsPerHour={rollsPerHour}
+          {...(config?.strategies ? { strategies: config.strategies } : {})}
+          onRun={(spec) => {
+            setStrategyIds([spec.id]);
+            setUnit(spec.unit);
+            setOddsMultiple(undefined);
+            setView('run');
+          }}
+        />
+      )}
+      <div class="sim-ar-form" hidden={view === 'table' && !fixedSpecs}>
         <fieldset class="sim-ar-fieldset">
           <legend>
             {fixedSpecs
@@ -447,10 +594,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ) : null}
         {!fixedSpecs && (
           <>
-            <div class="sim-ar-group" role="group" aria-label="Unit">
-              <span>Unit</span>
-              {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
-            </div>
+            {unitControl}
             <div class="sim-ar-group" role="group" aria-label="Odds">
               <span>Odds</span>
               {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
@@ -576,6 +720,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
             </p>
           ) : null}
+          {exposureNote ? (
+            <p class="sim-ar-desc" role="note" data-testid="bankroll-warning">
+              {exposureNote}
+            </p>
+          ) : null}
           {bankrollError ? (
             <p id="bankroll-error" role="alert" class="sim-invalid">
               {bankrollError}
@@ -586,55 +735,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
         </div>
-        {typeof props.rules !== 'object' && !fixedSpecs && (
-          <label class="sim-ar-group">
-            Rules
-            <select
-              value={editingRules || customRules ? 'custom' : preset}
-              disabled={running}
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                if (v === 'custom') return setEditingRules(true);
-                setEditingRules(false);
-                setCustomRules(null);
-                setPreset(v as RulePresetId);
-              }}
-            >
-              {PRESET_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {PRESET_LABEL[id]}
-                </option>
-              ))}
-              <option value="custom">Custom…</option>
-            </select>
-          </label>
-        )}
-        {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
-          <button
-            type="button"
-            class="sim-ar-btn"
-            disabled={running}
-            onClick={() => setEditingRules(true)}
-          >
-            Edit custom rules
-          </button>
-        ) : null}
-        {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
-          <RulesEditor
-            initial={rules}
-            disabled={running}
-            onCancel={() => setEditingRules(false)}
-            onApply={(r) => {
-              setEditingRules(false);
-              // a form equal to a preset is that preset
-              const m = matchingPreset(r);
-              if (m) {
-                setPreset(m);
-                setCustomRules(null);
-              } else setCustomRules(r);
-            }}
-          />
-        ) : null}
+        {rulesControl}
         <div class="sim-ar-group">
           <label>
             Seed{' '}
@@ -685,7 +786,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       </div>
 
       {outcome && (
-        <div data-testid="auto-roll-output" class="sim-ar-output" aria-live="polite">
+        <div
+          data-testid="auto-roll-output"
+          class="sim-ar-output"
+          aria-live="polite"
+          hidden={view === 'table' && !fixedSpecs}
+        >
           {renderOutput(outcome)}
         </div>
       )}
@@ -724,20 +830,44 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       }));
     }
     const metrics = o.metrics;
+    const canEdge = o.kind === 'single' && o.specs.length === 1 && o.results[0]!.rollsPlayed >= 2;
+    const edgeView = canEdge && chartKind === 'edge';
     return (
       <>
+        {canEdge && (
+          <div class="sim-ar-group" role="group" aria-label="Chart units">
+            {button(chartKind === 'bankroll', 'Bankroll', () => setChartKind('bankroll'))}
+            {button(chartKind === 'edge', 'Show as % of money bet', () => setChartKind('edge'))}
+          </div>
+        )}
         {o.kind === 'many' && (
           <div class="sim-ar-group" role="group" aria-label="Chart">
             {button(chartTab === 'results', 'Session results', () => setChartTab('results'))}
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
         )}
-        <BankrollChart
-          mode={mode}
-          series={series}
-          start={start}
-          sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
-        />
+        {edgeView && o.kind === 'single' && o.sigma === undefined ? (
+          <p class="sim-ar-note" role="status">
+            Working out the funnel…
+          </p>
+        ) : edgeView && o.kind === 'single' ? (
+          <EdgeChart
+            label={nameOf(o.specs[0]!.id)}
+            ratio={edgeSeries(o.results[0]!.equity, o.results[0]!.wagered)}
+            edge={o.metrics[0]!.edgeOnAction}
+            sigma={o.sigma!}
+            // bet sizes that grow with losses break the funnel's assumptions
+            funnel={all.find((x) => x.id === o.specs[0]!.id)?.escalating !== true}
+            approximate={o.metrics[0]!.approximate === true}
+          />
+        ) : (
+          <BankrollChart
+            mode={mode}
+            series={series}
+            start={start}
+            sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
+          />
+        )}
         {o.kind === 'many' && chartTab === 'results' && (
           <ResultsHistogram
             start={start}

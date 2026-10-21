@@ -20,7 +20,7 @@ import {
   parentFor,
   placeAction,
 } from './simHelpers';
-import { betLabel, buildEvFacts, fmtMoney } from './text';
+import { betLabel, buildEvFacts, fmtMoney, typeEdgeLabel } from './text';
 import type { SimulatorEvent } from './types';
 import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
@@ -105,7 +105,9 @@ export function buildSheetModel(
   const type = bet ? bet.type : sheet.type;
   const parent = parentFor(type, sheet.regionId, game);
   const def = BET_TYPES[type];
-  const facts = buildEvFacts(preview, game);
+  // basic EV detail hides the swing line, like the alternative (lessons 06-08)
+  const facts0 = buildEvFacts(preview, game);
+  const facts = scene.evDetail === 'basic' && facts0 ? { ...facts0, swingCents: null } : facts0;
   const removePreview = bet
     ? previewAction(game, { type: 'remove-bet', betId: bet.id }, { rollsPerHour })
     : undefined;
@@ -115,9 +117,16 @@ export function buildSheetModel(
         const allowed = betTypeAllowed(scene, rt, t);
         const odds = BET_TYPES[t].category === 'odds';
         const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
+        // the amount tapping this type would actually place, so the label and the tap agree
+        // the selected type is priced at the sheet's own amount; others at the amount a tap would place
+        const tapAmount =
+          t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
+        const edge = typeEdgeLabel(t, tapAmount, game);
+        const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
         return {
           id: t,
           label: betLabel(t),
+          ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
           enabled: allowed && hasParent,
           ...(!allowed
             ? { reason: 'Not available in this lesson' }

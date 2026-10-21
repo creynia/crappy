@@ -28,3 +28,38 @@ describe('loadSandbox migration', () => {
     expect(loadSandbox('k')?.game.stats.variance).toBeNaN();
   });
 });
+
+describe('loadSandbox roll log', () => {
+  beforeEach(() => localStorage.clear());
+  const save = (log: unknown) => {
+    const game = createGame({ seed: 1 });
+    localStorage.setItem(
+      'crappy:sim:k:v1',
+      JSON.stringify({ v: 1, game, startBankroll: 50000, presetId: 'x', log }),
+    );
+    return loadSandbox('k')?.log;
+  };
+  const good = {
+    id: 'r1',
+    kind: 'roll',
+    n: 1,
+    dice: [3, 4],
+    total: 7,
+    text: 'ok',
+    point: 'natural',
+    outcomes: ['win'],
+    net: 500,
+    bankroll: 50500,
+  };
+  it('keeps well-formed entries', () => expect(save([good])).toEqual([good]));
+  it('drops a log that is not an array', () => {
+    expect(save('nope')).toEqual([]);
+    expect(save({ a: 1 })).toEqual([]);
+  });
+  it('drops bad entries one by one', () => {
+    const { outcomes: _o, ...noOutcomes } = good;
+    expect(
+      save([null, good, noOutcomes, { ...good, dice: [9, 9] }, { ...good, net: 'x' }]),
+    ).toEqual([good]);
+  });
+});

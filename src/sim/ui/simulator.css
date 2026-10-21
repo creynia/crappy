@@ -130,6 +130,10 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.sim-step-count .sim-linkbtn {
+  min-height: 44px;
+  padding: 0 0.5rem;
+}
 .sim-step-text,
 .sim-step-hint,
 .sim-step-math p {
@@ -143,6 +147,7 @@
 }
 .sim-menu,
 .sim-session-panel,
+.sim-roll-log,
 .sim-auto {
   background: var(--sim-surface);
   border: 1px solid var(--sim-border);
@@ -430,6 +435,101 @@
   text-align: right;
 }
 
+/* strategy comparison table: a real table above 480px, stacked cards below */
+.sim-st-wrap {
+  overflow-x: auto;
+}
+.sim-st-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.sim-st-table th,
+.sim-st-table td {
+  padding: 4px 6px;
+  border-top: 1px solid var(--sim-border);
+  text-align: right;
+}
+.sim-st-table thead th {
+  border-top: 0;
+  vertical-align: bottom;
+}
+.sim-st-table tbody th,
+.sim-st-table thead th:first-child {
+  text-align: left;
+}
+.sim-st-run .sim-ar-btn {
+  white-space: nowrap;
+}
+.sim-st-sort {
+  font: inherit;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  min-height: 44px;
+  min-width: 44px;
+  color: inherit;
+  cursor: pointer;
+}
+.sim-st-lens {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+@media (max-width: 479px) {
+  .sim-st-table,
+  .sim-st-table tbody,
+  .sim-st-table tr,
+  .sim-st-table th,
+  .sim-st-table td {
+    display: block;
+  }
+  .sim-st-table thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .sim-st-table thead th:last-child {
+    display: none;
+  }
+  .sim-st-table thead th {
+    display: block;
+    padding: 0;
+  }
+  .sim-st-table thead .sim-st-sort {
+    border: 1px solid var(--sim-border);
+    border-radius: 999px;
+    padding: 0 12px;
+  }
+  .sim-st-table tbody tr {
+    border: 1px solid var(--sim-border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+  }
+  .sim-st-table th,
+  .sim-st-table td {
+    border-top: 0;
+    padding: 2px 0;
+  }
+  .sim-st-table tbody td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sim-st-table tbody td[data-label]::before {
+    content: attr(data-label);
+    opacity: 0.75;
+  }
+  .sim-st-run {
+    text-align: right;
+  }
+}
+.sim-autoroll [hidden] {
+  display: none !important;
+}
 .sim-sweep-intro {
   margin: 0 0 8px;
   font-size: 0.9rem;
@@ -445,6 +545,20 @@
 .sim-sweep-table th,
 .sim-sweep-table td {
   padding: 4px 3px;
+}
+
+/* ---------- session plan ---------- */
+.sim-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sim-plan-list {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.sim-plan select {
+  max-width: 100%;
 }
 
 /* Opened Auto-roll / Session panels scroll to the top edge, clear of the sticky header (I050). */

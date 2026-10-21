@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { peekEdgeFunnelSigma } from '../strategy';
 import { AutoRollPanel } from './AutoRollPanel';
 
 const spies = vi.hoisted(() => ({ simulateSession: null as null | ReturnType<typeof vi.fn> }));
@@ -29,6 +30,13 @@ async function waitUntil<T>(check: () => T | null | undefined | false): Promise<
   }
   if (!found) throw new Error('timed out waiting for condition');
   return found;
+}
+
+async function waitFor(el: HTMLElement, selector: string) {
+  for (let i = 0; i < 100 && !el.querySelector(selector); i++)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
 }
 
 describe('AutoRollPanel', () => {
@@ -134,6 +142,105 @@ describe('AutoRollPanel', () => {
     }
     expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain(
       '% ended by stop-win',
+    );
+  });
+
+  it('"% of money bet" toggle swaps in the edge chart with axis labels and a summary', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} config={{ rollOptions: [100], sessions: [1] }} />, el);
+    await click(el, '[data-testid="auto-roll-run"]');
+    expect(el.querySelector('[data-testid="edge-chart"]')).toBeNull();
+    const toggle = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('% of money bet'),
+    )!;
+    await act(() => {
+      toggle.click();
+    });
+    // the funnel's spread is worked out after a paint: a placeholder first, then the chart
+    expect(el.textContent).toContain('Working out the funnel');
+    await waitFor(el, '[data-testid="edge-chart"]');
+    const chart = el.querySelector('[data-testid="edge-chart"]')!;
+    expect(chart).not.toBeNull();
+    expect(el.querySelector('[data-testid="bankroll-chart"]')).toBeNull();
+    expect(chart.textContent).toContain('Rolls (log scale)');
+    expect(chart.querySelector('svg desc')!.textContent).toContain('House edge');
+    expect(chart.querySelector('[data-role="funnel"]')).not.toBeNull();
+    expect(chart.querySelector('[data-role="house-edge"]')).not.toBeNull();
+  });
+
+  it('scene chart: edge opens on the edge chart', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={7}
+        config={{ rollOptions: [100], sessions: [1], chart: 'edge' }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    await waitFor(el, '[data-testid="edge-chart"]');
+    expect(el.querySelector('[data-testid="edge-chart"]')).not.toBeNull();
+  });
+
+  it('martingale-pass draws no funnel (bet size escalates)', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={7}
+        config={{
+          rollOptions: [100],
+          sessions: [1],
+          chart: 'edge',
+          defaultStrategy: { id: 'martingale-pass', unit: 500 },
+        }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    await waitFor(el, '[data-testid="edge-chart"]');
+    expect(el.querySelector('[data-role="funnel"]')).toBeNull();
+    expect(el.textContent).toContain('No funnel');
+  });
+});
+
+describe('AutoRollPanel strategy table approximate rows', () => {
+  it('marks approximate presets with ≈ in the cells and a footnote', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel config={{ table: true }} />, el);
+    const row = el.querySelector('[data-strategy="martingale-pass"]')!;
+    expect(row.textContent).toContain('≈ starting layout');
+    expect(row.querySelector('td[data-label="Loss per hour"]')!.textContent).toContain('≈');
+    expect(
+      el.querySelector('[data-strategy="pass-max-odds"] td[data-label="Loss per hour"]')!
+        .textContent,
+    ).not.toContain('≈');
+    expect(el.querySelector('[data-testid="strategy-table-approx"]')).not.toBeNull();
+  });
+});
+
+describe('AutoRollPanel strategy table', () => {
+  it('opens on the table, sorts, and Run it selects the strategy', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel config={{ table: true }} />, el);
+    const rows = () =>
+      Array.from(el.querySelectorAll('[data-testid="strategy-table"] tbody tr')).map((r) =>
+        r.getAttribute('data-strategy'),
+      );
+    expect(rows().length).toBeGreaterThan(8);
+    expect(rows()).not.toContain('my-layout');
+    // default: cheapest hour first
+    expect(rows()[0]).toBe('no-bet');
+    const heads = Array.from(el.querySelectorAll<HTMLElement>('.sim-st-sort'));
+    await act(() => {
+      heads.find((b) => b.textContent.startsWith('Loss per hour'))!.click();
+    });
+    expect(rows()[0]).toBe('any-7-every-roll');
+    await act(() => {
+      el.querySelector<HTMLElement>('[data-strategy="iron-cross"] .sim-st-run button')!.click();
+    });
+    expect(el.querySelector('[data-testid="strategy-table"]')).toBeNull();
+    expect((el.querySelector('select[aria-label="Strategy"]') as HTMLSelectElement).value).toBe(
+      'iron-cross',
     );
   });
 });
@@ -286,5 +393,49 @@ describe('AutoRollPanel bankroll controls', () => {
     await waitUntil(() => el.querySelector('[data-testid="auto-roll-output"]'));
     expect(el.querySelector('[role="alert"]')).toBeNull();
     expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain('$500.00');
+  });
+
+  it('the funnel uses the rules the session ran with, not the select changed afterwards', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} config={{ rollOptions: [100], sessions: [1] }} />, el);
+    await click(el, '[data-testid="auto-roll-run"]');
+    // switch the rules without re-running, then open the % view
+    const select = el.querySelector('label.sim-ar-group select') as HTMLSelectElement;
+    await act(() => {
+      select.value = 'odds-100x';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const toggle = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('% of money bet'),
+    )!;
+    await act(() => {
+      toggle.click();
+    });
+    await waitFor(el, '[data-testid="edge-chart"]');
+    const spec = { id: 'pass-max-odds' as const, unit: 1000 };
+    expect(peekEdgeFunnelSigma(spec, 'standard-vegas')).toBeDefined();
+    expect(peekEdgeFunnelSigma(spec, 'odds-100x')).toBeUndefined();
+  });
+});
+
+describe('AutoRollPanel bankroll warning (I057)', () => {
+  const config = (unit: number) => ({
+    strategies: ['pass-max-odds' as const],
+    defaultStrategy: { id: 'pass-max-odds' as const, unit },
+    rollOptions: [100],
+    sessions: [1],
+  });
+
+  it('warns when a $100 max-odds unit is more than a quarter of a $500 bankroll', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(10_000)} />, el);
+    const note = el.querySelector('[data-testid="bankroll-warning"]');
+    expect(note?.textContent).toContain('expect a high bust rate');
+  });
+
+  it('does not warn for a $10 max-odds unit on $500', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(1_000)} />, el);
+    expect(el.querySelector('[data-testid="bankroll-warning"]')).toBeNull();
   });
 });

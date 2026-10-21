@@ -1,5 +1,6 @@
 import { isDicePair } from '../engine/bets';
 import type { Bet, GameState } from '../engine/types';
+import { sanitizeLog, type RollLogEntry } from './rollLog';
 
 /** Sandbox state saved under `crappy:sim:${key}:v1`. Every access is guarded: storage may be missing or full. */
 export interface PersistedSandbox {
@@ -9,6 +10,10 @@ export interface PersistedSandbox {
   startBankroll: number;
   presetId: string;
   chip?: number;
+  /** last few roll-log entries */
+  log?: RollLogEntry[];
+  /** rolls the seed has produced so far (I071): a share after a reload keeps its place */
+  rngSkip?: number;
 }
 
 const storageKey = (key: string) => `crappy:sim:${key}:v1`;
@@ -27,6 +32,7 @@ export function loadSandbox(key: string): PersistedSandbox | null {
     const stats = p.game.stats;
     if (typeof stats.variance !== 'number')
       stats.variance = p.game.rollCount > 0 || stats.totalWagered > 0 ? NaN : 0;
+    if (p.log !== undefined) p.log = sanitizeLog(p.log);
     return p;
   } catch {
     return null;

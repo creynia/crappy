@@ -1,5 +1,6 @@
 import type { SceneConfig, SceneRuntime, SceneStep } from '../scene/types';
 import { StepPanel } from './StepPanel';
+import type { TokenResolver } from './stepTokens';
 
 export interface SimStepProps {
   scene: SceneConfig;
@@ -9,6 +10,11 @@ export interface SimStepProps {
   onNext: () => void;
   onAnswer?: (choice: number) => void;
   onRestart: () => void;
+  /** set on a demo step when it is not playing */
+  onReplay?: (() => void) | undefined;
+  /** the demo's narration so far */
+  captions?: string[] | undefined;
+  resolve?: TokenResolver;
 }
 
 /** Guided-lesson step panel, or the "Done" panel once the scene is complete. */
@@ -20,15 +26,21 @@ export function SimStep({
   onNext,
   onAnswer,
   onRestart,
+  onReplay,
+  captions,
+  resolve,
 }: SimStepProps) {
   const guided = !!scene.steps?.length;
   const lastIdx = (scene.steps?.length ?? 1) - 1;
   const stepAck = step ? 'acknowledged' in step.completeWhen : false;
   const showNext = !!step && (rt.satisfied === true || stepAck);
+  const restart = scene.ui?.showRestart !== false;
+  const label = scene.ui?.stepPanelLabel ?? 'Lesson step';
   return (
     <>
       {guided && step ? (
         <StepPanel
+          resolve={resolve}
           step={step}
           index={rt.stepIndex}
           total={scene.steps!.length}
@@ -39,18 +51,24 @@ export function SimStep({
           onNext={onNext}
           {...(onAnswer ? { onAnswer } : {})}
           asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
-          onRestart={onRestart}
+          {...(restart ? { onRestart } : {})}
+          {...(onReplay ? { onReplay } : {})}
+          {...(captions ? { captions } : {})}
+          label={label}
         />
       ) : null}
       {guided && rt.done ? (
-        <section class="sim-step sim-step-done" aria-label="Lesson step">
+        <section class="sim-step sim-step-done" aria-label={label}>
           {/* not a live region: the simulator has one announcer; see Simulator.tsx */}
           <p class="sim-step-text">
-            <strong>Done.</strong> Nice work. Keep playing here, or restart the practice.
+            <strong>Done.</strong> Nice work.{' '}
+            {restart ? 'Keep playing here, or restart the practice.' : 'Keep playing here.'}
           </p>
-          <button type="button" class="sim-linkbtn" onClick={onRestart}>
-            Restart
-          </button>
+          {restart ? (
+            <button type="button" class="sim-linkbtn" onClick={onRestart}>
+              Restart
+            </button>
+          ) : null}
         </section>
       ) : null}
     </>

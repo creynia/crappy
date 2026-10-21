@@ -1,3 +1,5 @@
+import { replaceTokens } from '../scene/tokens';
+import type { TokenResolver } from './stepTokens';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SceneStep } from '../scene/types';
 
@@ -12,27 +14,36 @@ export interface StepPanelProps {
   nextLabel?: string;
   done: boolean;
   onNext: () => void;
+  /** accessible name of the panel (default "Lesson step") */
+  label?: string;
   /** the learner picked an option of the step's `ask` */
   onAnswer?: (choice: number) => void;
   /** answers given to the current step's ask so far, and whether one was correct */
   asked?: { count: number; correct: boolean };
   onRestart?: () => void;
+  /** demo step: play the scripted actions again */
+  onReplay?: () => void;
+  /** demo narration so far, one line per scripted frame */
+  captions?: string[];
+  /** Live values for {{tokens}} in the step text, hint and math. */
+  resolve?: TokenResolver;
 }
 
 /** Tiny inline formatter: **bold** and _italic_ only (scene text is trusted repo content, still escaped). */
-export function renderLite(text: string) {
+export function renderLite(text: string, resolve?: TokenResolver) {
+  const src = resolve ? replaceTokens(text, resolve) : text;
   const out: preact.ComponentChild[] = [];
   const re = /\*\*(.+?)\*\*|_(.+?)_/g;
   let last = 0;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
+  while ((m = re.exec(src))) {
+    if (m.index > last) out.push(src.slice(last, m.index));
     out.push(
       m[1] !== undefined ? <strong key={m.index}>{m[1]}</strong> : <em key={m.index}>{m[2]}</em>,
     );
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < src.length) out.push(src.slice(last));
   return out;
 }
 
@@ -110,9 +121,24 @@ export function StepPanel(p: StepPanelProps) {
   const [mathOpen, setMathOpen] = useState(false);
   useEffect(() => setMathOpen(false), [p.step.id]);
   return (
-    <section class="sim-step" aria-label="Lesson step" data-step={p.step.id}>
+    <section
+      class="sim-step"
+      aria-label={p.label ?? 'Lesson step'}
+      data-step={p.step.id}
+      tabIndex={-1}
+    >
       <div class="sim-step-count">
         {p.done ? 'Done' : `Step ${p.index + 1} of ${p.total}`}
+        {p.onReplay ? (
+          <button
+            type="button"
+            class="sim-linkbtn sim-replay"
+            aria-label="Replay the demo"
+            onClick={p.onReplay}
+          >
+            Replay
+          </button>
+        ) : null}
         {p.onRestart ? (
           <button type="button" class="sim-linkbtn" onClick={p.onRestart}>
             Restart
@@ -120,7 +146,7 @@ export function StepPanel(p: StepPanelProps) {
         ) : null}
       </div>
       {/* not a live region: the simulator has one announcer (roll results); see Simulator.tsx */}
-      <p class="sim-step-text">{renderLite(p.step.text)}</p>
+      <p class="sim-step-text">{renderLite(p.step.text, p.resolve)}</p>
       {p.step.ask ? (
         <AskBlock
           ask={p.step.ask}
@@ -129,9 +155,16 @@ export function StepPanel(p: StepPanelProps) {
           {...(p.onAnswer ? { onAnswer: p.onAnswer } : {})}
         />
       ) : null}
+      {p.captions && p.captions.length ? (
+        <ol class="sim-demo-captions" aria-label="What happens in the demo">
+          {p.captions.map((c, i) => (
+            <li key={i}>{c}</li>
+          ))}
+        </ol>
+      ) : null}
       {p.hintVisible && p.step.hint ? (
         <p class="sim-step-hint" role="note">
-          Hint: {renderLite(p.step.hint)}
+          Hint: {renderLite(p.step.hint, p.resolve)}
         </p>
       ) : null}
       {p.step.math ? (
@@ -144,7 +177,7 @@ export function StepPanel(p: StepPanelProps) {
           >
             {mathOpen ? 'Hide the math' : 'Show the math'}
           </button>
-          {mathOpen ? <p>{renderLite(p.step.math)}</p> : null}
+          {mathOpen ? <p>{renderLite(p.step.math, p.resolve)}</p> : null}
         </div>
       ) : null}
       {p.showNext && !p.done ? (

@@ -2,6 +2,7 @@ import { isBetTypeId, Simulator } from '../../sim';
 import type { SceneConfig } from '../../sim';
 import { RULE_PRESETS } from '../../sim';
 import type { RulePresetId } from '../../sim';
+import { Link } from '../components/Link';
 import { useStore } from '../context';
 import { simSettings } from '../simSettings';
 
@@ -25,6 +26,11 @@ export function Play({ query }: { query: URLSearchParams }) {
   return (
     <div class="page page-wide">
       <h1 class="sr">Practice table</h1>
+      <p class="play-challenge-link">
+        <Link to="/challenge" class="btn btn-ghost">
+          Challenge: 300 scored rolls
+        </Link>
+      </p>
       <Simulator
         key={`${scene.bankroll}:${preset ?? ''}:${rulesPreset ?? ''}`}
         scene={scene}

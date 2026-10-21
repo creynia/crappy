@@ -1,7 +1,9 @@
 import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS, resolveRules } from '../engine/rules';
+import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
+import { runScript, stageFor } from './runner';
 import { answeredRequirements } from './conditions';
 import type { SceneConfig } from './types';
 
@@ -90,6 +92,29 @@ class Ctx {
     v.forEach((a, i) => {
       if (!ACTION_TYPES.includes(a as string))
         this.err(`${path}[${i}]`, `unknown action type ${JSON.stringify(a)}`);
+    });
+  }
+  playFrames(path: string, v: unknown) {
+    if (!Array.isArray(v) || v.length === 0 || v.length > 30)
+      return this.err(path, 'must be an array of 1-30 frames');
+    v.forEach((f: unknown, i) => {
+      const p = `${path}[${i}]`;
+      if (!isObj(f)) return this.err(p, 'must be an object');
+      this.keys(p, f, ['action', 'say', 'pauseMs']);
+      if (f.say !== undefined) this.str(`${p}.say`, f.say);
+      if (f.pauseMs !== undefined && !(isInt(f.pauseMs) && f.pauseMs >= 0 && f.pauseMs <= 10_000))
+        this.err(`${p}.pauseMs`, 'must be an integer 0-10000');
+      const a = f.action;
+      if (!isObj(a) || !ACTION_TYPES.includes(a.type as string))
+        return this.err(`${p}.action`, 'must be an action with a known type');
+      if (a.type === 'place-bet') {
+        if (!isBetTypeId(a.betType)) this.err(`${p}.action.betType`, 'unknown bet type');
+        this.cents(`${p}.action.amount`, a.amount, { min: 1 });
+      } else if (a.type === 'roll') {
+        // a scripted roll must be forced, or the demo would differ on every replay
+        if (!isDicePair(a.dice))
+          this.err(`${p}.action.dice`, 'a scripted roll needs dice: a pair, each an integer 1-6');
+      } else if (typeof a.betId !== 'string') this.err(`${p}.action.betId`, 'must be a bet id');
     });
   }
   phase(path: string, v: unknown) {
@@ -327,6 +352,7 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'challenge',
 ];
 const STEP_KEYS = [
   'id',
@@ -342,6 +368,7 @@ const STEP_KEYS = [
   'completeWhen',
   'advance',
   'showEV',
+  'play',
   'ask',
 ];
 
@@ -405,6 +432,8 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'showRestart',
+        'stepPanelLabel',
       ]);
       if (
         u.orientation !== undefined &&
@@ -426,8 +455,10 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
+      if (u.stepPanelLabel !== undefined) c.str('ui.stepPanelLabel', u.stepPanelLabel);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))
         c.err('ui.speed', 'must be normal, fast or instant');
     }
@@ -446,6 +477,8 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'table',
+        'chart',
         'stopWin',
         'stopLoss',
         'bankroll',
@@ -477,6 +510,9 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.table !== undefined) c.bool('autoRoll.table', a.table);
+      if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
+        c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       // The panel offers these amounts as chips, so a scene can only pick one of them.
       const stopAmounts = [5000, 10_000, 25_000];
       for (const [k, v] of [
@@ -535,6 +571,19 @@ export function validateScene(
     }
   }
 
+  if (s.challenge !== undefined) {
+    if (!isObj(s.challenge)) c.err('challenge', 'must be an object');
+    else {
+      c.keys('challenge', s.challenge, ['rolls', 'scoring']);
+      if (!(isInt(s.challenge.rolls) && s.challenge.rolls >= 1))
+        c.err('challenge.rolls', 'must be a positive integer');
+      if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
+      else {
+        c.keys('challenge.scoring', s.challenge.scoring, ['minResolved']);
+        c.cents('challenge.scoring.minResolved', s.challenge.scoring.minResolved);
+      }
+    }
+  }
   if (s.steps !== undefined) {
     if (!Array.isArray(s.steps) || s.steps.length === 0)
       c.err('steps', 'must be a non-empty array');
@@ -552,6 +601,13 @@ export function validateScene(
         c.str(`${p}.text`, st.text);
         if (st.hint !== undefined) c.str(`${p}.hint`, st.hint);
         if (st.math !== undefined) c.str(`${p}.math`, st.math);
+        for (const [field, value] of [
+          ['text', st.text],
+          ['hint', st.hint],
+          ['math', st.math],
+        ] as const)
+          if (typeof value === 'string')
+            for (const msg of tokenProblems(value)) c.err(`${p}.${field}`, msg);
         if (st.forcedDice !== undefined) c.dice(`${p}.forcedDice`, st.forcedDice);
         if (st.allowedBets !== undefined) c.betList(`${p}.allowedBets`, st.allowedBets);
         if (st.allowedActions !== undefined) c.actions(`${p}.allowedActions`, st.allowedActions);
@@ -565,6 +621,7 @@ export function validateScene(
             c.err(`${p}.expect`, 'must be a non-empty array');
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
+        if (st.play !== undefined) c.playFrames(`${p}.play`, st.play);
         if (st.ask !== undefined) c.ask(`${p}.ask`, st.ask);
         const needsAnswer = answeredRequirements(st.completeWhen).length > 0;
         if (needsAnswer && st.ask === undefined)
@@ -602,7 +659,46 @@ export function validateScene(
       });
     }
   }
-  return c.errors.length
-    ? { ok: false, errors: c.errors }
-    : { ok: true, scene: json as unknown as SceneConfig };
+  if (c.errors.length) return { ok: false, errors: c.errors };
+  const scene = json as unknown as SceneConfig;
+  // Demo scripts are replayed against the engine from the scene start plus the step's own setup,
+  // so an illegal scripted action is reported with its step id.
+  scene.steps?.forEach((st, i) => {
+    if (!st.play) return;
+    if (!('acknowledged' in st.completeWhen))
+      c.err(
+        `steps[${i}].completeWhen`,
+        `step "${st.id}": a demo step must complete with acknowledged`,
+      );
+    // later steps start from wherever the learner left the table, so the demo must stage its own
+    if (
+      i > 0 &&
+      !(
+        st.setup?.replaceBets === true &&
+        st.setup.phase !== undefined &&
+        (st.setup.phase === 'come-out' || st.setup.point !== undefined) &&
+        st.setup.bankroll !== undefined
+      )
+    )
+      c.err(
+        `steps[${i}].setup`,
+        `step "${st.id}": a demo step after the first needs setup with replaceBets: true, a phase (and point on a point), and a bankroll, so it starts from a known table`,
+      );
+    let stage;
+    try {
+      stage = stageFor(scene, i);
+    } catch (e) {
+      return c.err(
+        `steps[${i}].play`,
+        `step "${st.id}": cannot stage the step (${(e as Error).message})`,
+      );
+    }
+    const r = runScript(stage, st.play);
+    if (!r.ok)
+      c.err(
+        `steps[${i}].play[${r.index}]`,
+        `step "${st.id}": scripted action is illegal: ${r.message}`,
+      );
+  });
+  return c.errors.length ? { ok: false, errors: c.errors } : { ok: true, scene };
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { bankrollNote } from './bankrollNote';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
@@ -271,13 +272,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     0,
     ...(fixedSpecs ?? strategyIds.map(specFor)).map((sp) => maxExposure(sp, rules)),
   );
-  const decisions = Math.floor(bankroll / Math.max(1, worstExposure));
-  const exposureNote =
-    worstExposure > bankroll * 0.25
-      ? decisions >= 1
-        ? `Your bankroll covers about ${decisions} decisions at this size; expect a high bust rate.`
-        : 'Your bankroll does not cover one decision at this size; expect a high bust rate.'
-      : null;
+  const exposureNote = bankrollNote(worstExposure, bankroll);
 
   const run = async (): Promise<void> => {
     setError(null);

@@ -6,6 +6,7 @@ import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { RollLog, type RollLogFocus } from './RollLog';
+import { exposureOf } from '../strategy/metrics';
 import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
@@ -368,7 +369,12 @@ export function Simulator(props: SimulatorInternalProps) {
       ) : null}
 
       {panels.session ? (
-        <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
+        <SessionPanel
+          stats={liveGame.stats}
+          rollCount={liveGame.rollCount}
+          exposure={exposureOf(liveGame.bets, liveGame.rules)}
+          bankroll={equity(liveGame)}
+        />
       ) : null}
 
       {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}

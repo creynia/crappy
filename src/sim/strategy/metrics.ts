@@ -196,16 +196,14 @@ export function lineOddsEdge(
 }
 
 /**
- * Worst-case money on the table for one decision of a strategy, cents: its flat bets plus the largest odds
- * the table allows on each line or come bet (the table maximum at the worst point). Used for the bankroll
- * warning (I057).
+ * Worst-case money on the table for one decision with these bets, cents: the flat bets plus the largest odds
+ * the table allows on each line or come bet (the table maximum at the worst point). I057.
  */
-export function maxExposure(spec: StrategySpec, rules: TableRules): number {
-  const { state, comeOutOnly } = steadyState(spec, rules);
+export function exposureOf(bets: readonly Bet[], rules: TableRules): number {
   let total = 0;
-  for (const b of state.bets) {
+  for (const b of bets) {
     if (b.type.endsWith('-odds')) {
-      const parent = state.bets.find((x) => x.id === b.parentId);
+      const parent = bets.find((x) => x.id === b.parentId);
       if (!parent) continue;
       const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
       const caps = Object.values(lay ? rules.maxLayOdds : rules.maxOdds);
@@ -214,6 +212,11 @@ export function maxExposure(spec: StrategySpec, rules: TableRules): number {
     }
     total += b.amount;
   }
-  for (const b of comeOutOnly) total += b.amount;
   return total;
+}
+
+/** Worst-case exposure of a strategy's steady layout, cents (see exposureOf). */
+export function maxExposure(spec: StrategySpec, rules: TableRules): number {
+  const { state, comeOutOnly } = steadyState(spec, rules);
+  return exposureOf(state.bets, rules) + comeOutOnly.reduce((t, b) => t + b.amount, 0);
 }

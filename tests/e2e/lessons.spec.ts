@@ -87,3 +87,18 @@ test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ pa
   await sheet.getByRole('button', { name: 'Confirm' }).click();
   await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
 });
+
+test('lesson 7: the call-the-bet question locks Roll until answered', async ({ page }) => {
+  await page.goto('/#/learn/come-bets');
+  const scene = await openScene(page, 1);
+  await scene.getByRole('button', { name: 'Next' }).click();
+  const roll = scene.getByRole('button', { name: /^Roll/ });
+  await roll.click({ force: true });
+  await expect(scene.locator('.sim-ask')).toBeVisible();
+  await scene.getByRole('button', { name: 'Both lose' }).click();
+  await expect(scene.locator('.sim-ask-feedback')).toContainText('Not quite');
+  await scene.getByRole('button', { name: 'The Come bet loses and the odds come back' }).click();
+  await expect(scene.locator('.sim-ask-feedback')).toContainText('Correct');
+  await roll.click();
+  await expect(scene.locator('.sim-step-done')).toBeVisible();
+});

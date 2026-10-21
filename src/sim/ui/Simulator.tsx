@@ -225,6 +225,13 @@ export function Simulator(props: SimulatorInternalProps) {
       rt={rt}
       hintVisible={hintVisible}
       onNext={() => feedInput({ kind: 'acknowledged' })}
+      onAnswer={(choice) => {
+        const ask = step?.ask;
+        if (!step || !ask) return;
+        const correct = choice === ask.answer;
+        emit({ type: 'step-answered', stepId: step.id, index: rt.stepIndex, choice, correct });
+        feedInput({ kind: 'answered', correct });
+      }}
       onRestart={() => resetGame()}
     />
   );

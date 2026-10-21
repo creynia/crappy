@@ -12,6 +12,10 @@ export interface StepPanelProps {
   nextLabel?: string;
   done: boolean;
   onNext: () => void;
+  /** the learner picked an option of the step's `ask` */
+  onAnswer?: (choice: number) => void;
+  /** answers given to the current step's ask so far, and whether one was correct */
+  asked?: { count: number; correct: boolean };
   onRestart?: () => void;
 }
 
@@ -32,6 +36,56 @@ export function renderLite(text: string) {
   return out;
 }
 
+function AskBlock(p: {
+  ask: NonNullable<SceneStep['ask']>;
+  stepId: string;
+  asked: { count: number; correct: boolean };
+  onAnswer?: (choice: number) => void;
+}) {
+  const [picked, setPicked] = useState<number | null>(null);
+  useEffect(() => setPicked(null), [p.stepId]);
+  // a restart clears the runtime counters; forget the old pick with them
+  useEffect(() => {
+    if (p.asked.count === 0) setPicked(null);
+  }, [p.asked.count]);
+  const shown = p.asked.count === 0 ? null : picked;
+  const correct = shown !== null && shown === p.ask.answer;
+  const solved = p.asked.correct;
+  return (
+    <div class="sim-ask" role="group" aria-labelledby={`ask-q-${p.stepId}`}>
+      <p class="sim-ask-q" id={`ask-q-${p.stepId}`}>
+        {renderLite(p.ask.q)}
+      </p>
+      <div class="sim-ask-options">
+        {p.ask.options.map((o, i) => (
+          <button
+            key={i}
+            type="button"
+            class="sim-ask-opt"
+            aria-pressed={shown === i}
+            data-state={shown === i ? (correct ? 'correct' : 'wrong') : undefined}
+            disabled={solved}
+            onClick={() => {
+              setPicked(i);
+              p.onAnswer?.(i);
+            }}
+          >
+            {renderLite(o)}
+          </button>
+        ))}
+      </div>
+      <p class="sim-ask-feedback" role="status" aria-live="polite">
+        {shown === null ? null : (
+          <>
+            <strong>{correct ? 'Correct.' : 'Not quite.'}</strong> {renderLite(p.ask.explain)}
+            {correct ? null : ' Try again.'}
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export function StepPanel(p: StepPanelProps) {
   const [mathOpen, setMathOpen] = useState(false);
   useEffect(() => setMathOpen(false), [p.step.id]);
@@ -48,6 +102,14 @@ export function StepPanel(p: StepPanelProps) {
       <p class="sim-step-text" role="status" aria-live="polite">
         {renderLite(p.step.text)}
       </p>
+      {p.step.ask ? (
+        <AskBlock
+          ask={p.step.ask}
+          stepId={p.step.id}
+          asked={p.asked ?? { count: 0, correct: false }}
+          {...(p.onAnswer ? { onAnswer: p.onAnswer } : {})}
+        />
+      ) : null}
       {p.hintVisible && p.step.hint ? (
         <p class="sim-step-hint" role="note">
           Hint: {renderLite(p.step.hint)}

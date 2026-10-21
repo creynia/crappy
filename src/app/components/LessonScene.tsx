@@ -33,6 +33,8 @@ export function LessonScene(props: { lessonId: string; scene: SceneConfig }) {
   const done = store.lesson(lessonId)?.scenes[scene.id]?.completed === true;
   const onEvent = (e: SimulatorEvent) => {
     if (e.type === 'step-completed') store.markSceneStep(lessonId, scene.id, e.index + 1);
+    else if (e.type === 'step-answered')
+      store.markQuiz(lessonId, `${scene.id}:${e.stepId}`, e.correct);
     else if (e.type === 'scene-completed') store.markSceneComplete(lessonId, scene.id);
   };
   return (

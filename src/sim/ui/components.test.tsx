@@ -493,3 +493,62 @@ describe('DiceGrid', () => {
     expect(screen.getAllByLabelText(/1 and 1, total 2: wins/)).toHaveLength(1);
   });
 });
+
+describe('StepPanel ask', () => {
+  const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+  const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+  it('renders keyboard-reachable option buttons and live feedback', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const picks: number[] = [];
+    const { container, rerender } = render(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 0, correct: false }}
+      />,
+    );
+    const opts = container.querySelectorAll<HTMLButtonElement>('button.sim-ask-opt');
+    expect(opts).toHaveLength(2);
+    expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBe('polite');
+    fireEvent.click(opts[0]!);
+    expect(picks).toEqual([0]);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 1, correct: false }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Not quite');
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('b is right');
+    expect(opts[1]!.disabled).toBe(false); // retry allowed
+    fireEvent.click(opts[1]!);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 2, correct: true }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Correct.');
+    expect(opts[0]!.disabled).toBe(true);
+  });
+});

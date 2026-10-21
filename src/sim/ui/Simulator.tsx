@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
 import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
-import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
+import {
+  betTypeAllowed,
+  calloutsFor,
+  currentStep,
+  highlightedFor,
+  initScene,
+  rollLock,
+} from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { RollLog, type RollLogFocus } from './RollLog';
@@ -311,6 +318,7 @@ export function Simulator(props: SimulatorInternalProps) {
     offBetIds: offIds,
     disabledRegions,
     highlightedBets: highlighted,
+    callouts: calloutsFor(scene, step),
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,
     wonBets: anim.won,

@@ -13,6 +13,15 @@ import type {
 import type { BetInit } from '../engine/game';
 import type { StrategyId, StrategySpec } from '../strategy/types';
 
+/** A labelled pointer at a table region (or at the region of a bet type), shown with a leader line. */
+export interface Callout {
+  /** a table region id (see REGION_IDS in ui/layouts/types.ts), or the region of a bet type */
+  target: string | { betType: BetTypeId };
+  text: string;
+  /** default 'above'; flips when there is no room */
+  placement?: 'above' | 'below';
+}
+
 export interface SceneConfig {
   id: string;
   version: 1;
@@ -28,6 +37,7 @@ export interface SceneConfig {
   allowedBets?: BetTypeId[] | 'all';
   allowedActions?: ActionType[];
   highlightedBets?: BetTypeId[];
+  callouts?: Callout[];
   showEV?: boolean;
   evDetail?: 'basic' | 'full';
   whyOpen?: boolean;
@@ -69,6 +79,8 @@ export interface SceneConfig {
     bankroll?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
+    /** show a lab tool instead of the run form: 'streaks' = the gambler's-fallacy streak lab */
+    lab?: 'streaks';
   };
   steps?: SceneStep[];
   /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
@@ -100,6 +112,8 @@ export interface SceneStep {
   allowedBets?: BetTypeId[] | 'all';
   allowedActions?: ActionType[];
   highlightedBets?: BetTypeId[];
+  /** replaces the scene-level callouts for this step ([] = none) */
+  callouts?: Callout[];
   expect?: ActionMatcher[];
   /** An in-sim question. With mode 'before-roll' (default) Roll stays locked until it is answered. */
   ask?: StepAsk;

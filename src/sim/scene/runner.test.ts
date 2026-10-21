@@ -623,4 +623,50 @@ describe('demo scripts (SceneStep.play)', () => {
     });
     expect(malformed.ok).toBe(false);
   });
+
+  it('validate: a demo step must complete with acknowledged and roll with forced dice', () => {
+    const step0 = demo.steps![0]!;
+    const noAck = validateScene({ ...demo, steps: [{ ...step0, completeWhen: { rolls: 1 } }] });
+    expect(noAck.ok).toBe(false);
+    if (!noAck.ok) expect(noAck.errors.join('\n')).toContain('must complete with acknowledged');
+    const unforced = validateScene({
+      ...demo,
+      steps: [{ ...step0, play: [{ action: { type: 'roll' } }] }],
+    });
+    expect(unforced.ok).toBe(false);
+  });
+
+  it('validate: a demo step after the first must stage its own table', () => {
+    const first = { id: 'a', text: 'a', completeWhen: { acknowledged: true } } as const;
+    const second = demo.steps![0]!;
+    const bad = validateScene({ ...demo, steps: [first, { ...second, id: 'b' }] });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toMatch(/step "b".*replaceBets/);
+    const good = validateScene({
+      ...demo,
+      steps: [
+        first,
+        { ...second, id: 'b', setup: { replaceBets: true, phase: 'come-out', bets: [] } },
+      ],
+    });
+    // come bets are illegal on a come-out: the staged table is what the script is checked against
+    expect(good.ok).toBe(false);
+    const ok = validateScene({
+      ...demo,
+      steps: [
+        first,
+        {
+          ...second,
+          id: 'b',
+          setup: {
+            replaceBets: true,
+            phase: 'point',
+            point: 6,
+            bets: [{ type: 'pass-line', amount: 1000 }],
+          },
+        },
+      ],
+    });
+    expect(ok.ok).toBe(true);
+  });
 });

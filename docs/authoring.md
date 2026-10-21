@@ -81,12 +81,16 @@ Rules:
   change when a bet is placed, so wait for a roll (for example `forcedDice` that loses) before
   testing equity.
 - A **demo step** has `play: [{ action, say?, pauseMs? }]` (1-30 frames). When the step starts, the
-  actions are played one at a time (bets, and rolls with `dice: [a, b]`) with `say` shown as a caption,
-  then control is handed back; the learner can tap to skip to the end or press Replay. Scripted actions
-  skip the step's `allowedActions` gate, and instant speed (reduced motion) plays them all at once.
-  `validateScene` replays each script from the scene start plus that step's `setup` and reports an
-  illegal frame with the step id, so give a demo step the `setup` it needs and complete it with
-  `acknowledged` (its own actions also count toward `completeWhen`).
+  actions are played one at a time (bets, and rolls, which must give `dice: [a, b]`) then control is
+  handed back; the learner can tap to skip to the end or press Replay. `say` captions are listed in the
+  step panel and announced to screen readers (at instant speed, or with reduced motion, all the
+  captions appear at once and are announced together). Scripted actions skip the step's
+  `allowedActions` gate, are kept out of the roll log, and a refused action stops the demo.
+  Rules, checked by `validateScene`: the step must complete with `acknowledged`; every frame is
+  replayed against the engine and an illegal one is reported with the step id; a demo step after the
+  first must have `setup` with `replaceBets: true` and a `phase` (plus bets as needed), because it
+  starts from wherever the learner left the table and the script is checked against that staged
+  table (scene start plus the step's `setup`).
 - Step `text`, `hint` and `math` can hold live values, shown from the table as the learner plays.
   Unknown tokens fail validation. Tokens: `{{bankroll}}` cash on hand, `{{point}}` the point or
   "off", `{{onTable}}` chips on the table, `{{session}}` won minus lost this session, `{{ev:<bet>}}`

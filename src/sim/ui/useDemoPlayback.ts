@@ -3,7 +3,6 @@ import type { Action } from '../engine/types';
 import type { PlayFrame, SceneStep } from '../scene/types';
 import type { Speed } from './animation';
 import type { Core } from './simCore';
-import type { ToastItem } from './Toasts';
 
 /** Pause after a frame when it sets none, by speed (instant plays everything at once). */
 const DEFAULT_PAUSE: Record<Speed, number> = { normal: 1600, fast: 800, instant: 0 };
@@ -17,7 +16,8 @@ export interface DemoPlaybackOptions {
   /** dispatches through the engine and the scene runner; `scripted` skips the step's action gate */
   doAction: (action: Action, opts?: { scripted?: boolean }) => unknown;
   getSpeed: () => Speed;
-  pushToast: (text: string, tone?: ToastItem['tone']) => void;
+  /** the one live announcer, so narration reaches screen readers */
+  announce: (text: string) => void;
   /** stop roll animations (replay and skip) */
   clearAnimation: () => void;
   skipAnimation: () => void;
@@ -37,6 +37,11 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
   const [tail, setTail] = useState(false);
   /** the demo of the current step has played at least once, so Replay makes sense */
   const [canReplay, setCanReplay] = useState(false);
+  /** the captions of the demo so far, shown in the step panel (at instant speed they all arrive at once) */
+  const [captions, setCaptions] = useState<string[]>([]);
+  /** true from the first frame until the last roll animation ends: scripted rolls stay out of the roll log */
+  const active = useRef(false);
+  const spoken = useRef<string[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queue = useRef<PlayFrame[]>([]);
   const startedFor = useRef(-1);
@@ -51,19 +56,29 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
   const finish = () => {
     stopTimer();
     queue.current = [];
+    active.current = false;
+    // at instant speed the narration is announced once, whole, instead of being overwritten
+    if (spoken.current.length) opts.current.announce(spoken.current.join(' '));
+    spoken.current = [];
     setPlaying(false);
     setTail(false);
     setCanReplay(startedFor.current >= 0);
   };
-  const dispatch = (f: PlayFrame) => {
-    if (f.say) opts.current.pushToast(f.say, 'info');
-    opts.current.doAction(f.action, { scripted: true });
+  /** plays one frame; false when the engine refused it (the demo stops there) */
+  const dispatch = (f: PlayFrame): boolean => {
+    if (f.say) {
+      setCaptions((c) => [...c, f.say!]);
+      if (opts.current.getSpeed() === 'instant') spoken.current.push(f.say);
+      else opts.current.announce(f.say);
+    }
+    const r = opts.current.doAction(f.action, { scripted: true }) as { ok?: boolean };
+    return r.ok !== false;
   };
   const next = () => {
     timer.current = null;
     const f = queue.current.shift();
     if (!f) return finish();
-    dispatch(f);
+    if (!dispatch(f)) return finish();
     if (queue.current.length === 0) {
       stopTimer();
       setTail(true);
@@ -79,6 +94,9 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
   const start = (frames: readonly PlayFrame[]) => {
     stopTimer();
     queue.current = [...frames];
+    active.current = true;
+    spoken.current = [];
+    setCaptions([]);
     setCanReplay(false);
     setPlaying(true);
     next();
@@ -104,6 +122,9 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
   return {
     playing,
     canReplay,
+    captions,
+    /** scripted rolls are not logged while this is true */
+    isActive: () => active.current,
     /** the scene was reset: the next step 0 may play again */
     reset: () => {
       startedFor.current = -1;
@@ -118,10 +139,17 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
       start(play);
     },
     skip: () => {
-      if (queue.current.length === 0 && timer.current === null) return;
+      if (queue.current.length === 0 && timer.current === null) {
+        // every frame is out and the last roll is still animating: skip that animation
+        if (tail) {
+          opts.current.skipAnimation();
+          finish();
+        }
+        return;
+      }
       stopTimer();
       opts.current.skipAnimation();
-      while (queue.current.length) dispatch(queue.current.shift()!);
+      while (queue.current.length) if (!dispatch(queue.current.shift()!)) break;
       opts.current.skipAnimation();
       finish();
     },

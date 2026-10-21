@@ -232,6 +232,94 @@ describe('demo steps', () => {
     expect(container.querySelector('.sim-status-money')!.textContent).toBe(finalText);
   });
 
+  const narrated: SceneConfig = {
+    ...scene,
+    steps: [
+      {
+        ...scene.steps![0]!,
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'First line' },
+          { action: { type: 'roll', dice: [5, 4] }, say: 'Second line' },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'Third line' },
+          { action: { type: 'roll', dice: [3, 6] }, say: 'Fourth line' },
+        ],
+      },
+    ],
+  };
+
+  it('shows every caption in the step panel and announces the narration once, even at instant speed', async () => {
+    const { container } = render(<Simulator scene={narrated} initialSettings={instant} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy(),
+    );
+    const list = screen.getByRole('list', { name: 'What happens in the demo' });
+    expect(Array.from(list.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+      'First line',
+      'Second line',
+      'Third line',
+      'Fourth line',
+    ]);
+    const live = container.querySelector('[data-testid="roll-announcer"]')!.textContent;
+    expect(live).toContain('First line');
+    expect(live).toContain('Fourth line');
+  });
+
+  it('scripted rolls stay out of the roll log, and a replay does not duplicate anything', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator scene={narrated} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
+    expect(screen.getByText(/No rolls yet/)).toBeTruthy();
+  });
+
+  it('a tap while the last roll is still animating skips that animation and ends the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            { ...scene.steps![0]!, play: [{ action: { type: 'roll', dice: [5, 4] }, pauseMs: 0 }] },
+          ],
+        }}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(1)); // every frame is out; the roll animates
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).toBeNull();
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+
+  it('a refused scripted action stops the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            {
+              ...scene.steps![0]!,
+              play: [
+                { action: { type: 'place-bet', betType: 'pass-line', amount: 1000 } }, // not legal on a point
+                { action: { type: 'roll', dice: [5, 4] } },
+              ],
+            },
+          ],
+        }}
+        initialSettings={instant}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(events.some((e) => e.type === 'action-rejected')).toBe(true));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(0);
+  });
+
   it('a tap skips to the end state while a slower demo is playing', async () => {
     const events: SimulatorEvent[] = [];
     const { container } = render(

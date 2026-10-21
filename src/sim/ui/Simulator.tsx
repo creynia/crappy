@@ -102,11 +102,13 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
+  const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
     () => settingsRef.current.speed,
     pushToast,
     announce,
     (pre, post, events) => {
+      if (demoActive.current()) return; // a demo's scripted rolls are not the learner's rolls
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
     },
@@ -134,11 +136,12 @@ export function Simulator(props: SimulatorInternalProps) {
     setCore,
     doAction,
     getSpeed: () => settingsRef.current.speed,
-    pushToast,
+    announce,
     clearAnimation: anim.clear,
     skipAnimation: anim.skip,
     animBusy: anim.busy,
   });
+  demoActive.current = demo.isActive;
 
   // ---------- events + effects ----------
   useEffect(() => {
@@ -299,6 +302,7 @@ export function Simulator(props: SimulatorInternalProps) {
       }}
       onRestart={() => resetGame()}
       onReplay={step?.play && demo.canReplay && !demo.playing ? demo.replay : undefined}
+      captions={step?.play ? demo.captions : undefined}
       resolve={resolverFor(game)}
     />
   );

@@ -111,8 +111,9 @@ class Ctx {
         if (!isBetTypeId(a.betType)) this.err(`${p}.action.betType`, 'unknown bet type');
         this.cents(`${p}.action.amount`, a.amount, { min: 1 });
       } else if (a.type === 'roll') {
-        if (a.dice !== undefined && !isDicePair(a.dice))
-          this.err(`${p}.action.dice`, 'must be a pair of dice, each an integer 1-6');
+        // a scripted roll must be forced, or the demo would differ on every replay
+        if (!isDicePair(a.dice))
+          this.err(`${p}.action.dice`, 'a scripted roll needs dice: a pair, each an integer 1-6');
       } else if (typeof a.betId !== 'string') this.err(`${p}.action.betId`, 'must be a bet id');
     });
   }
@@ -644,6 +645,17 @@ export function validateScene(
   // so an illegal scripted action is reported with its step id.
   scene.steps?.forEach((st, i) => {
     if (!st.play) return;
+    if (!('acknowledged' in st.completeWhen))
+      c.err(
+        `steps[${i}].completeWhen`,
+        `step "${st.id}": a demo step must complete with acknowledged`,
+      );
+    // later steps start from wherever the learner left the table, so the demo must stage its own
+    if (i > 0 && !(st.setup?.replaceBets === true && st.setup.phase !== undefined))
+      c.err(
+        `steps[${i}].setup`,
+        `step "${st.id}": a demo step after the first needs setup with replaceBets: true and a phase, so it starts from a known table`,
+      );
     let stage;
     try {
       stage = stageFor(scene, i);

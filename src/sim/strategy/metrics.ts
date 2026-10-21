@@ -127,3 +127,22 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
   };
 }
+
+/**
+ * Edge on action for a line bet with odds at `multiple` x the flat bet (capped by the table at each point,
+ * 'max' = the table maximum): flat edge / (1 + expected odds per decision).
+ */
+export function lineOddsEdge(
+  flatEdge: number,
+  rules: TableRules,
+  multiple: number | 'max',
+  lay = false,
+): number {
+  if (multiple === 'max') return flatEdge / (1 + oddsMultiplePerDecision(rules, lay));
+  let t = 0;
+  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[]) {
+    const cap = (lay ? rules.maxLayOdds : rules.maxOdds)[n];
+    t += (POINT_WAYS[n] / 36) * Math.min(multiple, cap);
+  }
+  return flatEdge / (1 + t);
+}

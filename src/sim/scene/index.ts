@@ -9,6 +9,7 @@ export {
   allowedBetsFor,
   allowedActionsFor,
   highlightedFor,
+  calloutsFor,
   betTypeAllowed,
   conditionNeedsRoll,
   stageFor,

@@ -4,7 +4,8 @@ import { add, eq, frac, mul, ONE, toNumber, ZERO } from './fraction';
 import { betEV } from './ev';
 import { fracText } from './format';
 import { expectedLossByTypePerRoll, tableExpectedLossPerRoll } from './ev';
-import { previewAction, suggestAlternative } from './preview';
+import { previewAction, suggestAlternative, vigCliff } from './preview';
+import { DEFAULT_RULES } from '../engine/rules';
 import { explainBet } from './explain';
 
 const comeOut = () => createGame({ seed: 1 });
@@ -238,6 +239,25 @@ describe('"Why?" rows count deciding combinations', () => {
       ways: 1,
       outOf: 36,
     });
+  });
+});
+
+describe('vigCliff (buy/lay vig saw-tooth)', () => {
+  const ctx = { phase: 'come-out' as const, point: null, rules: DEFAULT_RULES };
+  const edges = (type: 'buy-4' | 'lay-4', amounts: number[]) =>
+    vigCliff(type, amounts, ctx).map((r) => frac(r.edge.n, r.edge.d));
+  it('buy-4 edges at $10, $15, $20, $39, $40, $59', () => {
+    expect(edges('buy-4', [1000, 1500, 2000, 3900, 4000, 5900])).toEqual([
+      frac(1, 30),
+      frac(1, 45),
+      frac(1, 60),
+      frac(1, 117),
+      frac(1, 60),
+      frac(2, 177),
+    ]);
+  });
+  it('lay-4 $40 is 1.67% and $41 is 1.63%', () => {
+    expect(edges('lay-4', [4000, 4100])).toEqual([frac(1, 60), frac(2, 123)]);
   });
 });
 

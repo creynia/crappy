@@ -453,7 +453,7 @@ export function Simulator(props: SimulatorInternalProps) {
       <div class="sim-main">
         <div class="sim-felt">
           {!landscape ? (
-            <div class="sim-status-wrap">
+            <div class="sim-status-wrap sim-status-wrap-cost">
               {status(false)}
               <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
             </div>
@@ -477,7 +477,6 @@ export function Simulator(props: SimulatorInternalProps) {
             {stepEl}
             <div class="sim-status-wrap">
               {status(true)}
-              <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
               {toastsEl}
             </div>
             {controls}

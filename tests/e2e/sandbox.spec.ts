@@ -165,6 +165,29 @@ test.describe('sandbox', () => {
     }
   });
 
+  test('auto-roll starting bankroll picker sets the run bankroll without page overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/play?speed=fast');
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const panel = page.locator('.sim-auto');
+    await panel
+      .getByRole('group', { name: 'Starting bankroll' })
+      .getByRole('button', { name: '$5,000' })
+      .click();
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('region', { name: 'Strategy summary' })).toContainText(
+      '$5,000.00',
+    );
+    const scroll = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+      '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+    );
+    expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
+  });
+
   test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

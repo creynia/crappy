@@ -46,3 +46,19 @@ describe('box-4 type switcher labels', () => {
     expect(option(after.options, 'Buy 4').edgeText).not.toContain(' at ');
   });
 });
+
+describe('evDetail basic hides the swing line', () => {
+  it('keeps the edge but drops the swing', () => {
+    const { game, runtime } = initScene(SANDBOX_SCENE, { seed: 1 });
+    const basic = buildSheetModel(
+      { regionId: 'box-4', type: 'place-4', amount: 1000 },
+      game,
+      { ...SANDBOX_SCENE, evDetail: 'basic' },
+      runtime,
+      100,
+      CHIP,
+    )!;
+    expect(basic.facts?.swingCents).toBeNull();
+    expect(basic.facts?.edge).not.toBeNull();
+  });
+});

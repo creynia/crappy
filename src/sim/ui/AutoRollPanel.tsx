@@ -26,6 +26,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { PlanPanel } from './PlanPanel';
 import { StrategyTable } from './StrategyTable';
 import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
@@ -233,9 +234,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'run' | 'table'>(config?.table ? 'table' : 'run');
+  const [view, setView] = useState<'run' | 'table' | 'plan'>(config?.table ? 'table' : 'run');
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // guided lessons script their own controls; the free planner is for the open sandbox
+  const planAvailable = !fixedSpecs && !config?.strategies && !config?.defaultStrategy;
   // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
   // paint, and never twice for the same strategy and rules (it is cached).
   useEffect(() => {
@@ -456,14 +459,24 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       />
     );
 
+  const viewTabs = !fixedSpecs ? (
+    <div class="sim-ar-group" role="group" aria-label="Auto-roll view">
+      {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
+      {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
+      {planAvailable && button(view === 'plan', 'Plan', () => setView('plan'), 'view-plan')}
+    </div>
+  ) : null;
+  if (planAvailable && view === 'plan')
+    return (
+      <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
+        {viewTabs}
+        <PlanPanel rules={props.rules} bankroll={bankroll} rollsPerHour={rollsPerHour} />
+      </section>
+    );
+
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
-      {!fixedSpecs && (
-        <div class="sim-ar-group" role="group" aria-label="Auto-roll view">
-          {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
-          {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
-        </div>
-      )}
+      {viewTabs}
       {view === 'table' && !fixedSpecs && (
         <>
           {unitControl}

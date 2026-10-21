@@ -1,3 +1,5 @@
+import { replaceTokens } from '../scene/tokens';
+import type { TokenResolver } from './stepTokens';
 import { useEffect, useState } from 'preact/hooks';
 import type { SceneStep } from '../scene/types';
 
@@ -13,22 +15,25 @@ export interface StepPanelProps {
   done: boolean;
   onNext: () => void;
   onRestart?: () => void;
+  /** Live values for {{tokens}} in the step text, hint and math. */
+  resolve?: TokenResolver;
 }
 
 /** Tiny inline formatter: **bold** and _italic_ only (scene text is trusted repo content, still escaped). */
-export function renderLite(text: string) {
+export function renderLite(text: string, resolve?: TokenResolver) {
+  const src = resolve ? replaceTokens(text, resolve) : text;
   const out: preact.ComponentChild[] = [];
   const re = /\*\*(.+?)\*\*|_(.+?)_/g;
   let last = 0;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
+  while ((m = re.exec(src))) {
+    if (m.index > last) out.push(src.slice(last, m.index));
     out.push(
       m[1] !== undefined ? <strong key={m.index}>{m[1]}</strong> : <em key={m.index}>{m[2]}</em>,
     );
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < src.length) out.push(src.slice(last));
   return out;
 }
 
@@ -46,10 +51,10 @@ export function StepPanel(p: StepPanelProps) {
         ) : null}
       </div>
       {/* not a live region: the simulator has one announcer (roll results); see Simulator.tsx */}
-      <p class="sim-step-text">{renderLite(p.step.text)}</p>
+      <p class="sim-step-text">{renderLite(p.step.text, p.resolve)}</p>
       {p.hintVisible && p.step.hint ? (
         <p class="sim-step-hint" role="note">
-          Hint: {renderLite(p.step.hint)}
+          Hint: {renderLite(p.step.hint, p.resolve)}
         </p>
       ) : null}
       {p.step.math ? (
@@ -62,7 +67,7 @@ export function StepPanel(p: StepPanelProps) {
           >
             {mathOpen ? 'Hide the math' : 'Show the math'}
           </button>
-          {mathOpen ? <p>{renderLite(p.step.math)}</p> : null}
+          {mathOpen ? <p>{renderLite(p.step.math, p.resolve)}</p> : null}
         </div>
       ) : null}
       {p.showNext && !p.done ? (

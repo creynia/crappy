@@ -11,6 +11,7 @@ import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { resolverFor } from './stepTokens';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
@@ -231,6 +232,7 @@ export function Simulator(props: SimulatorInternalProps) {
       hintVisible={hintVisible}
       onNext={() => feedInput({ kind: 'acknowledged' })}
       onRestart={() => resetGame()}
+      resolve={resolverFor(liveGame)}
     />
   );
 

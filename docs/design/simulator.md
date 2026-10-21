@@ -17,7 +17,7 @@ All figures in this document were checked by exact rational computation (Python 
 | Engine | Pure, immutable, framework-free TS in `src/sim/engine/`. No DOM, no `Math.random`, no `Date`. |
 | Math | Exact rationals (`bigint`-based `Fraction`) in `src/sim/math/`. EV comes from the same payout functions the engine uses, so preview and play always agree. |
 | Default rules | **Standard Vegas**: 3-4-5x odds, Field pays 2x on 2 **and 2x on 12**, buy/lay vig 5% **collected only on a win**, don't-side lay odds up to **6x the flat bet**. Presets: `field-3x-12`, `odds-10x`, `odds-100x`. |
-| Bets in v1 | The list in §1.3, including `world`, plus the bonus side bets `fire`, `all`, `tall`, `small` (added by I037, see decisions.md). **No** hop bets. |
+| Bets in v1 | The list in §1.3, including `world`, plus **hop bets** (`hop`, added in I035: one-roll bet on an exact pair, easy 15:1, hard 30:1) and the bonus side bets `fire`, `all`, `tall`, `small` (added by I037, see decisions.md). |
 | Odds | Odds are **separate bet instances** (`pass-odds`, etc.) linked to their flat bet by `parentId`. |
 | RNG | `xoshiro128**` seeded through `splitmix32`, with rejection-sampled d6. Its state is stored in `GameState`, so play is replayable. |
 | Rendering | **SVG** layouts with a data-driven region map: one portrait layout, one landscape layout, and a separate **Center (props)** panel. Controls are HTML around the SVG. |
@@ -852,8 +852,11 @@ export type Condition =
   | { rolls: number }                                  // rolls since step start
   | { phase: Phase }
   | { point: PointNumber | null }
-  | { betOnTable: { type: BetTypeId; minAmount?: Cents } }
+  | { betOnTable: { type: BetTypeId; minAmount?: Cents; point?: PointNumber } }
+  | { betResolved: { type: BetTypeId; result?: 'won' | 'lost' | 'pushed' } }  // sugar over bet-won/lost/pushed
   | { bankrollAtLeast: Cents } | { bankrollAtMost: Cents }
+  | { equityAtLeast: Cents } | { equityAtMost: Cents }   // equity = bankroll + chips on the table
+  | { not: Condition }                                  // nests with all / any
   | { previewed: BetTypeId }                           // user opened the sheet for this bet
   | { autoRollCompleted: { minRolls?: number } }
   | { acknowledged: true };                            // user tapped "Next"

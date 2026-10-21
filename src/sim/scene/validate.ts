@@ -1,4 +1,4 @@
-import { isBetTypeId } from '../engine/bets';
+import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
@@ -8,6 +8,7 @@ type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const isInt = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x);
 const POINTS = [4, 5, 6, 8, 9, 10];
+const BET_RESULTS = ['won', 'lost', 'pushed'];
 const ACTION_TYPES = ['place-bet', 'set-amount', 'remove-bet', 'set-working', 'roll'];
 const EVENT_TYPES = [
   'bet-placed',
@@ -95,8 +96,18 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
+    this.keys(path, v, [
+      'ref',
+      'type',
+      'amount',
+      'point',
+      'parentRef',
+      'working',
+      'hop',
+      'progress',
+    ]);
     this.bet(`${path}.type`, v.type);
+    this.hop(path, v.type, v.hop, true);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
     if (v.parentRef !== undefined) this.str(`${path}.parentRef`, v.parentRef);
@@ -108,9 +119,21 @@ class Ctx {
         this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
     }
   }
+  /** Hop pair (I035): required on a hop BetInit, optional on a hop matcher, rejected elsewhere. */
+  hop(path: string, type: unknown, hop: unknown, required: boolean) {
+    const types = Array.isArray(type) ? type : type === undefined ? [] : [type];
+    const isHop = types.length > 0 && types.every((t) => t === 'hop');
+    if (hop === undefined) {
+      if (required && isHop) this.err(`${path}.hop`, 'a hop bet needs a dice pair, e.g. [2, 4]');
+      return;
+    }
+    if (!isDicePair(hop)) this.err(`${path}.hop`, 'must be a pair of dice, each an integer 1-6');
+    else if (!isHop) this.err(`${path}.hop`, 'only applies to the "hop" bet type');
+  }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax']);
+    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax', 'hop']);
+    this.hop(path, v.betType, v.hop, false);
     if (!ACTION_TYPES.includes(v.type as string)) this.err(`${path}.type`, 'unknown action type');
     if (v.betType !== undefined) {
       if (Array.isArray(v.betType))
@@ -163,13 +186,36 @@ class Ctx {
         break;
       case 'betOnTable':
         if (!isObj(val)) return this.err(`${path}.betOnTable`, 'must be an object');
-        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount']);
+        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount', 'point']);
         this.bet(`${path}.betOnTable.type`, val.type);
         if (val.minAmount !== undefined)
           this.cents(`${path}.betOnTable.minAmount`, val.minAmount, { min: 1 });
+        if (val.point !== undefined) {
+          this.point(`${path}.betOnTable.point`, val.point);
+          const t = val.type;
+          if (typeof t === 'string' && t !== 'come' && t !== 'dont-come' && !t.endsWith('-odds'))
+            this.err(
+              `${path}.betOnTable.point`,
+              'point only applies to come, dont-come and odds bets',
+            );
+        }
+        break;
+      case 'betResolved':
+        if (!isObj(val)) return this.err(`${path}.betResolved`, 'must be an object');
+        this.keys(`${path}.betResolved`, val, ['type', 'result']);
+        this.bet(`${path}.betResolved.type`, val.type);
+        if (val.result !== undefined && !BET_RESULTS.includes(val.result as string))
+          this.err(`${path}.betResolved.result`, 'must be "won", "lost" or "pushed"');
+        break;
+      case 'not':
+        this.condition(`${path}.not`, val, autoRoll);
         break;
       case 'bankrollAtLeast':
       case 'bankrollAtMost':
+        this.cents(`${path}.${k}`, val);
+        break;
+      case 'equityAtLeast':
+      case 'equityAtMost':
         this.cents(`${path}.${k}`, val);
         break;
       case 'previewed':

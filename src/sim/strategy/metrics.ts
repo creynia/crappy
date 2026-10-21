@@ -194,3 +194,26 @@ export function lineOddsEdge(
   }
   return flatEdge / (1 + t);
 }
+
+/**
+ * Worst-case money on the table for one decision of a strategy, cents: its flat bets plus the largest odds
+ * the table allows on each line or come bet (the table maximum at the worst point). Used for the bankroll
+ * warning (I057).
+ */
+export function maxExposure(spec: StrategySpec, rules: TableRules): number {
+  const { state, comeOutOnly } = steadyState(spec, rules);
+  let total = 0;
+  for (const b of state.bets) {
+    if (b.type.endsWith('-odds')) {
+      const parent = state.bets.find((x) => x.id === b.parentId);
+      if (!parent) continue;
+      const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
+      const caps = Object.values(lay ? rules.maxLayOdds : rules.maxOdds);
+      total += parent.amount * Math.max(0, ...caps);
+      continue;
+    }
+    total += b.amount;
+  }
+  for (const b of comeOutOnly) total += b.amount;
+  return total;
+}

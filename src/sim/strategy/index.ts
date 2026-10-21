@@ -1,10 +1,10 @@
 import { resolveRules } from '../engine';
 import type { TableRules } from '../engine';
-import { oddsMultiplePerDecision, strategyMetrics as metrics } from './metrics';
+import { maxExposure, oddsMultiplePerDecision, strategyMetrics as metrics } from './metrics';
 import type { StrategyMetrics, StrategySpec } from './types';
 
 export * from './types';
-export { oddsMultiplePerDecision };
+export { maxExposure, oddsMultiplePerDecision };
 export { getStrategy, listStrategies } from './presets';
 export {
   simulateSession,

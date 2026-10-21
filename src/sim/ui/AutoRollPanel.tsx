@@ -3,6 +3,7 @@ import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
   listStrategies,
+  maxExposure,
   simulateCompare,
   simulateMany,
   simulateManyCompare,
@@ -263,6 +264,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (id === 'my-layout') spec.layout = layout ?? [];
     return spec;
   };
+
+  // I057: when the worst-case exposure of a selected strategy per decision is over a quarter of the
+  // bankroll (fewer than four decisions at full size), say so before the run.
+  const worstExposure = Math.max(
+    0,
+    ...(fixedSpecs ?? strategyIds.map(specFor)).map((sp) => maxExposure(sp, rules)),
+  );
+  const decisions = Math.floor(bankroll / Math.max(1, worstExposure));
+  const exposureNote =
+    worstExposure > bankroll * 0.25
+      ? decisions >= 1
+        ? `Your bankroll covers about ${decisions} decisions at this size; expect a high bust rate.`
+        : 'Your bankroll does not cover one decision at this size; expect a high bust rate.'
+      : null;
 
   const run = async (): Promise<void> => {
     setError(null);
@@ -574,6 +589,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           {tableTooSmall ? (
             <p class="sim-ar-desc">
               Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
+          {exposureNote ? (
+            <p class="sim-ar-desc" role="note" data-testid="bankroll-warning">
+              {exposureNote}
             </p>
           ) : null}
           {bankrollError ? (

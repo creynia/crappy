@@ -63,3 +63,14 @@ describe('minHeadingDepth', () => {
     expect(minHeadingDepth('no headings')).toBe(7);
   });
 });
+
+describe('quiz ids', () => {
+  it('reject ":" so they cannot collide with in-scene answers', () => {
+    expect(() =>
+      compileLesson(
+        head + '```quiz\n- id: scene:step\n  q: A?\n  options: [a, b]\n  answer: 0\n  explain: e\n```\n',
+        't.md',
+      ),
+    ).toThrow(/":"/);
+  });
+});

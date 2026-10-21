@@ -3,6 +3,7 @@ import { createGame } from '../engine/game';
 import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import { validateCustom } from '../strategy/custom';
 import { listStrategies } from '../strategy/presets';
+import { answeredRequirements } from './conditions';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -235,12 +236,32 @@ class Ctx {
           this.err(`${path}.autoRollCompleted.minRolls`, 'must be a positive integer');
         if (!autoRoll) this.err(path, 'autoRollCompleted needs autoRoll.enabled on the scene');
         break;
+      case 'answered':
+        if (val !== true && val !== 'correct')
+          this.err(`${path}.answered`, 'must be true or "correct"');
+        break;
       case 'acknowledged':
         if (val !== true) this.err(`${path}.acknowledged`, 'must be true');
         break;
       default:
         this.err(path, `unknown condition "${k}"`);
     }
+  }
+  ask(path: string, v: unknown) {
+    if (!isObj(v)) return this.err(path, 'must be an object');
+    this.keys(path, v, ['q', 'options', 'answer', 'explain', 'mode']);
+    this.str(`${path}.q`, v.q);
+    this.str(`${path}.explain`, v.explain);
+    if (
+      !Array.isArray(v.options) ||
+      v.options.length < 2 ||
+      v.options.some((o) => typeof o !== 'string' || o === '')
+    )
+      this.err(`${path}.options`, 'must be an array of at least 2 non-empty strings');
+    else if (!(isInt(v.answer) && v.answer >= 0 && v.answer < v.options.length))
+      this.err(`${path}.answer`, 'must be an integer index into options');
+    if (v.mode !== undefined && v.mode !== 'before-roll' && v.mode !== 'any')
+      this.err(`${path}.mode`, 'must be before-roll or any');
   }
   strategySpec(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
@@ -328,6 +349,7 @@ const STEP_KEYS = [
   'completeWhen',
   'advance',
   'showEV',
+  'ask',
 ];
 
 /** Strict scene validation: canonical ids, integer cents, dice 1-6, shapes, and engine-backed bet checks. */
@@ -550,6 +572,19 @@ export function validateScene(
             c.err(`${p}.expect`, 'must be a non-empty array');
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
+        if (st.ask !== undefined) c.ask(`${p}.ask`, st.ask);
+        const needsAnswer = answeredRequirements(st.completeWhen).length > 0;
+        if (needsAnswer && st.ask === undefined)
+          c.err(`${p}.completeWhen`, 'an answered condition needs the step to have an ask');
+        // the feedback must be seen before the step moves on: wait for Next or for something else too
+        const cw = isObj(st.completeWhen) ? st.completeWhen : {};
+        const alsoWaits =
+          Array.isArray(cw.all) && cw.all.some((x) => answeredRequirements(x).length === 0);
+        if (st.ask !== undefined && st.advance !== 'button' && !alsoWaits)
+          c.err(
+            `${p}.advance`,
+            'a step with an ask needs advance: button, or an all condition with something besides answered',
+          );
         if (st.completeWhen === undefined) c.err(`${p}.completeWhen`, 'is required');
         else c.condition(`${p}.completeWhen`, st.completeWhen, autoOn);
         if (st.setup !== undefined) {

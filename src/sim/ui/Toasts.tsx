@@ -12,6 +12,8 @@ export interface ToastsProps {
   onDismiss: (id: string) => void;
   /** auto-dismiss after this many ms (see toastDurationMs); omit to keep until dismissed */
   autoDismissMs?: number;
+  /** keep the toasts (and their timers) but do not show them, e.g. while a prompt takes their place */
+  hidden?: boolean;
 }
 
 const SWIPE_PX = 60;
@@ -80,9 +82,9 @@ function ToastView({
   );
 }
 
-export function Toasts({ toasts, onDismiss, autoDismissMs }: ToastsProps) {
+export function Toasts({ toasts, onDismiss, autoDismissMs, hidden }: ToastsProps) {
   return (
-    <div class="sim-toasts">
+    <div class="sim-toasts" hidden={hidden}>
       {toasts.map((t) => (
         <ToastView key={t.id} t={t} onDismiss={onDismiss} ms={autoDismissMs} />
       ))}

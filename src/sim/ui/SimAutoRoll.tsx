@@ -4,7 +4,9 @@ import { resolveRules } from '../engine/rules';
 import type { GameState, RulePresetId } from '../engine/types';
 import type { SceneConfig, SceneInput } from '../scene/types';
 import type { ManyResult, SessionResult, StrategySpec } from '../strategy/types';
+import { decodeCustom } from '../strategy/custom';
 import { AutoRollPanel } from './AutoRollPanel';
+import { readUrlParams } from './useUrlBoot';
 import { StreakLab } from './StreakLab';
 import type { SimulatorEvent } from './types';
 
@@ -34,7 +36,13 @@ export function SimAutoRoll({
 }: SimAutoRollProps) {
   const ar = scene.autoRoll;
   const config = useMemo(() => {
-    if (!ar) return undefined;
+    if (!ar) {
+      // I013: a shared "My system" link (#/play?system=...) opens the builder with that system
+      const custom = decodeCustom(readUrlParams().get('system'));
+      return custom
+        ? { defaultStrategy: { id: 'custom' as const, unit: 1000, custom } }
+        : undefined;
+    }
     const cfg: NonNullable<Parameters<typeof AutoRollPanel>[0]['config']> = {};
     if (ar.compare?.length) {
       cfg.compare = ar.compare;

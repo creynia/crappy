@@ -1106,9 +1106,12 @@
   margin: 0;
   flex: 1 1 0;
   min-width: 0;
-  white-space: nowrap;
+  /* up to two lines in a narrow rail, never clipped sideways */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .sim-odds-hint-actions {
   display: flex;

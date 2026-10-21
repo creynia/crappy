@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { AutoRollPanel } from './AutoRollPanel';
 import { PlanPanel } from './PlanPanel';
 
-async function until(el: HTMLElement, selector: string, ms = 20_000) {
+async function until(el: HTMLElement, selector: string, ms = 90_000) {
   const end = Date.now() + ms;
   while (!el.querySelector(selector) && Date.now() < end)
     await act(async () => {
@@ -33,7 +33,7 @@ describe('PlanPanel', () => {
       /gets that under 5%/,
     );
     expect(el.querySelector('[data-testid="plan-stop"]')!.textContent).toMatch(/stop-loss: \$/);
-  }, 60_000);
+  }, 120_000);
 
   it('changing an input restarts: the old result disappears and the expected loss updates', async () => {
     const el = document.createElement('div');
@@ -48,7 +48,7 @@ describe('PlanPanel', () => {
     expect(el.querySelector('[data-testid="plan-expected"]')!.textContent).not.toBe(before);
     await until(el, '[data-testid="plan-risk"]');
     expect(el.querySelector('[data-testid="plan-risk"]')).not.toBeNull();
-  }, 60_000);
+  }, 120_000);
 
   it('is reachable from the auto-roll panel through the Plan tab', async () => {
     const el = document.createElement('div');

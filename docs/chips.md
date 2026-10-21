@@ -17,10 +17,6 @@ Optional dice-rattle, dice-land and chip-clack sounds in the simulator.
 A drill where the app names a dice result and the learner calls out which bets
 win, lose or stay (dealer-style). Builds table fluency.
 
-### Session plan panel
-A small planner: pick bankroll, unit, strategy and session length, and see
-expected loss, risk of ruin and a suggested stop-loss before you play.
-
 ### Contract-bet sheet wording
 For a Pass/Come bet already on a point, the sheet shows "Expected loss: $0.00".
 Show the bet's current (positive) value instead, or hide the loss line.
@@ -34,5 +30,6 @@ stacked card layout.
 
 ## Done
 
+- Session plan panel (I011): a Plan tab in Auto-roll with bankroll, unit, strategy and hours. It shows the analytic expected loss at once, then simulated bust and ahead rates (500 seeded sessions), a suggested stop-loss and the bankroll that keeps bust under 5% (`strategy/plan.ts`).
 - Combined edge with two Come bets (PR #18): `combinedEdge` uses the managed bet (`betId` / `parentId`) for every lookup, so set-amount and odds on the second Come bet no longer fall back to the first.
 - Hop bets (I035): one-roll bets on a specific dice pair (hard hop 30:1, easy hop 15:1), with a 21-pair picker in the center panel.

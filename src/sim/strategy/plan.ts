@@ -134,7 +134,7 @@ export function bustRateAt(
 export interface BankrollSuggestion {
   /** a bankroll found with bust probability at or under the target, within `step` of the smallest such; null when none up to the cap */
   bankroll: Cents | null;
-  /** bust probability at that bankroll (same seeds as the plan's own estimate) */
+  /** bust probability at that bankroll (first `searchSessions` of the plan's seeds) */
   bustRate: number;
   target: number;
   /** the largest bankroll tried, when none worked */
@@ -144,7 +144,7 @@ export interface BankrollSuggestion {
 }
 
 /**
- * A bankroll whose bust probability is at or under `targetBust` (default 5%), within about 3% of the
+ * A bankroll whose bust probability is at or under `targetBust` (default 5%), within about 5% of the
  * smallest that does (and never coarser than $10). Doubles from the plan's own bankroll until it is
  * safe, then bisects. Every estimate uses the same seeds, so the answer is deterministic and the
  * bust rate does not rise as the bankroll grows. Unsafe candidates are abandoned as soon as they
@@ -152,7 +152,7 @@ export interface BankrollSuggestion {
  */
 export async function suggestBankroll(
   input: PlanInput,
-  opts: PlanOptions & { capMultiple?: number } = {},
+  opts: PlanOptions & { capMultiple?: number; searchSessions?: number } = {},
 ): Promise<BankrollSuggestion> {
   const target = opts.targetBust ?? 0.05;
   const unit = input.strategy.unit;
@@ -162,7 +162,11 @@ export async function suggestBankroll(
   const at = async (b: Cents): Promise<number> => {
     let v = cache.get(b);
     if (v === undefined) {
-      v = await bustRateAt(input, b, { ...opts, stopAbove: target });
+      v = await bustRateAt(input, b, {
+        ...opts,
+        sessions: opts.searchSessions ?? Math.min(opts.sessions ?? PLAN_SESSIONS, 250),
+        stopAbove: target,
+      });
       cache.set(b, v);
     }
     return v;
@@ -174,7 +178,7 @@ export async function suggestBankroll(
     if (hi >= cap) return { bankroll: null, bustRate: cache.get(hi)!, target, cap: hi, step: base };
     hi = Math.min(cap, hi * 2);
   }
-  const step = Math.max(base, Math.round((hi * 0.03) / base) * base);
+  const step = Math.max(base, Math.round((hi * 0.05) / base) * base);
   while (hi - lo > step) {
     const mid = lo + Math.max(base, Math.floor((hi - lo) / 2 / base) * base);
     if (mid >= hi) break;

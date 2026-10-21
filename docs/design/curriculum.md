@@ -1900,7 +1900,7 @@ Definitions
 | `horn` | Horn (amount in multiples of 4) | Any roll | 2, 3, 11, 12: the winning quarter is paid as its own prop, the other three quarters lose | other | — | 2/12: net +27 per 4 units; 3/11: net +12 per 4 units | One-roll | n/a |
 | `c-e` | Craps & Eleven (multiples of 2) | Any roll | 2, 3, 12 (net 3:1 on the whole bet); 11 (net 7:1) | other | — | as Wins | One-roll | n/a |
 | `world` | World / Whirl (multiples of 5) | Any roll | 2/12: net +26 per 5 units; 3/11: net +11 per 5 | 4, 5, 6, 8, 9, 10 | 7 (the any-7 unit's win covers the four losing units) | as Wins | One-roll | n/a |
-| `hop` | Hop bet (param `dice: [a,b]`) | Any roll | That exact pair (either order) | other | — | Easy (a≠b) 15:1; hard (a=b) 30:1 | One-roll | n/a |
+| `hop` | Hop bet (param `hop: [a,b]`, normalized low-high) | Any roll | That exact pair (either order) | other | — | Easy (a≠b) 15:1; hard (a=b) 30:1 | One-roll | n/a |
 
 Instances: a `come`/`dont-come` that has moved carries `number`. Odds bets carry `number`. A Horn, C&E or World bet is one bet object in the simulator; it is paid as a combined net result.
 

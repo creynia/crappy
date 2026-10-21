@@ -97,6 +97,8 @@ export interface ActionMatcher {
   minAmount?: Cents;
   maxAmount?: Cents;
   oddsMax?: boolean;
+  /** EXTENSION (I035): only a hop bet on this pair matches (either order). */
+  hop?: Dice;
 }
 
 export type Condition =

@@ -15,7 +15,7 @@ import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
-import { OddsHint } from './OddsHint';
+import { OddsHint, oddsHintText } from './OddsHint';
 import { oddsRoom } from './oddsHint';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
@@ -63,6 +63,8 @@ export function Simulator(props: SimulatorInternalProps) {
   const [chip, setChip] = useState<Cents>(initialChip(chips, ui.defaultChip, boot.chip));
   const [view, setView] = useState<'table' | 'center'>(ui.view ?? 'table');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // The one live announcer: { text, n } so a repeated message is re-announced (the key changes).
+  const [live, setLive] = useState({ text: '', n: 0 });
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
@@ -75,8 +77,9 @@ export function Simulator(props: SimulatorInternalProps) {
     const id = `t${++toastN.current}`;
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
+  const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
-  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast);
+  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast, announce);
   const { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction } = useGameCore({
     boot,
     sceneRef,
@@ -84,6 +87,7 @@ export function Simulator(props: SimulatorInternalProps) {
     onRejected: (message) => {
       setHintVisible(true);
       pushToast(message, 'info');
+      announce(message);
     },
     onRolled: anim.run,
   });
@@ -99,13 +103,15 @@ export function Simulator(props: SimulatorInternalProps) {
     }
   });
   const [oddsHintKey, setOddsHintKey] = useState<string | null>(null);
-  const oddsShown = useRef(new Set<string>());
-  const oddsNow = ui.hints === true && !hideOddsHint ? oddsRoom(liveGame) : null;
+  // Once per mount: the first time a point gives odds room. Never while the auto-roll panel is open.
+  const oddsShownOnce = useRef(false);
+  const oddsNow = ui.hints === true && !hideOddsHint && !panels.auto ? oddsRoom(liveGame) : null;
   const oddsNowKey = oddsNow ? `${oddsNow.betId}:${oddsNow.point}` : null;
   useEffect(() => {
-    if (!oddsNowKey || oddsShown.current.has(oddsNowKey)) return;
-    oddsShown.current.add(oddsNowKey);
+    if (!oddsNow || oddsShownOnce.current) return;
+    oddsShownOnce.current = true;
     setOddsHintKey(oddsNowKey);
+    announce(oddsHintText(oddsNow));
   }, [oddsNowKey]);
   const oddsHintRoom = oddsNow && oddsHintKey === oddsNowKey ? oddsNow : null;
   const step = currentStep(scene, rt);
@@ -132,6 +138,7 @@ export function Simulator(props: SimulatorInternalProps) {
     setCore,
     emit,
     pushToast,
+    announce,
     doAction,
     game,
     scene,
@@ -140,6 +147,21 @@ export function Simulator(props: SimulatorInternalProps) {
     chip,
   });
   const { sheet } = sh;
+  const oddsHintEl = oddsHintRoom ? (
+    <OddsHint
+      room={oddsHintRoom}
+      onDismiss={() => setOddsHintKey(null)}
+      onHideForever={() => {
+        try {
+          localStorage.setItem('crappy-sim-hide-odds-hint', '1');
+        } catch {
+          /* private mode: the hint just stays hidden for this session */
+        }
+        setHideOddsHint(true);
+        setOddsHintKey(null);
+      }}
+    />
+  ) : null;
 
   // ---------- derived UI data ----------
   const onTable = game.bets.reduce((t, b) => t + b.amount, 0);
@@ -208,6 +230,7 @@ export function Simulator(props: SimulatorInternalProps) {
     offBetIds: offIds,
     disabledRegions,
     highlightedBets: highlighted,
+    oddsSpotType: oddsHintRoom?.type,
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,
     wonBets: anim.won,
@@ -301,28 +324,20 @@ export function Simulator(props: SimulatorInternalProps) {
           <div class="sim-rail">
             {stepEl}
             {status(true)}
+            {oddsHintEl}
             {controls}
           </div>
         ) : (
-          controls
+          <>
+            {oddsHintEl}
+            {controls}
+          </>
         )}
       </div>
 
-      {oddsHintRoom ? (
-        <OddsHint
-          room={oddsHintRoom}
-          onDismiss={() => setOddsHintKey(null)}
-          onHideForever={() => {
-            try {
-              localStorage.setItem('crappy-sim-hide-odds-hint', '1');
-            } catch {
-              /* private mode: the hint just stays hidden for this session */
-            }
-            setHideOddsHint(true);
-            setOddsHintKey(null);
-          }}
-        />
-      ) : null}
+      <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
+        <span key={live.n}>{live.text}</span>
+      </div>
       <Toasts
         toasts={toasts}
         onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}

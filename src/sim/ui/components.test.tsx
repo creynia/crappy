@@ -307,7 +307,9 @@ describe('RollButton, StatusBar, history, toasts', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
+    const toasts = document.querySelector('.sim-toasts')!;
+    expect(toasts.getAttribute('aria-hidden')).toBeNull();
+    expect(toasts.getAttribute('aria-live')).toBeNull();
     fireEvent.click(screen.getByLabelText('Dismiss'));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });
@@ -552,20 +554,33 @@ describe('DiceGrid', () => {
 });
 
 describe('OddsHint', () => {
+  it("lays against a Don't pass and names the room; both buttons call back", () => {
+    render(
+      <OddsHint
+        room={{ betId: 'b', type: 'dont-pass', label: "Don't pass", point: 6, room: 6000 }}
+        onDismiss={() => {}}
+        onHideForever={() => {}}
+      />,
+    );
+    expect(document.querySelector('[data-testid="odds-hint"]')!.textContent).toContain(
+      "Lay up to $60 against your Don't pass on 6",
+    );
+    cleanup();
+  });
   it('states the room and the 0% edge, and both buttons call back', () => {
     const onDismiss = vi.fn();
     const onHideForever = vi.fn();
     render(
       <OddsHint
-        room={{ betId: 'b', label: 'Pass line', point: 6, room: 3000 }}
+        room={{ betId: 'b', type: 'pass-line', label: 'Pass line', point: 6, room: 3000 }}
         onDismiss={onDismiss}
         onHideForever={onHideForever}
       />,
     );
-    expect(screen.getByRole('status').textContent).toContain(
-      'add up to $30 behind your Pass line on 6',
-    );
-    expect(screen.getByRole('status').textContent).toContain('no house edge');
+    const text = document.querySelector('[data-testid="odds-hint"]')!.textContent;
+    expect(text).toContain('Add up to $30 odds behind your Pass line on 6');
+    expect(text).toContain('no house edge');
+    expect(document.querySelector('[role=status]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     fireEvent.click(screen.getByRole('button', { name: "Don't show again" }));
     expect(onDismiss).toHaveBeenCalledTimes(1);

@@ -244,6 +244,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const controls = (
     <SimControls
+      rollsPerHour={settings.rollsPerHour}
       ui={ui}
       chips={chips}
       chip={chip}

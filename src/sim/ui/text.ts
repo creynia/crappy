@@ -508,3 +508,36 @@ export function workingCopy(c: WorkingCopyInput): string | undefined {
   }
   return `${cost}.`;
 }
+
+/** Units the Roll-button cost cycles through: per roll, per hour, per $100 of action on the table. */
+export type CostUnit = 'roll' | 'hour' | 'bet100';
+export const COST_UNIT_LABEL: Record<CostUnit, string> = {
+  roll: 'per roll',
+  hour: 'per hour',
+  bet100: 'per $100 bet',
+};
+const COST_UNIT_NEXT: Record<CostUnit, CostUnit> = { roll: 'hour', hour: 'bet100', bet100: 'roll' };
+
+export function nextCostUnit(u: CostUnit): CostUnit {
+  return COST_UNIT_NEXT[u];
+}
+
+/** Expected cost in the chosen unit, e.g. "Expected cost: $5.86 per hour"; undefined when it has no meaning. */
+export function rollCostText(
+  unit: CostUnit,
+  perRollCents: number,
+  rollsPerHour: number,
+  actionCents: number,
+): string | undefined {
+  const value =
+    unit === 'roll'
+      ? perRollCents
+      : unit === 'hour'
+        ? perRollCents * rollsPerHour
+        : actionCents > 0
+          ? (perRollCents / actionCents) * 10_000
+          : null;
+  if (value === null) return undefined;
+  const amount = value > 0 && value < 1 ? '<1¢' : fmtMoney(Math.round(value), { exact: true });
+  return `Expected cost: ${amount} ${COST_UNIT_LABEL[unit]}`;
+}

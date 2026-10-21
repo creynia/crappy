@@ -5,7 +5,17 @@ import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { Action, BetTypeId, GameState } from '../engine/types';
 import type { BetInit } from '../engine';
-import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
+import {
+  buildEvFacts,
+  describeRoll,
+  fmtMoney,
+  nextCostUnit,
+  normalizeTier,
+  regionAriaLabel,
+  rollCostText,
+} from './text';
+import { tableExpectedLossPerRoll } from '../math/ev';
+import { toNumber } from '../math/fraction';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
   n: 1,
@@ -224,5 +234,34 @@ describe('combined edge with two Come bets', () => {
     const refAction = { ...action, betId: byType(ref, 'come').id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
     expect(combinedOf(s, action)!.edge).toBeCloseTo(14 / 2365, 12);
+  });
+});
+
+describe('roll cost units (I043)', () => {
+  it('cycles per roll → per hour → per $100 bet → per roll', () => {
+    expect(nextCostUnit('roll')).toBe('hour');
+    expect(nextCostUnit('hour')).toBe('bet100');
+    expect(nextCostUnit('bet100')).toBe('roll');
+  });
+  it('pass $10 + place-6 $12 layout: per roll, per hour and per $100 bet', () => {
+    const game = createGame({
+      bankroll: 100000,
+      bets: [
+        { type: 'pass-line', amount: 1000 },
+        { type: 'place-6', amount: 1200 },
+      ],
+    });
+    const perRoll = toNumber(tableExpectedLossPerRoll(game));
+    const action = 2200;
+    expect(rollCostText('roll', perRoll, 100, action)).toBe(
+      `Expected cost: ${fmtMoney(Math.round(perRoll), { exact: true })} per roll`,
+    );
+    expect(rollCostText('hour', perRoll, 100, action)).toBe(
+      `Expected cost: ${fmtMoney(Math.round(perRoll * 100), { exact: true })} per hour`,
+    );
+    expect(rollCostText('bet100', perRoll, 100, action)).toBe(
+      `Expected cost: ${fmtMoney(Math.round((perRoll / action) * 10_000), { exact: true })} per $100 bet`,
+    );
+    expect(rollCostText('bet100', perRoll, 100, 0)).toBeUndefined();
   });
 });

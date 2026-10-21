@@ -39,3 +39,11 @@
   font-size: 0.85rem;
   color: var(--sim-muted);
 }
+/* Landscape side panel: the 21 cells as 3 rows of 7 (reading order, no triangle) so the
+   stepper and the EV text stay near the top of a 390px-tall panel. */
+.sim-sheet-panel .sim-hop-grid {
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
+}
+.sim-sheet-panel .sim-hop-gap {
+  display: none;
+}

@@ -1,5 +1,8 @@
 import type { BetTypeId } from '../../engine/types';
+import { hopSlot0 } from './hopSlots';
 import type { Rect, RegionDef, RegionId, TableLayout } from './types';
+
+const CHIP_R = 32;
 
 function r(id: RegionId, rect: Rect, label: string, sublabel: string, bet: BetTypeId): RegionDef {
   // Chips sit to the right of the printed title so the cell stays readable with a bet on it.
@@ -30,17 +33,24 @@ const regions: RegionDef[] = [
   r('horn', { x: 20, y: 660, w: 280, h: 105 }, 'Horn', '2, 3, 11, 12', 'horn'),
   r('c-e', { x: 310, y: 660, w: 280, h: 105 }, 'C and E', 'Craps and eleven', 'c-e'),
   r('world', { x: 600, y: 660, w: 280, h: 105 }, 'World', 'Horn plus any 7', 'world'),
-  // I035: hop bets open a 21-pair picker in the sheet.
-  r('hop', { x: 20, y: 780, w: 860, h: 110 }, 'Hop Bets', 'Easy 15 to 1, hard 30 to 1', 'hop'),
+  // I035: hop bets open a 21-pair picker in the sheet. The title sits in a top band; below it,
+  // two rows of 11 chip slots, one per pair placed (layouts/index.ts hopSpot).
+  hopRegion(),
 ];
+
+function hopRegion(): RegionDef {
+  const rect = { x: 20, y: 780, w: 860, h: 320 };
+  const base = r('hop', rect, 'Hop Bets', 'Easy 15 to 1, hard 30 to 1', 'hop');
+  return { ...base, chipSpots: { main: hopSlot0(rect, CHIP_R) } };
+}
 
 const zero = { x: 0, y: 0 };
 export const centerLayout: TableLayout = {
   id: 'center',
-  viewBox: { w: 900, h: 905 },
+  viewBox: { w: 900, h: 1115 },
   regions,
   puck: { 4: zero, 5: zero, 6: zero, 8: zero, 9: zero, 10: zero, off: zero },
   puckRadius: 0,
-  chipRadius: 32,
+  chipRadius: CHIP_R,
   minTapUnits: 102,
 };

@@ -1,4 +1,5 @@
 import { centerLayout } from './center';
+import { hopSlot } from './hopSlots';
 import { landscapeLayout } from './landscape';
 import { portraitLayout } from './portrait';
 import type { Point2, RegionDef, RegionId, TableLayout } from './types';
@@ -78,13 +79,7 @@ export function spotPosition(region: RegionDef, type: string): Point2 {
   return s.main ?? fallback;
 }
 
-/**
- * Hop bets (I035) get one stack per pair, side by side from the region's main spot leftwards
- * (`slot` = 0 for the first pair placed), so each stack can show its pair.
- */
+/** Hop bets (I035) get one stack per pair, in rows under the title (`slot` = 0 for the first pair placed). */
 export function hopSpot(region: RegionDef, slot: number, chipRadius: number): Point2 {
-  const main = region.chipSpots.main ?? { x: region.rect.x + region.rect.w / 2, y: region.rect.y };
-  const step = chipRadius * 2.3;
-  const perRow = Math.max(1, Math.floor((main.x - region.rect.x) / step));
-  return { x: main.x - (slot % perRow) * step, y: main.y + Math.floor(slot / perRow) * 8 };
+  return hopSlot(region.rect, slot, chipRadius);
 }

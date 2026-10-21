@@ -100,7 +100,7 @@ export function SimSheet(p: SimSheetProps) {
           }
         : {})}
       {...(sheet.hop && !m.bet
-        ? { hop: { value: sheet.hop, onChange: (d: Dice) => p.setSheet({ ...sheet, hop: d }) } }
+        ? { hop: { value: sheet.hop, onChange: (d: Dice) => p.openSheet({ ...sheet, hop: d }) } }
         : {})}
       onConfirm={p.onConfirm}
       onCancel={p.onClose}

@@ -2,6 +2,7 @@ import type { JSX } from 'preact';
 import { memo } from 'preact/compat';
 import type { PointNumber } from '../engine/types';
 import { DieFaceSvg } from './Dice';
+import { HOP_BAND } from './layouts/hopSlots';
 import { NUMBER_WORD } from './layouts/shared';
 import type { RegionDef } from './layouts/types';
 
@@ -340,6 +341,46 @@ function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
         </g>
       );
     }
+  }
+
+  // ---- hop bets (I035): title in a top band, the rest holds one chip stack per pair ----
+  if (id === 'hop') {
+    return (
+      <g>
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx="14"
+          fill="rgba(20,20,20,0.22)"
+          stroke={WHITE}
+          stroke-width="3.5"
+        />
+        <text x={x + 28} y={y + 42} class="sim-label" font-size="36" fill={WHITE}>
+          HOP BETS
+        </text>
+        <text
+          x={x + w - 28}
+          y={y + 40}
+          class="sim-tiny"
+          font-size="17"
+          text-anchor="end"
+          fill={WHITE}
+        >
+          {(region.sublabel ?? '').toUpperCase()}
+        </text>
+        <line
+          x1={x + 20}
+          x2={x + w - 20}
+          y1={y + HOP_BAND}
+          y2={y + HOP_BAND}
+          stroke={WHITE}
+          stroke-opacity="0.25"
+          stroke-width="2"
+        />
+      </g>
+    );
   }
 
   // ---- center (proposition) cells ----

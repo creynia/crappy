@@ -20,9 +20,10 @@ import type {
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { ResultsHistogram } from './ResultsHistogram';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
-import { fmtMoney } from './text';
+import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
 const MAX_ODDS_BY_DEFAULT = new Set<string>([
@@ -509,6 +510,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
+        {o.kind === 'many' && chartTab === 'results' && (
+          <ResultsHistogram
+            start={start}
+            series={o.results.map((r, i) => ({
+              label: nameOf(o.specs[i]!.id),
+              color: COLORS[i]!,
+              finals: r.finals,
+              busted: Math.round(r.bustRate * r.sessions),
+              expected: r.expected[r.expected.length - 1]! - start,
+            }))}
+          />
+        )}
         <div class="sim-ar-summary-wrap" tabindex={0} role="region" aria-label="Strategy summary">
           <table class="sim-ar-summary" data-testid="auto-roll-summary">
             <thead>
@@ -571,6 +584,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
+        ...(rs.some((r) => r.bonusHits?.length)
+          ? [
+              [
+                'Bonus bet hits',
+                rs.map((r) =>
+                  r.bonusHits?.length
+                    ? r.bonusHits
+                        .map((h) => `${betLabel(h.type)} ${h.pays}:1 x${h.count}`)
+                        .join(', ')
+                    : 'none',
+                ),
+              ] as [string, string[]],
+            ]
+          : []),
         ['Rolls per $1 of expected loss', perDollar],
         [`Expected cost per ${rollsPerHour} rolls`, perHour],
       ];

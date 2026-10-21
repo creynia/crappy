@@ -13,7 +13,14 @@ export {
   nominalVig,
   upfrontVig,
   isToggleable,
+  isBonusType,
+  bonusTargets,
+  withProgress,
+  FIRE_PAYS,
+  ATS_PAYS,
 } from './bets';
+export type { BonusBetTypeId } from './bets';
+export { isHandStart } from './hand';
 export { validateAction, legalBetTypes, maxOddsAmount, suggestAmount } from './validate';
 export { resolveRoll } from './resolve';
 export { formatMoney, formatPct } from './money';

@@ -3,6 +3,7 @@ import {
   applyAction,
   createGame,
   equity,
+  isBonusType,
   pointsFor,
   resolveRules,
 } from '../engine';
@@ -55,6 +56,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   let sevenOuts = 0;
   let longest = 0;
   let hand = 0;
+  const bonusHits = new Map<string, NonNullable<SessionResult['bonusHits']>[number]>();
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
@@ -80,6 +82,13 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     if (rec) totals[rec.total]!++;
     hand++;
     for (const e of r.events) {
+      if (e.type === 'bet-won' && isBonusType(e.betType)) {
+        const pays = Math.round(e.profit / e.amount);
+        const k = `${e.betType}:${pays}`;
+        const cur = bonusHits.get(k);
+        if (cur) cur.count++;
+        else bonusHits.set(k, { type: e.betType, pays, count: 1 });
+      }
       if (e.type === 'point-made') pointsMade++;
       else if (e.type === 'seven-out') {
         sevenOuts++;
@@ -119,6 +128,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     pointsMade,
     sevenOuts,
     longestHand: longest,
+    ...(bonusHits.size ? { bonusHits: [...bonusHits.values()] } : {}),
   };
 }
 

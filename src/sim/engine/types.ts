@@ -26,11 +26,12 @@ export type BetTypeId =
   | 'field' | 'big-6' | 'big-8'
   | 'hard-4' | 'hard-6' | 'hard-8' | 'hard-10'
   | 'any-7' | 'any-craps' | 'yo-11' | 'aces-2' | 'boxcars-12' | 'ace-deuce-3'
-  | 'horn' | 'c-e' | 'world';
+  | 'horn' | 'c-e' | 'world'
+  | 'fire' | 'all' | 'tall' | 'small';   // bonus side bets (decisions.md, I037)
 
 export type BetCategory =
   | 'line' | 'come' | 'odds' | 'place' | 'buy' | 'lay'
-  | 'field' | 'big' | 'hardway' | 'prop';
+  | 'field' | 'big' | 'hardway' | 'prop' | 'bonus';
 
 /** 'auto' = follow table convention (see isWorking); 'on'/'off' = player override. */
 export type WorkingMode = 'auto' | 'on' | 'off';
@@ -46,6 +47,11 @@ export interface Bet {
   placedOnRoll: number;       // state.rollCount when placed
   /** Upfront vig already paid (only when rules.vig.timing === 'upfront'); refunded on take-down */
   vigPaid: Cents;
+  /**
+   * EXTENSION (I037): memory of a multi-hand bonus bet, sorted ascending. Fire: the distinct points made
+   * this hand; All/Tall/Small: the numbers already rolled. Absent (older saved states) means empty.
+   */
+  progress?: readonly number[];
 }
 
 export interface TableRules {
@@ -171,6 +177,7 @@ export type GameEvent =
   | { type: 'bet-pushed'; betId: string; betType: BetTypeId; amount: Cents }
   | { type: 'bet-returned'; betId: string; betType: BetTypeId; amount: Cents; reason: 'odds-off' | 'parent-gone' }
   | { type: 'bet-travelled'; betId: string; betType: 'come' | 'dont-come'; point: PointNumber }
+  | { type: 'bet-progressed'; betId: string; betType: BetTypeId; progress: readonly number[] }
   | { type: 'natural'; total: 7 | 11 }
   | { type: 'craps'; total: 2 | 3 | 12 }     // never in crapless
   | { type: 'point-established'; point: PointNumber }
@@ -190,6 +197,7 @@ export type Resolution =
   | { kind: 'lose' }
   | { kind: 'push' }
   | { kind: 'travel'; point: PointNumber }       // come/dont-come only
+  | { kind: 'advance'; progress: readonly number[] }  // bonus bets only: stays up with new progress
   | { kind: 'return'; reason: 'odds-off' | 'parent-gone' };
 
 export interface BetTypeDef {

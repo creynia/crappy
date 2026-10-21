@@ -110,8 +110,16 @@ describe('crapless rules', () => {
   });
 
   it("no don't side in crapless; place 2/3/11/12 only in crapless", () => {
-    for (const t of ['dont-pass', 'dont-come', 'dont-pass-odds', 'dont-come-odds'] as BetTypeId[])
+    for (const t of [
+      'dont-pass',
+      'dont-come',
+      'dont-pass-odds',
+      'dont-come-odds',
+      'fire',
+    ] as BetTypeId[])
       expect(betTypeAvailable(t, CR)).toBe(false);
+    for (const t of ['all', 'tall', 'small'] as BetTypeId[])
+      expect(betTypeAvailable(t, CR)).toBe(true);
     for (const t of CRAPLESS_BET_TYPE_IDS) {
       expect(betTypeAvailable(t, CR)).toBe(true);
       expect(betTypeAvailable(t, resolveRules())).toBe(false);

@@ -111,7 +111,12 @@ export function previewAction(
       case 'set-amount': {
         const old = state.bets.find((b) => b.id === action.betId);
         if (!old) return unknown(base, validation);
-        const next: BetLike = { type: old.type, amount: action.amount, point: old.point };
+        const next: BetLike = {
+          type: old.type,
+          amount: action.amount,
+          point: old.point,
+          progress: old.progress,
+        };
         const ev = sub(betEV(next, ctx), betEV(old, ctx));
         const edge = edgeOfBet(next, ctx);
         const cost = sub(lossPerRoll(next, ctx), lossPerRoll(old, ctx));
@@ -236,6 +241,10 @@ const ALTERNATIVES: Partial<Record<BetTypeId, BetTypeId[]>> = {
   'lay-6': ['dont-come', 'dont-pass'],
   'lay-8': ['dont-come', 'dont-pass'],
   'lay-9': ['dont-come', 'dont-pass'],
+  fire: ['pass-line', 'come'],
+  all: ['pass-line', 'come'],
+  tall: ['pass-line', 'come'],
+  small: ['pass-line', 'come'],
 };
 
 function gcd(a: number, b: number): number {
@@ -324,7 +333,7 @@ export function suggestAlternative(
   for (const cand of ALTERNATIVES[action.betType] ?? []) {
     const def = BET_TYPES[cand];
     const floor =
-      def.category === 'prop' || def.category === 'hardway'
+      def.category === 'prop' || def.category === 'hardway' || def.category === 'bonus'
         ? state.rules.propMin
         : state.rules.tableMin;
     const amt = suggestAmount(cand, Math.max(action.amount, floor), state);

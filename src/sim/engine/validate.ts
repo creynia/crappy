@@ -1,6 +1,7 @@
 import {
   BET_TYPES,
   betTypeAvailable,
+  isDontSide,
   isBetTypeId,
   isToggleable,
   nominalVig,
@@ -8,6 +9,7 @@ import {
   payout,
   upfrontVig,
 } from './bets';
+import { isHandStart } from './hand';
 import { formatMoney } from './money';
 import { isWorking } from './working';
 import type {
@@ -114,8 +116,14 @@ export function maxOddsAmount(state: GameState, parentId: string): Cents {
 
 function minFor(state: GameState, def: BetTypeDef): Cents {
   if (def.category === 'odds') return 100;
-  if (def.category === 'prop' || def.category === 'hardway') return state.rules.propMin;
+  if (def.category === 'prop' || def.category === 'hardway' || def.category === 'bonus')
+    return state.rules.propMin;
   return state.rules.tableMin;
+}
+
+function bonusTiming(state: GameState, def: BetTypeDef, verb: string): Fail | null {
+  if (def.category !== 'bonus' || isHandStart(state)) return null;
+  return fail('wrong-phase', `${def.label} can only be ${verb} before a new shooter's first roll.`);
 }
 
 function shape(def: BetTypeDef, amount: Cents): Fail | null {
@@ -246,9 +254,11 @@ function validatePlace(
   if (!betTypeAvailable(betType, state.rules))
     return fail(
       'unknown-bet',
-      state.rules.variant === 'crapless'
-        ? `Crapless craps has no don't side, so ${def.label} is not offered.`
-        : `${def.label} is only offered on a crapless craps table.`,
+      state.rules.variant !== 'crapless'
+        ? `${def.label} is only offered on a crapless craps table.`
+        : isDontSide(betType)
+          ? `Crapless craps has no don't side, so ${def.label} is not offered.`
+          : `${def.label} is not offered on a crapless craps table.`,
     );
   const shapeErr = shape(def, amount);
   if (shapeErr) return shapeErr;
@@ -283,7 +293,10 @@ function validatePlace(
       if (state.phase === 'come-out')
         return fail('wrong-phase', `${def.label} bets can only be made after a point is set.`);
       break;
-    default:
+    default: {
+      const bt = bonusTiming(state, def, 'placed');
+      if (bt) return bt;
+    }
   }
   // 6. odds
   let point: PointNumber | null = def.number;
@@ -365,7 +378,10 @@ function validateSetAmount(
           });
         }
         break;
-      default:
+      default: {
+        const bt = bonusTiming(state, def, 'changed');
+        if (bt) return bt;
+      }
     }
   }
   const mm = minMax(state, def, amount);
@@ -414,6 +430,11 @@ function validateRemove(
     return fail('contract-bet', 'The Pass Line cannot be taken down once a point is set.');
   if (bet.type === 'come' && bet.point !== null)
     return fail('contract-bet', 'A Come bet on a number cannot be taken down.');
+  if (BET_TYPES[bet.type].category === 'bonus')
+    return fail(
+      'not-removable',
+      `${BET_TYPES[bet.type].label} stays up until the hand decides it.`,
+    );
   const w: Warning[] = [];
   if (
     (bet.type === 'dont-pass' && state.phase === 'point') ||

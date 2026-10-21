@@ -54,6 +54,10 @@ export const BET_TYPE_IDS: readonly BetTypeId[] = [
   'horn',
   'c-e',
   'world',
+  'fire',
+  'all',
+  'tall',
+  'small',
 ];
 
 /** Bets that exist only on a crapless table (rules.variant 'crapless'); not in the standard catalogue. */
@@ -72,10 +76,60 @@ const DONT_SIDE = new Set<BetTypeId>([
   'dont-come-odds',
 ]);
 
-/** Whether a bet type exists under these rules (crapless: no don't side; place 2/3/11/12 only there). */
+/** True for the don't-side bets (not offered in crapless craps). */
+export function isDontSide(type: BetTypeId): boolean {
+  return DONT_SIDE.has(type);
+}
+
+/**
+ * Whether a bet type exists under these rules. Crapless: no don't side and no Fire Bet (its 4/5/6
+ * different points assume the six standard points); place 2/3/11/12 exist only there.
+ */
 export function betTypeAvailable(type: BetTypeId, rules: Pick<TableRules, 'variant'>): boolean {
-  if (rules.variant === 'crapless') return !DONT_SIDE.has(type);
+  if (rules.variant === 'crapless') return !DONT_SIDE.has(type) && type !== 'fire';
   return !CRAPLESS_BET_TYPE_IDS.includes(type);
+}
+
+// ---------------------------------------------------------------------------
+// Bonus side bets (I037): multi-hand bets with a `progress` memory
+// ---------------------------------------------------------------------------
+
+/** Fire Bet paytable (to 1) by distinct points made when the hand ends; 6 points pays at once. */
+export const FIRE_PAYS: Readonly<Record<4 | 5 | 6, number>> = { 4: 24, 5: 249, 6: 999 };
+/** All/Tall/Small paytable (to 1). */
+export const ATS_PAYS: Readonly<Record<'all' | 'tall' | 'small', number>> = {
+  all: 175,
+  tall: 34,
+  small: 34,
+};
+export const SMALL_NUMBERS: readonly number[] = [2, 3, 4, 5, 6];
+export const TALL_NUMBERS: readonly number[] = [8, 9, 10, 11, 12];
+export const ALL_NUMBERS: readonly number[] = [...SMALL_NUMBERS, ...TALL_NUMBERS];
+
+export type BonusBetTypeId = 'fire' | 'all' | 'tall' | 'small';
+export function isBonusType(t: BetTypeId): t is BonusBetTypeId {
+  return t === 'fire' || t === 'all' || t === 'tall' || t === 'small';
+}
+
+/** The numbers a bonus bet has to collect (Fire: the six points). */
+export function bonusTargets(t: BonusBetTypeId): readonly number[] {
+  switch (t) {
+    case 'fire':
+      return [4, 5, 6, 8, 9, 10];
+    case 'all':
+      return ALL_NUMBERS;
+    case 'tall':
+      return TALL_NUMBERS;
+    case 'small':
+      return SMALL_NUMBERS;
+  }
+}
+
+/** Progress plus one number, sorted and without duplicates ("a point made twice counts once"). */
+export function withProgress(progress: readonly number[] | undefined, n: number): number[] {
+  const set = new Set(progress ?? []);
+  set.add(n);
+  return [...set].sort((a, b) => a - b);
 }
 
 // ---------------------------------------------------------------------------
@@ -584,6 +638,53 @@ specs.push(
     },
   ),
 );
+
+specs.push({
+  id: 'fire',
+  label: 'Fire Bet',
+  shortLabel: 'FIRE',
+  category: 'bonus',
+  afterWin: 'comes-down',
+  describePayout: flat(
+    `${FIRE_PAYS[4]} to 1 for 4 points, ${FIRE_PAYS[5]} to 1 for 5, ${FIRE_PAYS[6]} to 1 for all 6`,
+  ),
+  resolve(bet, r, rules) {
+    if (r.phase !== 'point' || r.point === null) return NONE;
+    if (r.total === r.point) {
+      const progress = withProgress(bet.progress, r.point);
+      if (progress.length === 6) return win(payout(bet.amount, FIRE_PAYS[6], 1, rules.payoutUnit));
+      return progress.length === (bet.progress ?? []).length ? NONE : { kind: 'advance', progress };
+    }
+    if (r.total === 7) {
+      const made = (bet.progress ?? []).length;
+      if (made === 4 || made === 5)
+        return win(payout(bet.amount, FIRE_PAYS[made], 1, rules.payoutUnit));
+      return LOSE;
+    }
+    return NONE;
+  },
+});
+for (const id of ['small', 'tall', 'all'] as const) {
+  const targets = bonusTargets(id);
+  const range =
+    id === 'all' ? '2 through 12 (except 7)' : id === 'small' ? '2 through 6' : '8 through 12';
+  specs.push({
+    id,
+    label: id === 'all' ? 'All' : id === 'tall' ? 'Tall' : 'Small',
+    shortLabel: id.toUpperCase(),
+    category: 'bonus',
+    afterWin: 'comes-down',
+    describePayout: flat(`${ATS_PAYS[id]} to 1 once every number ${range} has rolled before a 7`),
+    resolve(bet, r, rules) {
+      if (r.total === 7) return LOSE;
+      if (!targets.includes(r.total)) return NONE;
+      const progress = withProgress(bet.progress, r.total);
+      if (progress.length === targets.length)
+        return win(payout(bet.amount, ATS_PAYS[id], 1, rules.payoutUnit));
+      return progress.length === (bet.progress ?? []).length ? NONE : { kind: 'advance', progress };
+    },
+  });
+}
 
 for (const n of [2, 3, 11, 12] as const) specs.push(placeSpec(n));
 

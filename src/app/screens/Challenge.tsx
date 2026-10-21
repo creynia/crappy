@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Simulator,
+  bandLabel,
   challengeScene,
   dailySeed,
   emptyTally,
@@ -110,10 +111,12 @@ export function Challenge({ query }: { query: URLSearchParams }) {
       <div class="page">
         <h1>Challenge</h1>
         <p class="muted">
-          Play 300 rolls at a $500 table and get a score for your <strong>decisions</strong>, not
-          your luck: the score is the house edge of the bets you chose, weighted by what you put on
-          them. Sucker bets and point cycles played without odds add penalties. Nobody wins money
-          here; a low score means you gave the house as little as possible.
+          Play 300 rolls at a $500 table and get a score for your <strong>bets</strong>, not your
+          luck: the score is the house edge on your action, every bet the dice decide counted by its
+          amount and its exact edge. Winning or losing a bet changes nothing; odds carry no edge, so
+          they pull the score down. The mix of bets that gets decided depends on the session, so the
+          same play can land a hair apart from one seed to the next. Nobody wins money here; a low
+          score means you gave the house as little as possible.
         </p>
         <div class="grid">
           <button type="button" class="card tile" onClick={() => start(dailySeed())}>
@@ -139,7 +142,7 @@ export function Challenge({ query }: { query: URLSearchParams }) {
           </ul>
           {best ? (
             <p>
-              Your best: <strong>{formatScore(best.score)}</strong> ({best.band}), after{' '}
+              Your best: <strong>{formatScore(best.score)}</strong> ({bandLabel(best.band)}), after{' '}
               {store.challenge.played} {store.challenge.played === 1 ? 'session' : 'sessions'}.
             </p>
           ) : (
@@ -170,22 +173,23 @@ export function Challenge({ query }: { query: URLSearchParams }) {
           <dl class="challenge-kv">
             <dt>Rolls</dt>
             <dd>{r.rolls}</dd>
-            <dt>Bets you put up</dt>
-            <dd>{money(r.wagered)}</dd>
-            <dt>House edge of those bets, per dollar</dt>
-            <dd>{(r.edgePerDollar * 100).toFixed(2)}%</dd>
-            <dt>Sucker-bet decisions</dt>
-            <dd>{r.redBets} (+0.50% each)</dd>
-            <dt>Points played without odds</dt>
-            <dd>{r.noOddsCycles} (+0.25% each)</dd>
-            <dt>Score</dt>
+            <dt>Bets decided by the dice</dt>
+            <dd>
+              {money(r.resolved)} in {r.decisions} {r.decisions === 1 ? 'decision' : 'decisions'}
+            </dd>
+            <dt>House edge on that action (the score)</dt>
             <dd>
               <strong>{formatScore(r.score)}</strong>
             </dd>
+            <dt>Sucker bets decided (observation)</dt>
+            <dd>{r.redDecisions}</dd>
+            <dt>Points played without odds (observation)</dt>
+            <dd>{r.noOddsCycles}</dd>
           </dl>
           <p class="muted">
-            The dice: your bankroll finished at {money(r.actualNet, true)} against an expected{' '}
-            {money(-r.expectedLoss, true)}. That gap is luck, and it does not touch the score.
+            The dice: you finished {r.actualNet >= 0 ? 'up' : 'down'} {money(Math.abs(r.actualNet))}{' '}
+            against an expected {money(-r.expectedLoss, true)}. That gap is luck, and it does not
+            touch the score.
           </p>
         </section>
         <div class="challenge-actions">

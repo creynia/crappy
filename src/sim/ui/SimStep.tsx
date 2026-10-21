@@ -25,6 +25,8 @@ export function SimStep({
   const lastIdx = (scene.steps?.length ?? 1) - 1;
   const stepAck = step ? 'acknowledged' in step.completeWhen : false;
   const showNext = !!step && (rt.satisfied === true || stepAck);
+  const restart = scene.ui?.showRestart !== false;
+  const label = scene.ui?.stepPanelLabel ?? 'Lesson step';
   return (
     <>
       {guided && step ? (
@@ -43,14 +45,17 @@ export function SimStep({
         />
       ) : null}
       {guided && rt.done ? (
-        <section class="sim-step sim-step-done" aria-label="Lesson step">
+        <section class="sim-step sim-step-done" aria-label={label}>
           {/* not a live region: the simulator has one announcer; see Simulator.tsx */}
           <p class="sim-step-text">
-            <strong>Done.</strong> Nice work. Keep playing here, or restart the practice.
+            <strong>Done.</strong> Nice work.{' '}
+            {restart ? 'Keep playing here, or restart the practice.' : 'Keep playing here.'}
           </p>
-          <button type="button" class="sim-linkbtn" onClick={onRestart}>
-            Restart
-          </button>
+          {restart ? (
+            <button type="button" class="sim-linkbtn" onClick={onRestart}>
+              Restart
+            </button>
+          ) : null}
         </section>
       ) : null}
     </>

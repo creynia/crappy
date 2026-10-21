@@ -20,6 +20,7 @@ export {
   observeChallenge,
   scoreChallenge,
   bandFor,
+  bandLabel,
   formatScore,
   RANK_BANDS,
   DEFAULT_CHALLENGE_ROLLS,

@@ -406,6 +406,8 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'showRestart',
+        'stepPanelLabel',
       ]);
       if (
         u.orientation !== undefined &&
@@ -427,8 +429,10 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
+      if (u.stepPanelLabel !== undefined) c.str('ui.stepPanelLabel', u.stepPanelLabel);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))
         c.err('ui.speed', 'must be normal, fast or instant');
     }
@@ -544,15 +548,8 @@ export function validateScene(
         c.err('challenge.rolls', 'must be a positive integer');
       if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
       else {
-        c.keys('challenge.scoring', s.challenge.scoring, [
-          'redBetPenalty',
-          'noOddsPenalty',
-          'minWagered',
-        ]);
-        for (const k of ['redBetPenalty', 'noOddsPenalty'])
-          if (!(typeof s.challenge.scoring[k] === 'number' && s.challenge.scoring[k] >= 0))
-            c.err(`challenge.scoring.${k}`, 'must be a number >= 0');
-        c.cents('challenge.scoring.minWagered', s.challenge.scoring.minWagered);
+        c.keys('challenge.scoring', s.challenge.scoring, ['minResolved']);
+        c.cents('challenge.scoring.minResolved', s.challenge.scoring.minResolved);
       }
     }
   }

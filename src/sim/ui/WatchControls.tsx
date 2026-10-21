@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'preact/hooks';
 import type { WatchSpeed, WatchState } from './useWatchReplay';
 import { fmtMoney } from './text';
 
@@ -16,10 +17,13 @@ const SPEEDS: WatchSpeed[] = [1, 4, 16];
 /** Play/pause, speed, step, scrub and exit for a replayed auto-roll run. */
 export function WatchControls(p: WatchControlsProps) {
   const { watch } = p;
+  const root = useRef<HTMLElement>(null);
+  // bring the controls into view when the replay starts (the page was scrolled to the auto-roll panel)
+  useEffect(() => root.current?.scrollIntoView?.({ block: 'nearest' }), []);
   const total = watch.log.length;
   const finished = watch.index >= total;
   return (
-    <section class="sim-watch" aria-label="Replay controls" data-testid="watch-controls">
+    <section class="sim-watch" ref={root} aria-label="Replay controls" data-testid="watch-controls">
       <p class="sim-watch-status">
         Watching a replay: roll {watch.index} of {total}
         {finished ? `. Finished at ${fmtMoney(watch.finalEquity)}.` : ''}

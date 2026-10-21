@@ -89,4 +89,12 @@ describe('scene runner', () => {
     });
     expect(r.ok).toBe(true);
   });
+
+  it('validates autoRoll.sweep', () => {
+    const mk = (sweep: unknown) =>
+      validateScene({ id: 'x', version: 1, autoRoll: { enabled: true, sweep } });
+    expect(mk({ strategy: 'pass-max-odds', oddsMultiples: [0, 1, 'max', 100] }).ok).toBe(true);
+    const bad = mk({ strategy: 'nope', oddsMultiples: [0, 'big'] });
+    expect(bad.ok).toBe(false);
+  });
 });

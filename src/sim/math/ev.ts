@@ -5,6 +5,9 @@ import { distributionFor, isLineLike, isOddsType, toOutcomes } from './outcomes'
 import { add, div, frac, mul, neg, sub, toNumber, ZERO, ONE, type Fraction } from './fraction';
 import type { BetCtx, BetLike, EdgeInfo, Outcome } from './types';
 
+/** Expected rolls in one shooter's hand (come-out to seven-out): 1671/196 = 8.5255. */
+export const HAND_ROLLS: Fraction = frac(1671, 196);
+
 export function betOutcomes(bet: BetLike, ctx: BetCtx): Outcome[] {
   return toOutcomes(distributionFor(bet, ctx));
 }
@@ -81,11 +84,14 @@ export function edgeOfBet(bet: BetLike, ctx: BetCtx): EdgeInfo {
   }
   const perResolved = neg(div(ev, base));
   const perResolvedExPush = neg(div(ev, mul(base, sub(ONE, pPush))));
+  // A bonus bet can only go up once per shooter, so its cost is spread over a whole hand of rolls
+  // (1671/196 on average) even when it resolves early.
+  const perRollBase = isBonusType(bet.type) ? HAND_ROLLS : d.expectedRolls;
   return {
     perResolved,
     perResolvedExPush,
     expectedRolls: d.expectedRolls,
-    perRoll: div(perResolved, d.expectedRolls),
+    perRoll: div(perResolved, perRollBase),
   };
 }
 

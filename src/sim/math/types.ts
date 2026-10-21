@@ -13,7 +13,10 @@ export interface BetCtx {
   point: PointNumber | null;
   rules: TableRules;
 }
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'progress'>;
+/** `working` is the player's ON/OFF setting; omitted means 'auto'. */
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'progress'> & {
+  working?: Bet['working'];
+};
 
 export interface EdgeInfo {
   perResolved: Fraction; // -EV / amount, pushes count as decisions
@@ -27,6 +30,10 @@ export type EdgeTier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
 
 export interface Explanation {
   rows: Outcome[];
+  /** next-roll effect on the bet per dice combination (36, ALL_DICE order) */
+  grid?: import('./outcomes').RollEffect[];
+  /** shown with the grid when the bet is off / does nothing this roll */
+  gridNote?: string;
   evFormula: string;
   note?: string;
 }

@@ -71,9 +71,11 @@ function BonusArt({ region, progress }: { region: RegionDef; progress: readonly 
   const have = new Set(progress);
   const left = x + 24;
   const right = x + w * 0.72;
-  const step = (right - left) / pips.length;
-  const r = Math.min(16, step * 0.42);
-  const py = y + h * 0.78;
+  const perRow = pips.length > 6 ? Math.ceil(pips.length / 2) : pips.length;
+  const rows = Math.ceil(pips.length / perRow);
+  const step = (right - left) / perRow;
+  const r = Math.min(rows > 1 ? 15 : 16, step * 0.42);
+  const rowY = (row: number) => (rows > 1 ? y + h * (0.62 + row * 0.22) : y + h * 0.78);
   return (
     <g>
       <rect
@@ -109,7 +111,8 @@ function BonusArt({ region, progress }: { region: RegionDef; progress: readonly 
       </text>
       <g class="sim-pips" aria-hidden="true">
         {pips.map((n, i) => {
-          const px = left + step * i + r;
+          const px = left + step * (i % perRow) + r;
+          const py = rowY(Math.floor(i / perRow));
           const on = have.has(n);
           return (
             <g key={n} class={on ? 'is-hit' : ''}>

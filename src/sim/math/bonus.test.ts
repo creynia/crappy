@@ -53,6 +53,10 @@ describe('Fire Bet (exact Markov over subsets of points)', () => {
     );
   });
   it('edge is 20.763% at 24/249/999 and 19.70% at 25/250/1000', () => {
+    same(
+      fireEV(),
+      big('-3155010189076512755518373649266277142847', '15195531003242259962803834074351444164892'),
+    );
     expect(toNumber(fireEV())).toBeCloseTo(-0.2076275, 7);
     expect(toNumber(fireEV([], { 4: 25, 5: 250, 6: 1000 }))).toBeCloseTo(-0.197027, 6);
   });

@@ -3,6 +3,7 @@ import { betEV } from './ev';
 import { fracText, money } from './format';
 import { neg } from './fraction';
 import { betOutcomes } from './ev';
+import { rollEffectGrid, worksNow } from './outcomes';
 import type { BetCtx, BetLike, Explanation } from './types';
 
 export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
@@ -53,5 +54,13 @@ export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
     );
   }
   const note = notes.length > 0 ? notes.join(' ') : undefined;
-  return note === undefined ? { rows, evFormula } : { rows, evFormula, note };
+  const out: Explanation = { rows, grid: rollEffectGrid(bet, ctx), evFormula };
+  if (note !== undefined) out.note = note;
+  if (!worksNow(bet, ctx)) {
+    out.gridNote =
+      bet.working === 'off'
+        ? 'You turned this bet off, so no roll changes it.'
+        : 'This bet is off on the come-out, so no roll changes it.';
+  }
+  return out;
 }

@@ -40,7 +40,7 @@ Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% o
 - **Fire Bet**: pays if the shooter makes 4, 5 or 6 *different* points (the same point twice counts once). With the common 24:1 / 249:1 / 999:1 paytable the edge is **20.76%**. About 1 hand in 100 reaches 4 points.
 - **All / Tall / Small**: pays if every number from 2 to 6 (Small), from 8 to 12 (Tall), or both (All) rolls before a 7, come-out rolls included. With 34:1 / 34:1 / 175:1 the edge is **7.76%** for Small or Tall and **7.46%** for All; it jumps to 18.3% / 20.6% where they pay 30:1 / 150:1. Small and Tall hit 2.64% of the time, All 0.53%.
 
-They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy.
+They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy. In the simulator the Fire Bet shows the red **Sucker bet** tier; All, Tall and Small land in the orange **Costly** tier (between 5% and 9%), which is cheaper than any one-roll prop but still far from the line bets.
 
 :::math Prop-bet edges
 For a one-roll bet that wins on w of 36 ways and pays k:1: EV = (w × k − (36 − w))/36.
@@ -50,8 +50,8 @@ Horn ($4): 2 or 12 → +27 (1/36 each), 3 or 11 → +12 (2/36 each), else −4 (
 C&E ($2): craps → +6 (4/36), 11 → +14 (2/36), else −2 (30/36). EV = (24 + 28 − 60)/36 = −8/36 per $2 = **−11.11%**.
 World ($5): 2/12 → +26, 3/11 → +11, 7 → 0, else (24 ways) −5. EV = (52 + 44 − 120)/36 = −24/36 per $5 = **−13.33%**.
 Hard 8: wins on 4-4 (1 way), loses on 7 (6) or easy 8 (4). EV = (9 − 10)/11 = **−9.09%**. Hard 4: (7 − 8)/9 = **−11.11%**.
-Fire Bet: P(4 points) = 0.880%, P(5) = 0.164%, P(6) = 0.0162% → EV = 24 × 0.00880 + 249 × 0.00164 + 999 × 0.000162 − 0.9894 = **−20.76%**.
-Small: P(2, 3, 4, 5 and 6 all before a 7) = 20049/760760 = 2.635%; EV = 35 × 0.02635 − 1 = **−7.76%**. All: P = 0.5258%; EV = 176 × 0.005258 − 1 = **−7.46%**.
+Fire Bet: P(4 points) = 0.8798%, P(5) = 0.1640%, P(6) = 0.01624%, so P(no payout) = 98.940%. EV = 24 × 0.008798 + 249 × 0.001640 + 999 × 0.0001624 − 0.98940 ≈ 0.2112 + 0.4083 + 0.1623 − 0.9894 = **−0.2076 (−20.76%)**.
+Small: P(2, 3, 4, 5 and 6 all before a 7) = 20049/760760 = 2.6354%; EV = 35 × 0.026354 − 1 ≈ **−0.0776 (−7.76%)**. All: P = 0.5258%; EV = 176 × 0.005258 − 1 ≈ **−0.0746 (−7.46%)**.
 :::
 
 ```scene

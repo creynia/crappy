@@ -14,7 +14,9 @@ export interface BetCtx {
   rules: TableRules;
 }
 /** `working` is the player's ON/OFF setting; omitted means 'auto'. */
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point'> & { working?: Bet['working'] };
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'progress'> & {
+  working?: Bet['working'];
+};
 
 export interface EdgeInfo {
   perResolved: Fraction; // -EV / amount, pushes count as decisions

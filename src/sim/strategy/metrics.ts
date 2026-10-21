@@ -47,16 +47,19 @@ const WAYS: Record<number, number> = {
 /**
  * Long-run rates of the three-point Molly (pass plus up to two come bets, one come in the box at a time,
  * placed only in the point phase), from the exact Markov chain over (point, come numbers, boxed come):
- * flat bets resolved per roll, and odds resolved per roll for each number (odds are returned, not
- * resolved, when a 7 hits come bets on a come-out roll). Independent of the rules and the unit.
+ * flat bets resolved per roll, and odds resolved per roll for each number. Come odds are OFF on the
+ * come-out unless the rules say `comeOddsWorkOnComeOut`: then the engine returns them and counts no
+ * action, so they only count in the point phase (the cache is keyed on that flag). Independent of
+ * the unit and the other rules.
  */
 interface MollyRates {
   flatPerRoll: number;
   oddsPerRoll: Record<PointNumber, number>;
 }
-let mollyCache: MollyRates | undefined;
-function mollyRates(): MollyRates {
-  if (mollyCache) return mollyCache;
+const mollyCache = new Map<boolean, MollyRates>();
+function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
+  const cached = mollyCache.get(comeOddsOnComeOut);
+  if (cached) return cached;
   type S = { p: number; cs: number[]; box: boolean };
   const key = (x: S) => `${x.p}|${x.cs.join(',')}|${x.box ? 1 : 0}`;
   const index = new Map<string, number>();
@@ -83,7 +86,7 @@ function mollyRates(): MollyRates {
       for (const n of x.cs) {
         if (t === 7 || t === n) {
           flat++;
-          if (!(t === 7 && x.p === 0)) odds[POINTS.indexOf(n as PointNumber)]!++;
+          if (x.p !== 0 || comeOddsOnComeOut) odds[POINTS.indexOf(n as PointNumber)]!++;
         } else cs.push(n);
       }
       let box = x.box;
@@ -121,8 +124,9 @@ function mollyRates(): MollyRates {
       flatPerRoll += v[i]! * e.pr * e.flat;
       POINTS.forEach((pt, k) => (oddsPerRoll[pt] += v[i]! * e.pr * e.odds[k]!));
     }
-  mollyCache = { flatPerRoll, oddsPerRoll };
-  return mollyCache;
+  const out = { flatPerRoll, oddsPerRoll };
+  mollyCache.set(comeOddsOnComeOut, out);
+  return out;
 }
 
 const COME_NUMBERS: PointNumber[] = [8, 5, 9, 10, 4];
@@ -233,6 +237,9 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     }
     onTable += b.amount / 100;
     if (molly) continue;
+    // NOTE: come bets outside the Molly (my-layout, other presets) take this generic line path: each is
+    // priced as one bet amortized over a whole decision, with share 1. That is exact for one come bet in
+    // steady state but not for layouts that keep several cycling (see I091 for per-decision pricing).
     const line = isLineLike(b.type);
     const bctx = line ? { phase: 'come-out' as const, point: null, rules: r } : ctx;
     const e = betEdge(b.type, b.amount, bctx);
@@ -246,7 +253,7 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const pass = state.bets.find((b) => b.type === 'pass-line');
     const passOdds = state.bets.find((b) => b.type === 'pass-odds');
     if (pass) {
-      const rates = mollyRates();
+      const rates = mollyRates(r.comeOddsWorkOnComeOut);
       const mult = passOdds ? oddsMult(passOdds, pass, false) : 0;
       const e = betEdge('pass-line', pass.amount, { phase: 'come-out', point: null, rules: r });
       lossCents = rates.flatPerRoll * pass.amount * toNumber(e.perResolved);
@@ -262,4 +269,23 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
     avgAction: onTable,
   };
+}
+
+/**
+ * Edge on action for a line bet with odds at `multiple` x the flat bet (capped by the table at each point,
+ * 'max' = the table maximum): flat edge / (1 + expected odds per decision).
+ */
+export function lineOddsEdge(
+  flatEdge: number,
+  rules: TableRules,
+  multiple: number | 'max',
+  lay = false,
+): number {
+  if (multiple === 'max') return flatEdge / (1 + oddsMultiplePerDecision(rules, lay));
+  let t = 0;
+  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[]) {
+    const cap = (lay ? rules.maxLayOdds : rules.maxOdds)[n];
+    t += (POINT_WAYS[n] / 36) * Math.min(multiple, cap);
+  }
+  return flatEdge / (1 + t);
 }

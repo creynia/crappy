@@ -34,15 +34,6 @@ const MAX_POINTS = 360;
 export const SERIES_DASH: Array<string | undefined> = [undefined, '14 5', '3 3 10 3'];
 const EXPECTED_DASH = '2 4';
 export const SERIES_COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
-const hidden = {
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-} as const;
-
 export function formatAxisMoney(cents: number): string {
   const d = Math.round(cents) / 100;
   const a = Math.abs(d);
@@ -367,63 +358,65 @@ export function BankrollChart({
           </li>
         )}
       </ul>
-      <table style={hidden} data-testid="chart-summary">
-        <caption>
-          {heading}
-          {sessions && sessions > 1 ? `, ${sessions} sessions` : ''}
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Series</th>
-            {checkpoints.map((c) => (
-              <th key={c} scope="col">
-                Roll {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {series.flatMap((s) => {
-            const at = (a: ArrayLike<number>, i: number) =>
-              fmtVal(a[Math.min(i, a.length - 1)] ?? 0);
-            const rows = [
-              <tr key={s.id}>
-                <th scope="row">{s.label}</th>
-                {checkpoints.map((c) => (
-                  <td key={c}>{at(s.line, c)}</td>
-                ))}
-              </tr>,
-            ];
-            if (s.expected) {
-              rows.push(
-                <tr key={`${s.id}-e`}>
-                  <th scope="row">{s.label} expected</th>
+      <div class="sim-sr">
+        <table data-testid="chart-summary">
+          <caption>
+            {heading}
+            {sessions && sessions > 1 ? `, ${sessions} sessions` : ''}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Series</th>
+              {checkpoints.map((c) => (
+                <th key={c} scope="col">
+                  Roll {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {series.flatMap((s) => {
+              const at = (a: ArrayLike<number>, i: number) =>
+                fmtVal(a[Math.min(i, a.length - 1)] ?? 0);
+              const rows = [
+                <tr key={s.id}>
+                  <th scope="row">{s.label}</th>
                   {checkpoints.map((c) => (
-                    <td key={c}>{at(s.expected!, c)}</td>
+                    <td key={c}>{at(s.line, c)}</td>
                   ))}
                 </tr>,
-              );
-            }
-            if (s.band) {
-              rows.push(
-                <tr key={`${s.id}-lo`}>
-                  <th scope="row">{s.label} 10th percentile</th>
-                  {checkpoints.map((c) => (
-                    <td key={c}>{at(s.band!.lo, c)}</td>
-                  ))}
-                </tr>,
-                <tr key={`${s.id}-hi`}>
-                  <th scope="row">{s.label} 90th percentile</th>
-                  {checkpoints.map((c) => (
-                    <td key={c}>{at(s.band!.hi, c)}</td>
-                  ))}
-                </tr>,
-              );
-            }
-            return rows;
-          })}
-        </tbody>
-      </table>
+              ];
+              if (s.expected) {
+                rows.push(
+                  <tr key={`${s.id}-e`}>
+                    <th scope="row">{s.label} expected</th>
+                    {checkpoints.map((c) => (
+                      <td key={c}>{at(s.expected!, c)}</td>
+                    ))}
+                  </tr>,
+                );
+              }
+              if (s.band) {
+                rows.push(
+                  <tr key={`${s.id}-lo`}>
+                    <th scope="row">{s.label} 10th percentile</th>
+                    {checkpoints.map((c) => (
+                      <td key={c}>{at(s.band!.lo, c)}</td>
+                    ))}
+                  </tr>,
+                  <tr key={`${s.id}-hi`}>
+                    <th scope="row">{s.label} 90th percentile</th>
+                    {checkpoints.map((c) => (
+                      <td key={c}>{at(s.band!.hi, c)}</td>
+                    ))}
+                  </tr>,
+                );
+              }
+              return rows;
+            })}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

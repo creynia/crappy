@@ -16,12 +16,15 @@ import type {
   SessionResult,
   StrategyId,
   StrategySpec,
+  SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { StrategyTable } from './StrategyTable';
+import { ResultsHistogram } from './ResultsHistogram';
+import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
-import { fmtMoney } from './text';
+import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
 const MAX_ODDS_BY_DEFAULT = new Set<string>([
@@ -56,6 +59,11 @@ export interface AutoRollPanelProps {
     compare?: StrategySpec[];
     /** open on the all-presets comparison table instead of the run form */
     table?: boolean;
+    /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
+    stopWin?: Cents;
+    stopLoss?: Cents;
+    /** show the odds-multiple sweep table instead of the run form */
+    sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
   /** the player's current layout, for the `my-layout` strategy */
   layout?: LayoutBet[];
@@ -67,6 +75,8 @@ export interface AutoRollPanelProps {
     all?: (SessionResult | ManyResult)[],
     specs?: StrategySpec[],
   ): void;
+  /** The odds sweep finished (config.sweep); `rolls` is the length of each swept session. */
+  onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
 }
@@ -82,6 +92,8 @@ const PRESET_LABEL: Record<RulePresetId, string> = {
   'odds-100x': '100x odds',
 };
 const COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
+// Stop-rule chips: undefined means no stop.
+const STOP_OPTIONS: Array<Cents | undefined> = [undefined, 5000, 10_000, 25_000];
 
 type Metrics = ReturnType<typeof strategyMetrics>;
 type Outcome =
@@ -107,6 +119,20 @@ function money(c: number, sign = false): string {
 /** Exact cents for the summary table, e.g. $1,935.00 */
 function money2(c: number, sign = false): string {
   return fmtMoney(c, { sign, exact: true });
+}
+
+/** How one session ended, using the stop amounts it ran with, e.g. "Stopped: up $100 at roll 37". */
+function endedByText(r: SessionResult, cfg: SessionConfig): string {
+  switch (r.endedBy) {
+    case 'bust':
+      return `Busted at roll ${r.bustedAtRoll ?? r.rollsPlayed}`;
+    case 'stop-win':
+      return `Stopped: up ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    case 'stop-loss':
+      return `Stopped: down ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    default:
+      return `All ${r.rollsPlayed} rolls`;
+  }
 }
 
 function randomSeed(): number {
@@ -140,6 +166,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [oddsMultiple, setOddsMultiple] = useState<number | undefined>(
     config?.defaultStrategy?.oddsMultiple,
   );
+  const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
+  const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
   const [rolls, setRolls] = useState<number>(rollOptions.includes(100) ? 100 : rollOptions[0]!);
   const [custom, setCustom] = useState('');
   const [sessions, setSessions] = useState<number>(sessionOptions[0] ?? 1);
@@ -189,6 +217,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       seed,
       bankroll,
       rules: rulesInput,
+      ...(stopWin !== undefined ? { stopWin } : {}),
+      ...(stopLoss !== undefined ? { stopLoss } : {}),
     };
     const cfg: SessionConfig = { ...base, strategy: specs[0]! };
     try {
@@ -261,6 +291,17 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       </select>
     </label>
   );
+  if (config?.sweep)
+    return (
+      <SweepPanel
+        config={config.sweep}
+        rules={props.rules}
+        bankroll={bankroll}
+        onCompleted={() => props.onSweepCompleted?.(100)}
+        initialSeed={props.initialSeed}
+        unit={config.defaultStrategy?.unit}
+      />
+    );
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
@@ -373,6 +414,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           )}
         </fieldset>
 
+        {fixedSpecs && (config?.stopWin !== undefined || config?.stopLoss !== undefined) ? (
+          <p class="sim-ar-desc">
+            Scene stop rules:{' '}
+            {[
+              config?.stopWin !== undefined ? `stop if up ${money(config.stopWin)}` : null,
+              config?.stopLoss !== undefined ? `stop if down ${money(config.stopLoss)}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            .
+          </p>
+        ) : null}
         {!fixedSpecs && (
           <>
             {unitControl}
@@ -381,6 +434,28 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
               {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
               {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
+            </div>
+            <div class="sim-ar-group" role="group" aria-label="Stop when ahead by">
+              <span>Stop if up</span>
+              {STOP_OPTIONS.map((v) =>
+                button(
+                  stopWin === v,
+                  v === undefined ? 'None' : money(v),
+                  () => setStopWin(v),
+                  String(v),
+                ),
+              )}
+            </div>
+            <div class="sim-ar-group" role="group" aria-label="Stop when behind by">
+              <span>Stop if down</span>
+              {STOP_OPTIONS.map((v) =>
+                button(
+                  stopLoss === v,
+                  v === undefined ? 'None' : money(v),
+                  () => setStopLoss(v),
+                  String(v),
+                ),
+              )}
             </div>
           </>
         )}
@@ -530,28 +605,47 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           start={start}
           sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
         />
-        <table class="sim-ar-summary" data-testid="auto-roll-summary">
-          <thead>
-            <tr>
-              <th scope="col">Summary</th>
-              {o.specs.map((s, i) => (
-                <th key={i} scope="col" style={{ color: COLORS[i] }}>
-                  {nameOf(s.id)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {summaryRows(o, metrics).map(([label, cells]) => (
-              <tr key={label}>
-                <th scope="row">{label}</th>
-                {cells.map((c, i) => (
-                  <td key={i}>{c}</td>
+        {o.kind === 'many' && chartTab === 'results' && (
+          <ResultsHistogram
+            start={start}
+            series={o.results.map((r, i) => ({
+              label: nameOf(o.specs[i]!.id),
+              color: COLORS[i]!,
+              finals: r.finals,
+              busted: Math.round(r.bustRate * r.sessions),
+              expected: r.expected[r.expected.length - 1]! - start,
+            }))}
+          />
+        )}
+        <div class="sim-ar-summary-wrap" tabindex={0} role="region" aria-label="Strategy summary">
+          <table class="sim-ar-summary" data-testid="auto-roll-summary">
+            <thead>
+              <tr>
+                <th scope="col">Summary</th>
+                {o.specs.map((s, i) => (
+                  <th key={i} scope="col" style={{ color: COLORS[i] }}>
+                    {nameOf(s.id)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {summaryRows(o, metrics).map(([label, cells]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  {cells.map((c, i) => (
+                    <td key={i}>{c}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {o.cfg.stopWin !== undefined || o.cfg.stopLoss !== undefined ? (
+          <p class="sim-ar-desc">
+            Stops don't change the edge; they only cut how many rolls you play.
+          </p>
+        ) : null}
       </>
     );
   }
@@ -563,20 +657,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
     // learner-facing cost rows come from the run's OWN expected loss, so they agree with the
     // "Expected loss" / "Expected final bankroll" rows (the analytic steady-layout figure is not shown)
+    // Per roll PLAYED: stopped sessions play fewer rolls, so divide by the rolls actually played.
     const lossPerRoll = (): number[] =>
       o.kind === 'single'
         ? o.results.map((r) => (r.rollsPlayed > 0 ? r.expectedLoss / r.rollsPlayed : 0))
-        : o.results.map((r) => {
-            const n = Math.max(1, r.expected.length - 1);
-            return (bankroll - r.expected[r.expected.length - 1]!) / n;
-          });
+        : o.results.map((r) => r.meanExpectedLoss / Math.max(1, r.meanRollsPlayed));
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
     const edge = metrics.map((m) => pct(m.edgeOnAction));
     if (o.kind === 'single') {
       const rs = o.results;
-      return [
+      const rows: Array<[string, string[]]> = [
         ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
         ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
         ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
@@ -588,24 +680,49 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ['Edge on action', edge],
         ['Biggest drop from a peak', rs.map((r) => money2(r.maxDrawdown))],
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
+        ['Ended by', rs.map((r) => endedByText(r, o.cfg))],
+        ['Rolls played', rs.map((r) => String(r.rollsPlayed))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
+        ...(rs.some((r) => r.bonusHits?.length)
+          ? [
+              [
+                'Bonus bet hits',
+                rs.map((r) =>
+                  r.bonusHits?.length
+                    ? r.bonusHits
+                        .map((h) => `${betLabel(h.type)} ${h.pays}:1 x${h.count}`)
+                        .join(', ')
+                    : 'none',
+                ),
+              ] as [string, string[]],
+            ]
+          : []),
         ['Rolls per $1 of expected loss', perDollar],
         [`Expected cost per ${rollsPerHour} rolls`, perHour],
       ];
+      return rows;
     }
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
-    return [
+    const rows: Array<[string, string[]]> = [
       ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
       ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
       ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],
       ['Expected final bankroll', rs.map((r) => money2(last(r.expected)))],
       ['Chance of finishing ahead', rs.map((r) => pct(r.probAhead))],
       ['Busted sessions', rs.map((r) => pct(r.bustRate))],
+    ];
+    if (o.cfg.stopWin !== undefined)
+      rows.push(['% ended by stop-win', rs.map((r) => pct(r.stopWinRate))]);
+    if (o.cfg.stopLoss !== undefined)
+      rows.push(['% ended by stop-loss', rs.map((r) => pct(r.stopLossRate))]);
+    rows.push(
+      ['Average rolls played', rs.map((r) => r.meanRollsPlayed.toFixed(1))],
       ['Edge on action', edge],
       ['Rolls per $1 of expected loss', perDollar],
       [`Expected cost per ${rollsPerHour} rolls`, perHour],
-    ];
+    );
+    return rows;
   }
 }

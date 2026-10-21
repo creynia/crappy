@@ -1,5 +1,3 @@
-import { isToggleable } from '../engine/bets';
-import { isWorking } from '../engine/game';
 import type { Action, Cents, GameState } from '../engine/types';
 import { BetSheet } from './BetSheet';
 import { regionIdForBet } from './layouts';
@@ -60,9 +58,7 @@ export function SimSheet(p: SimSheetProps) {
       step={chip}
       quickActions={m.quick}
       confirmSucker={p.confirmSucker}
-      {...(m.bet && isToggleable(m.bet.type)
-        ? { working: { value: isWorking(m.bet, p.game), canToggle: true } }
-        : {})}
+      {...(m.working ? { working: m.working } : {})}
       onTypeChange={(t) => {
         const g = p.getLiveGame();
         p.openSheet({

@@ -20,6 +20,7 @@ const EVENT_TYPES = [
   'bet-pushed',
   'bet-returned',
   'bet-travelled',
+  'bet-progressed',
   'natural',
   'craps',
   'point-established',
@@ -94,7 +95,7 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working']);
+    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
     this.bet(`${path}.type`, v.type);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
@@ -102,6 +103,10 @@ class Ctx {
     if (v.point !== undefined) this.point(`${path}.point`, v.point);
     if (v.working !== undefined && !['auto', 'on', 'off'].includes(v.working as string))
       this.err(`${path}.working`, 'must be auto, on or off');
+    if (v.progress !== undefined) {
+      if (!Array.isArray(v.progress) || !v.progress.every((n) => isInt(n) && n >= 2 && n <= 12))
+        this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
+    }
   }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
@@ -374,6 +379,9 @@ export function validateScene(
         'compareMode',
         'compare',
         'table',
+        'stopWin',
+        'stopLoss',
+        'sweep',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -402,10 +410,46 @@ export function validateScene(
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
       if (a.table !== undefined) c.bool('autoRoll.table', a.table);
+      // The panel offers these amounts as chips, so a scene can only pick one of them.
+      const stopAmounts = [5000, 10_000, 25_000];
+      for (const [k, v] of [
+        ['stopWin', a.stopWin],
+        ['stopLoss', a.stopLoss],
+      ] as const) {
+        if (v === undefined) continue;
+        c.cents(`autoRoll.${k}`, v, { min: 1 });
+        if (typeof v === 'number' && !stopAmounts.includes(v))
+          c.err(`autoRoll.${k}`, 'must be $50, $100 or $250 (or leave it out)');
+        if (
+          k === 'stopLoss' &&
+          typeof v === 'number' &&
+          typeof s.bankroll === 'number' &&
+          v > s.bankroll
+        )
+          c.err('autoRoll.stopLoss', 'cannot be more than the scene bankroll');
+      }
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');
         else a.compare.forEach((x, i) => c.strategySpec(`autoRoll.compare[${i}]`, x));
+      }
+      if (a.sweep !== undefined) {
+        const w = a.sweep;
+        if (!isObj(w)) c.err('autoRoll.sweep', 'must be an object');
+        else {
+          c.keys('autoRoll.sweep', w, ['strategy', 'oddsMultiples']);
+          const ids = listStrategies().map((x) => x.id as string);
+          if (!ids.includes(w.strategy as string))
+            c.err('autoRoll.sweep.strategy', `unknown strategy id ${JSON.stringify(w.strategy)}`);
+          const m = w.oddsMultiples;
+          if (!Array.isArray(m) || m.length < 2 || m.length > 8)
+            c.err('autoRoll.sweep.oddsMultiples', 'must be an array of 2-8 multiples');
+          else
+            m.forEach((x, i) => {
+              if (!(x === 'max' || (typeof x === 'number' && x >= 0 && x <= 1000)))
+                c.err(`autoRoll.sweep.oddsMultiples[${i}]`, 'must be a number 0-1000 or "max"');
+            });
+        }
       }
     }
   }

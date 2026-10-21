@@ -1,4 +1,4 @@
-import { BET_TYPES, hopText, upfrontVig } from '../engine/bets';
+import { BET_TYPES, hopText, isToggleable, upfrontVig } from '../engine/bets';
 import type {
   Bet,
   BetTypeId,
@@ -285,4 +285,58 @@ export function toOutcomes(d: Distribution): Outcome[] {
     probability: r.probability,
     net: r.net,
   }));
+}
+
+/** What one roll does to a bet, per dice combination. */
+export type RollEffect = 'win' | 'lose' | 'push' | 'none' | 'travel';
+
+/** Whether the bet can win or lose on the next roll in this situation (mirrors engine isWorking). */
+export function worksNow(bet: BetLike, ctx: BetCtx): boolean {
+  if (!isToggleable(bet.type)) return true;
+  if (bet.working === 'on') return true;
+  if (bet.working === 'off') return false;
+  if (ctx.phase === 'point') return true;
+  const cat = BET_TYPES[bet.type].category;
+  if (cat === 'place' || cat === 'buy') return ctx.rules.placeBetsWorkOnComeOut;
+  if (cat === 'hardway') return ctx.rules.hardwaysWorkOnComeOut;
+  if (bet.type === 'come-odds') return ctx.rules.comeOddsWorkOnComeOut;
+  return true;
+}
+
+/**
+ * The effect of the next roll on this bet for each of the 36 dice combinations, in ALL_DICE order
+ * (rows = first die 1..6, columns = second die 1..6). One-roll bets show their final result;
+ * multi-roll bets show this roll's effect ('travel' = a point is set or the bet moves to a number).
+ */
+export function rollEffectGrid(bet: BetLike, ctx: BetCtx): RollEffect[] {
+  const working = worksNow(bet, ctx);
+  const point = isOddsType(bet.type) ? (bet.point ?? ctx.point) : ctx.point;
+  const full = synth(bet.type, bet.amount, bet.point, 0, bet.hop);
+  const def = BET_TYPES[bet.type];
+  return ALL_DICE.map((dice): RollEffect => {
+    const res = def.resolve(full, rollCtx(dice, ctx.phase, point), ctx.rules, working);
+    switch (res.kind) {
+      case 'win':
+      case 'lose':
+      case 'push':
+      case 'travel':
+        return res.kind;
+      case 'return':
+        return working ? 'push' : 'none';
+      default:
+        // A line bet on the come-out: a point number establishes the point.
+        return working &&
+          LINES.has(bet.type) &&
+          ctx.phase === 'come-out' &&
+          (POINT_NUMBERS as readonly number[]).includes(dice[0] + dice[1])
+          ? 'travel'
+          : 'none';
+    }
+  });
+}
+
+export function countEffects(grid: readonly RollEffect[]): Record<RollEffect, number> {
+  const c: Record<RollEffect, number> = { win: 0, lose: 0, push: 0, none: 0, travel: 0 };
+  for (const e of grid) c[e]++;
+  return c;
 }

@@ -4,6 +4,7 @@ import { applyAction, createGame } from '../engine/game';
 import { DEFAULT_RULES } from '../engine/rules';
 import type { Bet, Dice, Die } from '../engine/types';
 import { betEdge, betEV, betOutcomes, betVariance, tableExpectedLossPerRoll } from './ev';
+import { countEffects, rollEffectGrid } from './outcomes';
 import { frac, toNumber } from './fraction';
 import { previewAction } from './preview';
 import { edgeTier } from './tiers';
@@ -40,6 +41,12 @@ describe('hop edges are exact (curriculum: easy 11.11%, hard 13.89%)', () => {
     const v = (d: Dice) => betVariance({ type: 'hop', amount: 100, point: null, hop: d }, comeOut);
     expect(v(D(2, 4))).toEqual(frac(1088 * 10_000, 81));
     expect(v(D(3, 3))).toEqual(frac(33635 * 10_000, 1296));
+  });
+  it('the dice grid wins on exactly the pair (I019 grid)', () => {
+    const grid = (d: Dice) =>
+      rollEffectGrid({ type: 'hop', amount: 100, point: null, hop: d }, comeOut);
+    expect(countEffects(grid(D(4, 2)))).toMatchObject({ win: 2, lose: 34 });
+    expect(countEffects(grid(D(3, 3)))).toMatchObject({ win: 1, lose: 35 });
   });
   it('order does not matter (4-2 is the 2-4 hop)', () => {
     expect(betEdge('hop', 500, comeOut, D(4, 2))).toEqual(betEdge('hop', 500, comeOut, D(2, 4)));
@@ -120,6 +127,7 @@ describe('hop previews', () => {
     expect(p.headline).toContain('11.11%');
     expect(p.detail).toContain('One-roll bet');
     expect(p.explanation.rows).toHaveLength(2);
+    expect(countEffects(p.explanation.grid!)).toMatchObject({ win: 2, lose: 34 });
     expect(p.alternative?.action).toMatchObject({ betType: 'pass-line' });
   });
   it('hard hop preview is 13.89%', () => {

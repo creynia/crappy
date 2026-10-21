@@ -3,6 +3,7 @@ import type { Action, BetTypeId, Cents, Dice } from '../engine/types';
 import { HopPicker } from './HopPicker';
 import type { ActionPreview } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
+import { DiceGrid } from './DiceGrid';
 import './sim.css';
 
 export type SheetPreview = ActionPreview;
@@ -296,6 +297,9 @@ export function BetSheet(p: BetSheetProps) {
                     ))}
                   </tbody>
                 </table>
+                {preview.explanation.grid ? (
+                  <DiceGrid grid={preview.explanation.grid} note={preview.explanation.gridNote} />
+                ) : null}
                 <p class="sim-formula">{preview.explanation.evFormula}</p>
                 {preview.explanation.note ? (
                   <p class="sim-note">{preview.explanation.note}</p>

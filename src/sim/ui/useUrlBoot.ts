@@ -4,6 +4,7 @@ import type { Cents, Dice as DicePair, RulePresetId, TableRules } from '../engin
 import { initScene } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { loadSandbox } from './persist';
+import type { RollLogEntry } from './rollLog';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
 import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
@@ -56,7 +57,13 @@ export function buildCore(
   mode: 'sandbox' | 'embedded',
   persistKey: string | undefined,
   url: URLSearchParams,
-): { core: Core; startEquity: Cents; chip?: Cents; customRules?: Partial<TableRules> } {
+): {
+  core: Core;
+  startEquity: Cents;
+  chip?: Cents;
+  log?: RollLogEntry[];
+  customRules?: Partial<TableRules>;
+} {
   const sandbox = mode === 'sandbox';
   const hasUrl = sandbox && (url.has('seed') || url.has('dice') || url.has('rules'));
   const urlRules = url.get('rules');
@@ -80,6 +87,7 @@ export function buildCore(
         },
         startEquity: saved.startBankroll,
         ...(saved.chip ? { chip: saved.chip } : {}),
+        ...(saved.log ? { log: saved.log } : {}),
         ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
       };
     }

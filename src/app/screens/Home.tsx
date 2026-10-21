@@ -23,7 +23,8 @@ export function Home() {
       {badge && (
         <p class="card badge-card">
           <span class="badge tier-fair">Perfect Strategy</span> You passed the final exam with 80%
-          or better.
+          or better. Put it to work in the <Link to="/challenge">Challenge</Link>: 300 rolls, scored
+          on your decisions.
         </p>
       )}
       {nextL ? (

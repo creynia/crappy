@@ -3,7 +3,7 @@ import { equity } from '../engine/game';
 import type { Cents, GameEvent, GameState } from '../engine/types';
 import { replayRoll, replayStart, replayTo, simulateSession } from '../strategy';
 import type { SessionConfig, SessionLogEntry } from '../strategy';
-import type { Speed } from './animation';
+import { prefersReducedMotion, type Speed } from './animation';
 import type { Core } from './simCore';
 
 export type WatchSpeed = 1 | 4 | 16;
@@ -35,11 +35,15 @@ interface Options {
   baseSpeed: () => Speed;
 }
 
-const SPEED: Record<WatchSpeed, (base: Speed) => Speed> = {
-  1: (base) => base,
-  4: () => 'fast',
-  16: () => 'instant',
-};
+/** The animation speed for a watch speed. Reduced motion forces every speed to instant. */
+export function watchAnimationSpeed(
+  speed: WatchSpeed,
+  base: Speed,
+  reducedMotion: boolean = prefersReducedMotion(),
+): Speed {
+  if (reducedMotion) return 'instant';
+  return speed === 1 ? base : speed === 4 ? 'fast' : 'instant';
+}
 const GAP_MS: Record<WatchSpeed, number> = { 1: 450, 4: 120, 16: 0 };
 
 /**
@@ -54,7 +58,7 @@ export function useWatchReplay(o: Options) {
   watchRef.current = watch;
 
   const applySpeed = (w: WatchState | null) => {
-    o.speedRef.current = w ? SPEED[w.speed](o.baseSpeed()) : null;
+    o.speedRef.current = w ? watchAnimationSpeed(w.speed, o.baseSpeed()) : null;
   };
   const update = (patch: Partial<WatchState>) => {
     const w = watchRef.current;

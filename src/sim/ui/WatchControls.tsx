@@ -24,21 +24,6 @@ export function WatchControls(p: WatchControlsProps) {
   const finished = watch.index >= total;
   return (
     <section class="sim-watch" ref={root} aria-label="Replay controls" data-testid="watch-controls">
-      <p class="sim-watch-status">
-        Watching a replay: roll {watch.index} of {total}
-        {finished ? `. Finished at ${fmtMoney(watch.finalEquity)}.` : ''}
-      </p>
-      <label class="sim-watch-scrub">
-        <span class="sim-sr">Scrub the replay</span>
-        <input
-          type="range"
-          min={0}
-          max={total}
-          value={watch.index}
-          aria-valuetext={`Roll ${watch.index} of ${total}`}
-          onInput={(e) => p.onScrub(Number(e.currentTarget.value))}
-        />
-      </label>
       <div class="sim-watch-row">
         <button type="button" class="sim-ar-btn" onClick={p.onToggle} data-testid="watch-toggle">
           {watch.playing ? 'Pause' : finished ? 'Replay' : 'Play'}
@@ -68,6 +53,23 @@ export function WatchControls(p: WatchControlsProps) {
         <button type="button" class="sim-ar-btn" onClick={p.onExit} data-testid="watch-exit">
           Exit
         </button>
+      </div>
+      <div class="sim-watch-scrubrow">
+        <span class="sim-watch-status">
+          Replay: roll {watch.index} of {total}
+          {finished ? `. Finished at ${fmtMoney(watch.finalEquity)}.` : ''}
+        </span>
+        <label class="sim-watch-scrub">
+          <span class="sim-sr">Scrub the replay</span>
+          <input
+            type="range"
+            min={0}
+            max={total}
+            value={watch.index}
+            aria-valuetext={`Roll ${watch.index} of ${total}`}
+            onInput={(e) => p.onScrub(Number(e.currentTarget.value))}
+          />
+        </label>
       </div>
     </section>
   );

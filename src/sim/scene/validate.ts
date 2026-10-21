@@ -328,6 +328,7 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'challenge',
 ];
 const STEP_KEYS = [
   'id',
@@ -406,6 +407,8 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'showRestart',
+        'stepPanelLabel',
       ]);
       if (
         u.orientation !== undefined &&
@@ -427,8 +430,10 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
+      if (u.stepPanelLabel !== undefined) c.str('ui.stepPanelLabel', u.stepPanelLabel);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))
         c.err('ui.speed', 'must be normal, fast or instant');
     }
@@ -539,6 +544,19 @@ export function validateScene(
     }
   }
 
+  if (s.challenge !== undefined) {
+    if (!isObj(s.challenge)) c.err('challenge', 'must be an object');
+    else {
+      c.keys('challenge', s.challenge, ['rolls', 'scoring']);
+      if (!(isInt(s.challenge.rolls) && s.challenge.rolls >= 1))
+        c.err('challenge.rolls', 'must be a positive integer');
+      if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
+      else {
+        c.keys('challenge.scoring', s.challenge.scoring, ['minResolved']);
+        c.cents('challenge.scoring.minResolved', s.challenge.scoring.minResolved);
+      }
+    }
+  }
   if (s.steps !== undefined) {
     if (!Array.isArray(s.steps) || s.steps.length === 0)
       c.err('steps', 'must be a non-empty array');

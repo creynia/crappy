@@ -43,6 +43,10 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** hide the step panel's Restart (default shown); a challenge keeps its seed */
+    showRestart?: boolean;
+    /** accessible name of the step panel (default "Lesson step") */
+    stepPanelLabel?: string;
   };
   autoRoll?: {
     enabled: boolean;
@@ -65,6 +69,8 @@ export interface SceneConfig {
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: { rolls: number; scoring: { minResolved: Cents } };
 }
 
 export interface SceneStep {

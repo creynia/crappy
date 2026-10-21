@@ -121,7 +121,10 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     action += b.amount / toNumber(e.expectedRolls);
   }
   const expectedLossPerRoll = lossCents / 100;
+  // money on the table on average: every bet of the steady layout, odds included (dollars)
+  const avgAction = state.bets.reduce((t, b) => t + b.amount, 0) / 100;
   return {
+    avgAction,
     edgeOnAction: action > 0 ? lossCents / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,

@@ -53,6 +53,8 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** open on the sortable all-presets comparison table */
+    table?: boolean;
   };
   steps?: SceneStep[];
 }

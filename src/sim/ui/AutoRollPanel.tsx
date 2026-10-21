@@ -19,6 +19,7 @@ import type {
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { StrategyTable } from './StrategyTable';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
@@ -53,6 +54,8 @@ export interface AutoRollPanelProps {
     compareMode?: boolean;
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** open on the all-presets comparison table instead of the run form */
+    table?: boolean;
   };
   /** the player's current layout, for the `my-layout` strategy */
   layout?: LayoutBet[];
@@ -148,6 +151,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'run' | 'table'>(config?.table ? 'table' : 'run');
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -237,7 +241,27 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
-      <div class="sim-ar-form">
+      {!fixedSpecs && (
+        <div class="sim-ar-group" role="group" aria-label="Auto-roll view">
+          {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
+          {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
+        </div>
+      )}
+      {view === 'table' && !fixedSpecs && (
+        <StrategyTable
+          unit={effUnit}
+          rules={rules}
+          rollsPerHour={rollsPerHour}
+          {...(config?.strategies ? { strategies: config.strategies } : {})}
+          onRun={(spec) => {
+            setStrategyIds([spec.id]);
+            setUnit(spec.unit);
+            setOddsMultiple(undefined);
+            setView('run');
+          }}
+        />
+      )}
+      <div class="sim-ar-form" hidden={view === 'table' && !fixedSpecs}>
         <fieldset class="sim-ar-fieldset">
           <legend>
             {fixedSpecs
@@ -437,7 +461,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       </div>
 
       {outcome && (
-        <div data-testid="auto-roll-output" class="sim-ar-output" aria-live="polite">
+        <div
+          data-testid="auto-roll-output"
+          class="sim-ar-output"
+          aria-live="polite"
+          hidden={view === 'table' && !fixedSpecs}
+        >
           {renderOutput(outcome)}
         </div>
       )}

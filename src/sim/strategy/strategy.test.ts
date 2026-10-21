@@ -262,6 +262,17 @@ describe('strategyMetrics (simulator.md 2.4)', () => {
   });
 });
 
+describe('strategyMetrics avgAction', () => {
+  const rules = resolveRules('standard-vegas');
+  it('is the steady layout total in dollars', () => {
+    expect(strategyMetrics({ id: 'place-6-8', unit: 600 }, rules).avgAction).toBe(12);
+    expect(strategyMetrics({ id: 'iron-cross', unit: 500 }, rules).avgAction).toBe(22);
+    expect(strategyMetrics({ id: 'no-bet', unit: 500 }, rules).avgAction).toBe(0);
+    // $10 pass plus its maximum odds: 5x at point 6 = $50
+    expect(strategyMetrics({ id: 'pass-max-odds', unit: 1000 }, rules).avgAction).toBe(60);
+  });
+});
+
 describe('benchmark', () => {
   it('100 sessions x 1000 rolls under 2s (Node target ~0.5s)', () => {
     const t = performance.now();

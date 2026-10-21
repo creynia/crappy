@@ -60,6 +60,25 @@ test.describe('sandbox', () => {
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
   });
 
+  test('strategy table: sort, run it, no horizontal overflow', async ({ page }) => {
+    await page.goto('/#/play?speed=fast');
+    await page.getByRole('button', { name: 'Auto-roll' }).click();
+    const panel = page.locator('.sim-auto');
+    await panel.getByRole('button', { name: 'Compare all' }).click();
+    const table = panel.getByTestId('strategy-table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('tbody tr').first()).toBeVisible();
+    const fits = await page.evaluate(
+      'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
+    );
+    expect(fits).toBe(true);
+    if (process.env.SHOT)
+      await page.screenshot({ path: `${process.env.SHOT}-${test.info().project.name}.png` });
+    await table.getByRole('button', { name: /^Run it: Iron Cross/ }).click();
+    await expect(table).toHaveCount(0);
+    await expect(panel.getByRole('combobox', { name: 'Strategy' })).toHaveValue('iron-cross');
+  });
+
   test('sandbox state persists across reload', async ({ page }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

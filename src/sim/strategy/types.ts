@@ -102,4 +102,6 @@ export interface StrategyMetrics {
   edgeOnAction: number;
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
+  /** Dollars on the table on average in the steady layout (flat bets and odds). */
+  avgAction: number;
 }

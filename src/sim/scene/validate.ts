@@ -373,6 +373,7 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'table',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -400,6 +401,7 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.table !== undefined) c.bool('autoRoll.table', a.table);
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

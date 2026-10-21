@@ -704,6 +704,7 @@ export function Simulator(props: SimulatorInternalProps) {
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.table) cfg.table = true;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(

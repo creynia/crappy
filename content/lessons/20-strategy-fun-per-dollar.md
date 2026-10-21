@@ -127,6 +127,26 @@ steps:
     completeWhen: { rolls: 30 }
 ```
 
+Want to price your own table? This sortable version covers every preset, and its "Run it" buttons set up an auto-roll.
+
+```scene
+id: l20-table
+version: 1
+title: Every strategy, side by side
+rules: standard-vegas
+bankroll: 200000
+phase: come-out
+autoRoll:
+  enabled: true
+  table: true
+  rollOptions: [100]
+  sessions: [1, 20]
+steps:
+  - id: look
+    text: "Sort by **Loss per hour**, then by **On the table**. Tap **Run it** on any row to try it."
+    completeWhen: { acknowledged: true }
+```
+
 ## Your perfect-strategy cheat sheet
 
 | Lens | The play | Edge per $ bet | Cost/hour at $10 | Use it when |

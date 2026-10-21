@@ -81,3 +81,30 @@ describe('AutoRollPanel', () => {
     expect(row.querySelector('td')!.textContent).toMatch(/\.\d\d$/);
   });
 });
+
+describe('AutoRollPanel strategy table', () => {
+  it('opens on the table, sorts, and Run it selects the strategy', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel config={{ table: true }} />, el);
+    const rows = () =>
+      Array.from(el.querySelectorAll('[data-testid="strategy-table"] tbody tr')).map((r) =>
+        r.getAttribute('data-strategy'),
+      );
+    expect(rows().length).toBeGreaterThan(8);
+    expect(rows()).not.toContain('my-layout');
+    // default: cheapest hour first
+    expect(rows()[0]).toBe('no-bet');
+    const heads = Array.from(el.querySelectorAll<HTMLElement>('.sim-st-sort'));
+    await act(() => {
+      heads.find((b) => b.textContent.startsWith('Loss per hour'))!.click();
+    });
+    expect(rows()[0]).toBe('any-7-every-roll');
+    await act(() => {
+      el.querySelector<HTMLElement>('[data-strategy="iron-cross"] .sim-st-run button')!.click();
+    });
+    expect(el.querySelector('[data-testid="strategy-table"]')).toBeNull();
+    expect((el.querySelector('select[aria-label="Strategy"]') as HTMLSelectElement).value).toBe(
+      'iron-cross',
+    );
+  });
+});

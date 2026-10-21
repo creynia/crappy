@@ -1,5 +1,12 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { BET_TYPES, bonusTargets, isBonusType } from '../engine/bets';
+import {
+  BET_TYPES,
+  HOP_PAYS,
+  bonusTargets,
+  hopLabel,
+  isBonusType,
+  isHardHop,
+} from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge } from '../math';
 import { equity } from '../engine/game';
@@ -55,6 +62,7 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   horn: 'Horn',
   'c-e': 'C and E',
   world: 'World',
+  hop: 'Hop',
   fire: 'Fire Bet',
   all: 'All',
   tall: 'Tall',
@@ -257,8 +265,11 @@ export function buildEvFacts(
         : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
+  const hop = bet?.hop ?? (a.type === 'place-bet' ? a.hop : undefined);
   try {
-    pays = def.describePayout(state.rules, bet?.point ?? state.point);
+    pays = hop
+      ? `${isHardHop(hop) ? HOP_PAYS.hard : HOP_PAYS.easy} to 1`
+      : def.describePayout(state.rules, bet?.point ?? state.point);
   } catch {
     pays = '';
   }
@@ -414,7 +425,7 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
           : `Nothing collected yet (0 of ${total})`;
         return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${collected}`;
       }
-      return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
+      return `${b.hop ? hopLabel(b.hop) : betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
     });
     parts.push(`Your bet: ${desc.join('; ')}.`);
   } else {

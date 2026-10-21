@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import { BET_TYPES, isToggleable } from '../engine/bets';
-import type { Action, BetTypeId, Cents, GameState } from '../engine/types';
+import type { Action, BetTypeId, Cents, Dice, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
 import type { ActionPreview } from '../math/types';
@@ -16,6 +16,7 @@ import {
   defaultBetForRegion,
   minAmountFor,
   oddsRoom,
+  hopSheetFields,
   parentFor,
   placeAction,
 } from './simHelpers';
@@ -32,6 +33,8 @@ export interface SheetState {
   amount: Cents;
   /** manage mode: the existing bet */
   betId?: string;
+  /** hop bets (I035): the chosen pair */
+  hop?: Dice;
 }
 
 const regionFor = (id: RegionId): RegionDef | undefined => ALL_REGIONS.find((r) => r.id === id);
@@ -60,7 +63,7 @@ export function buildSheetModel(
     ? sheet.amount === bet.amount
       ? { type: 'remove-bet', betId: bet.id }
       : { type: 'set-amount', betId: bet.id, amount: sheet.amount }
-    : placeAction(sheet.type, sheet.amount, sheet.regionId, game);
+    : placeAction(sheet.type, sheet.amount, sheet.regionId, game, sheet.hop);
   let preview: ActionPreview = previewAction(game, action, { rollsPerHour });
   const showEV = st?.showEV ?? scene.showEV ?? true;
   const needed: Action['type'] = bet
@@ -206,7 +209,7 @@ export function useSheetModel(d: SheetDeps) {
     const { game: g, rt: r } = coreRef.current;
     const action: Action = s.betId
       ? { type: 'remove-bet', betId: s.betId }
-      : placeAction(s.type, s.amount, s.regionId, g);
+      : placeAction(s.type, s.amount, s.regionId, g, s.hop);
     const p = previewAction(g, action, { rollsPerHour: settingsRef.current.rollsPerHour });
     emit({ type: 'previewed', preview: p });
     const sc = sceneRef.current;
@@ -233,11 +236,12 @@ export function useSheetModel(d: SheetDeps) {
     if (!allowedTypes.includes(type)) type = allowedTypes[0]!;
     const amount = defaultAmount(type, id, g, chip);
     const needsParent = BET_TYPES[type].category === 'odds' && !parentFor(type, id, g);
-    if (settingsRef.current.skipPreview && !needsParent) {
+    // a hop always opens the sheet: the pair is picked there
+    if (settingsRef.current.skipPreview && !needsParent && type !== 'hop') {
       d.doAction(placeAction(type, amount, id, g));
       return;
     }
-    openSheet({ regionId: id, type, amount });
+    openSheet({ regionId: id, type, amount, ...hopSheetFields(type, undefined) });
   };
 
   const onStackTap = (betId: string) => {

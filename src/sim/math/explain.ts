@@ -32,6 +32,7 @@ export function buildTree(rows: ReturnType<typeof betOutcomes>): OutcomeTree | n
     });
   return { comeOut, points };
 }
+import { rollEffectGrid, worksNow } from './outcomes';
 
 export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   const rows = betOutcomes(bet, ctx);
@@ -75,10 +76,14 @@ export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
   if (def.oneRoll) notes.push('One-roll bet: its edge is paid on every roll.');
   const note = notes.length > 0 ? notes.join(' ') : undefined;
   const tree = buildTree(rows);
-  return {
-    rows,
-    ...(tree ? { tree } : {}),
-    evFormula,
-    ...(note === undefined ? {} : { note }),
-  };
+  const out: Explanation = { rows, grid: rollEffectGrid(bet, ctx), evFormula };
+  if (tree) out.tree = tree;
+  if (note !== undefined) out.note = note;
+  if (!worksNow(bet, ctx)) {
+    out.gridNote =
+      bet.working === 'off'
+        ? 'You turned this bet off, so no roll changes it.'
+        : 'This bet is off on the come-out, so no roll changes it.';
+  }
+  return out;
 }

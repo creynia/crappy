@@ -2,7 +2,13 @@ import { render } from 'preact';
 import { describe, expect, it } from 'vitest';
 import { validateScene } from '../scene';
 import { calloutBox, placeCallouts, wrapText } from './Callouts';
-import { centerLayout, landscapeLayout, portraitLayout } from './layouts';
+import {
+  centerLayout,
+  craplessLandscapeLayout,
+  craplessPortraitLayout,
+  landscapeLayout,
+  portraitLayout,
+} from './layouts';
 import { BET_TYPES_WITHOUT_REGION, REGION_IDS } from './layouts/types';
 import { regionIdForBet } from './layouts';
 import { BET_TYPE_IDS } from '../engine/bets';
@@ -13,8 +19,12 @@ const LONG =
   'Bet with the shooter here: it wins on 7 or 11 and loses on 2, 3 or 12, then rides the point.';
 
 describe('callout geometry', () => {
-  it('REGION_IDS lists exactly the regions of the layouts', () => {
-    const ids = new Set(LAYOUTS.flatMap((l) => l.regions.map((r) => r.id)));
+  it('REGION_IDS lists exactly the regions of the layouts (crapless felts included)', () => {
+    const ids = new Set(
+      [...LAYOUTS, craplessPortraitLayout, craplessLandscapeLayout].flatMap((l) =>
+        l.regions.map((r) => r.id),
+      ),
+    );
     expect([...ids].sort()).toEqual([...REGION_IDS].sort());
   });
   it.each(LAYOUTS.map((l) => [l.id, l] as const))(

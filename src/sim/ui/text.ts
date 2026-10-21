@@ -570,11 +570,15 @@ export interface RegionLabelOpts {
   /** ids of bets that are not working */
   offIds?: ReadonlySet<string>;
   disabled?: boolean;
+  /** dimmed because the rules don't offer it (crapless: no don't side), not because of the lesson */
+  notOffered?: boolean;
 }
 
 export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): string {
   const parts = [region.label + '.'];
-  if (region.sublabel) parts.push(region.sublabel.replace(/\.?$/, '') + '.');
+  // a "not offered" sublabel would repeat the reason given at the end
+  if (region.sublabel && !(opts.notOffered && /not offered/i.test(region.sublabel)))
+    parts.push(region.sublabel.replace(/\.?$/, '') + '.');
   const bets = opts.bets ?? [];
   if (bets.length) {
     const desc = bets.map((b) => {
@@ -593,7 +597,8 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   } else {
     parts.push('No bet.');
   }
-  if (opts.disabled) parts.push('Not available in this lesson.');
+  if (opts.notOffered) parts.push('Not offered on crapless craps.');
+  else if (opts.disabled) parts.push('Not available in this lesson.');
   return parts.join(' ');
 }
 

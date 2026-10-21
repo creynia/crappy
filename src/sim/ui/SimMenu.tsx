@@ -76,6 +76,7 @@ export function SimMenu({
           <option value="field-3x-12">Field pays 3x on 12</option>
           <option value="odds-10x">10x odds</option>
           <option value="odds-100x">100x odds</option>
+          <option value="crapless">Crapless craps</option>
           <option value="custom">Custom…</option>
         </select>
       </label>

@@ -22,6 +22,8 @@ export interface TableProps {
   offBetIds?: ReadonlySet<string>;
   /** regions dimmed to 40% (scene allowedBets); they stay focusable and announce why */
   disabledRegions?: ReadonlySet<RegionId>;
+  /** the subset of disabledRegions the rules don't offer (announced as "not offered", not "this lesson") */
+  unofferedRegions?: ReadonlySet<RegionId>;
   highlightedBets?: readonly BetTypeId[];
   /** the odds nudge: outline the region of this flat bet type (static under reduced motion) */
   oddsSpotType?: BetTypeId;
@@ -149,6 +151,7 @@ export function Table({
   point,
   offBetIds,
   disabledRegions,
+  unofferedRegions,
   highlightedBets,
   oddsSpotType,
   fieldPays = { 2: 2, 12: 2 },
@@ -194,7 +197,7 @@ export function Table({
   );
   const { w, h } = layout.viewBox;
   const hasPuck = layout.puckRadius > 0;
-  const puckPos = point ? layout.puck[point] : layout.puck.off;
+  const puckPos = point ? (layout.puck[point] ?? layout.puck.off) : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
   const placed = useMemo(
     () => placeCallouts(callouts ?? [], layout, feltId),
@@ -283,7 +286,12 @@ export function Table({
               role="button"
               tabindex={0}
               data-region={region.id}
-              aria-label={regionAriaLabel(region, { bets: rbets, offIds, disabled })}
+              aria-label={regionAriaLabel(region, {
+                bets: rbets,
+                offIds,
+                disabled,
+                notOffered: unofferedRegions?.has(region.id) ?? false,
+              })}
               aria-disabled={disabled || undefined}
               aria-describedby={
                 placed

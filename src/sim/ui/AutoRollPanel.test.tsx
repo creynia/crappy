@@ -145,6 +145,40 @@ describe('AutoRollPanel', () => {
     );
   });
 
+  it("crapless rules: don't-side strategies are disabled and labelled", async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel rules="crapless" initialSeed={1} />, el);
+    const opt = (id: string) =>
+      el.querySelector<HTMLOptionElement>(`select[aria-label="Strategy"] option[value="${id}"]`)!;
+    expect(opt('dont-pass-max-lay').disabled).toBe(true);
+    expect(opt('dont-pass-max-lay').textContent).toContain('(not on crapless)');
+    expect(opt('pass-max-odds').disabled).toBe(false);
+    const std = document.createElement('div');
+    render(<AutoRollPanel rules="standard-vegas" initialSeed={1} />, std);
+    expect(
+      std.querySelector<HTMLOptionElement>('option[value="dont-pass-max-lay"]')!.disabled,
+    ).toBe(false);
+    // pick Don't Pass on standard rules, then switch the panel's Rules to crapless: Run is disabled
+    const sel = std.querySelector<HTMLSelectElement>('select[aria-label="Strategy"]')!;
+    await act(async () => {
+      sel.value = 'dont-pass-max-lay';
+      sel.dispatchEvent(new Event('change'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const run = std.querySelector<HTMLButtonElement>('[data-testid="auto-roll-run"]')!;
+    expect(run.disabled).toBe(false);
+    const rulesSel = [...std.querySelectorAll<HTMLSelectElement>('select')].find((x) =>
+      [...x.options].some((o) => o.value === 'crapless'),
+    )!;
+    await act(async () => {
+      rulesSel.value = 'crapless';
+      rulesSel.dispatchEvent(new Event('change'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(run.disabled).toBe(true);
+    expect(std.textContent).toContain("Crapless craps has no don't side");
+  });
+
   it('"% of money bet" toggle swaps in the edge chart with axis labels and a summary', async () => {
     const el = document.createElement('div');
     render(<AutoRollPanel initialSeed={7} config={{ rollOptions: [100], sessions: [1] }} />, el);

@@ -128,7 +128,8 @@ export interface SessionResult {
   actualLoss: Cents;
   /** Count of each dice total, index 2..12 (0 and 1 unused). Used by the totals histogram. */
   totals: Int32Array;
-  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss';
+  /** 'unavailable': the strategy bets something these rules do not offer (crapless: no don't side) */
+  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss' | 'unavailable';
   maxDrawdown: Cents;
   peakEquity: Cents;
   bustedAtRoll: number | null;
@@ -175,6 +176,8 @@ export interface StrategyMetrics {
   avgAction: number;
   /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
   approximate?: boolean;
+  /** True when the rules don't offer a bet the strategy makes (crapless: no don't side): no edge to show. */
+  unavailable?: boolean;
 }
 
 /** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */

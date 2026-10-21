@@ -4,7 +4,7 @@ import { rollDice, seedRng } from './rng';
 import { resolveRoll } from './resolve';
 import { findMergeTarget, findParent, oddsPoint, validateAction } from './validate';
 import { isWorking } from './working';
-import { POINT_NUMBERS } from './types';
+import { pointsFor } from './rules';
 import type {
   Action,
   ApplyResult,
@@ -161,7 +161,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       betPoint = oddsPoint(state, parent);
     } else if (init.type === 'come' || init.type === 'dont-come') {
       betPoint = init.point ?? null;
-      if (betPoint !== null && !POINT_NUMBERS.includes(betPoint))
+      if (betPoint !== null && !pointsFor(rules).includes(betPoint))
         throw new Error(`createGame: invalid point ${String(betPoint)} for ${init.type}`);
     } else if (init.point !== undefined) {
       throw new Error(`createGame: ${init.type} cannot have a point`);

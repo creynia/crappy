@@ -1,3 +1,4 @@
+import { pointsFor, resolveRules } from '../engine/rules';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { applyAction, createGame } from '../engine';
@@ -325,5 +326,15 @@ describe('review round: hop bets, working flags, limits and the RNG position', (
     expect(text).toContain('(+3 more)');
     expect(text.length).toBeLessThan(5 * 42 + 60);
     expect(describeSkipped(['point "7"'])).toBe('Skipped from the link: point "7".');
+  });
+
+  it('crapless links keep points 2, 3, 11 and 12 and come bets on them (I036)', () => {
+    expect(parseBets('come@3:5,come-odds@3:10').bets).toEqual([]);
+    const p = parseBets('come@3:5,come-odds@3:10', pointsFor(resolveRules('crapless')));
+    expect(p.skipped).toEqual([]);
+    expect(p.bets.map((b) => [b.type, b.point])).toEqual([
+      ['come', 3],
+      ['come-odds', undefined],
+    ]);
   });
 });

@@ -1,4 +1,6 @@
+import type { RulesVariant } from '../../engine/types';
 import { centerLayout } from './center';
+import { craplessLandscapeLayout, craplessPortraitLayout } from './crapless';
 import { hopSlot } from './hopSlots';
 import { landscapeLayout } from './landscape';
 import { portraitLayout } from './portrait';
@@ -6,6 +8,13 @@ import type { Point2, RegionDef, RegionId, TableLayout } from './types';
 
 export * from './types';
 export { portraitLayout, landscapeLayout, centerLayout };
+export { craplessPortraitLayout, craplessLandscapeLayout };
+
+/** The main felt for an orientation and rules variant (crapless adds the 2, 3, 11 and 12 boxes). */
+export function feltLayout(landscape: boolean, variant: RulesVariant = 'standard'): TableLayout {
+  if (variant === 'crapless') return landscape ? craplessLandscapeLayout : craplessPortraitLayout;
+  return landscape ? landscapeLayout : portraitLayout;
+}
 
 export function layoutFor(kind: TableLayout['id']): TableLayout {
   return kind === 'portrait'

@@ -463,9 +463,10 @@ export function Simulator(props: SimulatorInternalProps) {
       hidden={winShown}
     />
   );
-  const status = (compact: boolean) => (
+  const status = (compact: boolean, rowExtra?: unknown) => (
     <StatusBar
       {...(compact ? { compact } : {})}
+      {...(rowExtra ? { rowExtra } : {})}
       bankroll={game.bankroll}
       onTable={onTable}
       session={session}
@@ -511,8 +512,7 @@ export function Simulator(props: SimulatorInternalProps) {
         <div class="sim-felt">
           {!landscape ? (
             <div class="sim-status-wrap sim-status-wrap-cost">
-              {status(false)}
-              <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
+              {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
             </div>
           ) : null}
           <div class="sim-felt-body">

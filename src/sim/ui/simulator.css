@@ -656,13 +656,15 @@
 
 /* expected-cost toggle: a compact 44x44 control over the status line's top-right corner.
    The status text reserves that width, so nothing is covered or clipped and the line keeps its height. */
-.sim-status-wrap-cost > .sim-status > .sim-status-money {
+.sim-status-wrap-cost > .sim-status > .sim-status-row {
+  position: relative;
   padding-right: 48px;
 }
-.sim-status-wrap > .sim-cost-toggle {
+.sim-status-wrap-cost .sim-status-row > .sim-cost-toggle {
   position: absolute;
-  top: 0;
+  top: 50%;
   right: 0;
+  transform: translateY(-50%);
   width: 44px;
   height: 44px;
   min-height: 44px;

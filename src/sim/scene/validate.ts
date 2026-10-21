@@ -511,6 +511,7 @@ export function validateScene(
         'stopLoss',
         'bankroll',
         'sweep',
+        'lab',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -578,6 +579,7 @@ export function validateScene(
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');
         else a.compare.forEach((x, i) => c.strategySpec(`autoRoll.compare[${i}]`, x));
       }
+      if (a.lab !== undefined && a.lab !== 'streaks') c.err('autoRoll.lab', 'must be "streaks"');
       if (a.sweep !== undefined) {
         const w = a.sweep;
         if (!isObj(w)) c.err('autoRoll.sweep', 'must be an object');

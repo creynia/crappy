@@ -119,7 +119,7 @@ export function StepPanel(p: StepPanelProps) {
   const [mathOpen, setMathOpen] = useState(false);
   useEffect(() => setMathOpen(false), [p.step.id]);
   return (
-    <section class="sim-step" aria-label="Lesson step" data-step={p.step.id}>
+    <section class="sim-step" aria-label="Lesson step" data-step={p.step.id} tabIndex={-1}>
       <div class="sim-step-count">
         {p.done ? 'Done' : `Step ${p.index + 1} of ${p.total}`}
         {p.onReplay ? (

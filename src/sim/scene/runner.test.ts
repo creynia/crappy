@@ -646,7 +646,11 @@ describe('demo scripts (SceneStep.play)', () => {
       ...demo,
       steps: [
         first,
-        { ...second, id: 'b', setup: { replaceBets: true, phase: 'come-out', bets: [] } },
+        {
+          ...second,
+          id: 'b',
+          setup: { replaceBets: true, phase: 'come-out', bankroll: 50_000, bets: [] },
+        },
       ],
     });
     // come bets are illegal on a come-out: the staged table is what the script is checked against
@@ -662,6 +666,7 @@ describe('demo scripts (SceneStep.play)', () => {
             replaceBets: true,
             phase: 'point',
             point: 6,
+            bankroll: 50_000,
             bets: [{ type: 'pass-line', amount: 1000 }],
           },
         },

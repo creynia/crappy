@@ -88,7 +88,7 @@ Rules:
   `allowedActions` gate, are kept out of the roll log, and a refused action stops the demo.
   Rules, checked by `validateScene`: the step must complete with `acknowledged`; every frame is
   replayed against the engine and an illegal one is reported with the step id; a demo step after the
-  first must have `setup` with `replaceBets: true` and a `phase` (plus bets as needed), because it
+  first must have `setup` with `replaceBets: true`, a `phase` (and `point` when it is `point`) and a `bankroll` (plus bets as needed), because it
   starts from wherever the learner left the table and the script is checked against that staged
   table (scene start plus the step's `setup`).
 - Step `text`, `hint` and `math` can hold live values, shown from the table as the learner plays.

@@ -651,10 +651,18 @@ export function validateScene(
         `step "${st.id}": a demo step must complete with acknowledged`,
       );
     // later steps start from wherever the learner left the table, so the demo must stage its own
-    if (i > 0 && !(st.setup?.replaceBets === true && st.setup.phase !== undefined))
+    if (
+      i > 0 &&
+      !(
+        st.setup?.replaceBets === true &&
+        st.setup.phase !== undefined &&
+        (st.setup.phase === 'come-out' || st.setup.point !== undefined) &&
+        st.setup.bankroll !== undefined
+      )
+    )
       c.err(
         `steps[${i}].setup`,
-        `step "${st.id}": a demo step after the first needs setup with replaceBets: true and a phase, so it starts from a known table`,
+        `step "${st.id}": a demo step after the first needs setup with replaceBets: true, a phase (and point on a point), and a bankroll, so it starts from a known table`,
       );
     let stage;
     try {

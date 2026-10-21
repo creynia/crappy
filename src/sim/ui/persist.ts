@@ -12,6 +12,8 @@ export interface PersistedSandbox {
   chip?: number;
   /** last few roll-log entries */
   log?: RollLogEntry[];
+  /** rolls the seed has produced so far (I071): a share after a reload keeps its place */
+  rngSkip?: number;
 }
 
 const storageKey = (key: string) => `crappy:sim:${key}:v1`;

@@ -62,6 +62,8 @@ export interface SessionResult {
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss
+  /** Cumulative total wagered (cents) after each roll; [0] = 0. Same length as `equity`. */
+  wagered: Float64Array;
   finalEquity: Cents;
   totalWagered: Cents;
   expectedLoss: number;

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
-import { afterEach, describe, expect, it } from 'vitest';
-import { Simulator } from '../index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
 import { askFeedback } from './StepPanel';
 import { buildEvFacts } from './text';
@@ -124,6 +124,26 @@ describe('auto-roll compare scene', () => {
     const heads = container.querySelectorAll('[data-testid="auto-roll-summary"] thead th');
     expect(heads).toHaveLength(4); // label + 3 strategies
     await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true));
+  });
+});
+
+describe('challenge scene panel (I030)', () => {
+  it('has no Restart while the challenge runs and is labelled Challenge', () => {
+    render(<Simulator scene={challengeScene({ seed: 1, rolls: 3 })} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Challenge' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+  });
+  it('a lesson scene still offers Restart under the default label', () => {
+    const lesson: SceneConfig = {
+      id: 'l',
+      version: 1,
+      steps: [{ id: 's', text: 'Roll once.', completeWhen: { rolls: 1 } }],
+    };
+    render(<Simulator scene={lesson} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Lesson step' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeTruthy();
   });
 });
 
@@ -253,6 +273,70 @@ describe('sandbox panel sheet (I064)', () => {
     expect(document.activeElement).toBe(tab);
   });
 
+  it('Tab from the revealed heading stays inside the sheet, and Escape works after tabbing out', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const dialog = screen.getByRole('dialog');
+    const heading = dialog.querySelector<HTMLElement>('.sim-session-panel h3')!;
+    heading.tabIndex = -1;
+    heading.focus();
+    expect(document.activeElement).toBe(heading);
+    fireEvent.keyDown(heading, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.getAttribute('role')).not.toBe('dialog');
+    // focus that escaped (e.g. a mouse click on the table) is pulled back on the next Tab
+    const roll = screen.getByRole('button', { name: /^Roll/ });
+    roll.focus();
+    fireEvent.keyDown(roll, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    roll.focus();
+    fireEvent.keyDown(roll, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('tabs use roving tabindex and arrow keys', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const session = screen.getByRole('tab', { name: 'Session' });
+    const log = screen.getByRole('tab', { name: 'Log' });
+    expect(session.getAttribute('tabindex')).toBe('0');
+    expect(log.getAttribute('tabindex')).toBe('-1');
+    expect(session.getAttribute('aria-controls')).toBe(
+      screen.getByRole('tabpanel').getAttribute('id'),
+    );
+    fireEvent.keyDown(session, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'Log' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('dialog').querySelector('.sim-roll-log')).not.toBeNull();
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Table panels');
+  });
+
+  it('a short drag on the handle is not a tap: the sheet stays', () => {
+    // happy-dom reports landscape by default; the handle only exists on the portrait sheet
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (q: string) =>
+        ({
+          matches: false,
+          media: q,
+          addEventListener() {},
+          removeEventListener() {},
+        }) as unknown as MediaQueryList,
+    );
+    try {
+      openSandbox();
+    } finally {
+      mm.mockRestore();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const handle = screen.getByRole('button', { name: /Close panel \(drag/ });
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientY: 120, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientY: 120, pointerId: 1 });
+    fireEvent.click(handle);
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+    fireEvent.click(handle); // a plain tap closes
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('traps Tab inside the sheet and keeps the dice reachable', () => {
     openSandbox();
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
@@ -267,5 +351,60 @@ describe('sandbox panel sheet (I064)', () => {
     expect(screen.getByRole('button', { name: 'Throw the dice' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('share link RNG position across Reset and reload (I071 review)', () => {
+  const shared: string[] = [];
+  beforeEach(() => {
+    shared.length = 0;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t: string) => Promise.resolve(void shared.push(t)) },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    localStorage.clear();
+  });
+  const share = async () => {
+    // the Menu tab toggles: open the menu only when it is closed
+    if (!screen.queryByRole('button', { name: 'Share table' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share table' }));
+    await waitFor(() => expect(shared.length).toBeGreaterThan(0));
+    return shared[shared.length - 1]!;
+  };
+  const skipOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('skip');
+  const seedOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('seed');
+
+  it('Reset bankroll starts a fresh seed with nothing drawn: no stale skip', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    render(<Simulator mode="sandbox" initialSettings={instant} />);
+    const first = await share();
+    expect(seedOf(first)).toBe('7');
+    expect(skipOf(first)).toBe('5');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset bankroll' }));
+    const after = await share();
+    expect(seedOf(after)).not.toBe('7');
+    expect(skipOf(after)).toBeNull();
+    location.hash = '';
+  });
+
+  it('a reload restores the saved sandbox with its draw count', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    const key = 'crappy:test-sandbox';
+    const first = render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(screen.getByTestId('roll-announcer').textContent).not.toBe(''));
+    expect(skipOf(await share())).toBe('6');
+    first.unmount();
+    // the next visit has no link params: the saved table comes back, one roll in
+    location.hash = '#/play';
+    await waitFor(() => expect(localStorage.length).toBeGreaterThan(0));
+    render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    expect(skipOf(await share())).toBe('6');
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(skipOf(shared[shared.length - 1]!)).toBe('6'));
+    expect(skipOf(await share())).toBe('7');
+    location.hash = '';
   });
 });

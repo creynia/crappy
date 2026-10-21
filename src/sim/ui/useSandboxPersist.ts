@@ -13,6 +13,8 @@ export function useSandboxPersist(
   game: GameState,
   chip: Cents,
   log: readonly RollLogEntry[] = [],
+  /** rolls the seed has produced so far (see shareLink.rngDraws) */
+  rngSkip = 0,
 ) {
   useEffect(() => {
     if (!persistKey) return;
@@ -24,6 +26,7 @@ export function useSandboxPersist(
       presetId: String(typeof rules === 'string' ? rules : 'custom'),
       chip,
       log: log.slice(-LOG_PERSIST),
+      rngSkip,
     });
-  }, [game, chip, log, persistKey, scene.bankroll, scene.rules, settings.rulesPreset]);
+  }, [game, chip, log, rngSkip, persistKey, scene.bankroll, scene.rules, settings.rulesPreset]);
 }

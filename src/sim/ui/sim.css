@@ -367,6 +367,16 @@
   top: 0;
   bottom: auto;
   gap: 2px;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-land .sim-toast > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .sim-land .sim-toast {
   font-size: 0.75rem;
@@ -424,11 +434,16 @@
   touch-action: none;
 }
 .sim-sheet-sheet .sim-sheet.sim-panel-sheet {
-  max-height: 82vh;
+  max-height: 62vh;
+}
+/* landscape: the panel sits over the table so the rail (status, Roll, tabs) stays in reach */
+.sim-sheet-panel.sim-panel-backdrop {
+  justify-content: flex-start;
 }
 .sim-sheet-panel .sim-sheet.sim-panel-sheet {
-  width: min(420px, 52vw);
-  border-left-color: var(--sim-border);
+  width: min(380px, 48vw);
+  border-left: 0;
+  border-right: 6px solid var(--sim-border);
 }
 .sim-panel-sheet.is-dragging {
   transition: none;
@@ -1195,4 +1210,37 @@
 .sim-luck-ticks span {
   position: absolute;
   transform: translateX(-50%);
+}
+
+/* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
+.sim-calls {
+  pointer-events: none;
+}
+.sim-stack-target {
+  fill: transparent;
+}
+.sim-call rect {
+  fill: #fff;
+  stroke: #1d2b22;
+  stroke-width: 2;
+}
+.sim-call text {
+  fill: #1d2b22;
+  font-weight: 700;
+}
+.sim-call.is-selected rect {
+  fill: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-call.is-right rect {
+  fill: var(--sim-win, #2f9e44);
+  stroke: #fff;
+}
+.sim-call.is-wrong rect {
+  fill: var(--sim-loss, #c92a2a);
+  stroke: #fff;
+}
+.sim-call.is-right text,
+.sim-call.is-wrong text {
+  fill: #fff;
 }

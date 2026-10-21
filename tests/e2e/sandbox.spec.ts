@@ -122,11 +122,15 @@ test.describe('sandbox', () => {
     await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
     await guard.check('rules-editor-open');
     // every select in the editor is a 44px tap target, even inside the menu
+    // (43.5 allows for sub-pixel rounding: a 44px control can measure 43.999969)
     for (const sel of await form.locator('select').all())
-      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
     await form.getByRole('button', { name: /^Apply/ }).click();
     await expect(form).toHaveCount(0);
     await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    // the panel sheet sits over the table in landscape: close it before betting (I064)
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
     expect(await buy4()).toContain('4.76%');
   });
 
@@ -138,6 +142,25 @@ test.describe('sandbox', () => {
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
     await guard.check('auto-roll-done');
+  });
+
+  test('strategy table: sort, run it, no horizontal overflow', async ({ page }) => {
+    await page.goto('/#/play?speed=fast');
+    await page.getByRole('button', { name: 'Auto-roll' }).click();
+    const panel = page.locator('.sim-auto');
+    await panel.getByRole('button', { name: 'Compare all' }).click();
+    const table = panel.getByTestId('strategy-table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('tbody tr').first()).toBeVisible();
+    const fits = await page.evaluate(
+      'document.documentElement.scrollWidth <= document.documentElement.clientWidth',
+    );
+    expect(fits).toBe(true);
+    if (process.env.SHOT)
+      await page.screenshot({ path: `${process.env.SHOT}-${test.info().project.name}.png` });
+    await table.getByRole('button', { name: /^Run it: Iron Cross/ }).click();
+    await expect(table).toHaveCount(0);
+    await expect(panel.getByRole('combobox', { name: 'Strategy' })).toHaveValue('iron-cross');
   });
 
   test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
@@ -200,6 +223,12 @@ test.describe('sandbox', () => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    // the table saves from an effect after render: wait for the bet on screen AND in storage
+    // before leaving, or a loaded CI machine can reload before the save
+    await expect(page.locator('.sim-status-money')).toContainText('On table $5');
+    await page.waitForFunction(
+      `Object.keys(localStorage).some((k) => /^crappy:sim:.*:v1$/.test(k) && (localStorage.getItem(k) || '').includes('"pass-line"'))`,
+    );
     await page.goto('/');
     await page.goto(url());
     await expect(page.locator('.sim-status-money')).toContainText('On table $5');
@@ -378,13 +407,24 @@ test.describe('sandbox flows', () => {
       await page.locator('[data-region="pass"]').click();
       const sheet = page.getByRole('dialog');
       await expect(sheet).toContainText('Pass line');
-      // wait out the slide-in transition before measuring
+      // wait out the slide-in transition before measuring: every animation finished and the box
+      // (position AND size) unchanged between two polls
       let box = (await sheet.boundingBox())!;
       await expect
         .poll(async () => {
           const prev = box;
           box = (await sheet.boundingBox())!;
-          return box.x === prev.x && box.y === prev.y && box.width === prev.width;
+          const settled = await page.evaluate<boolean>(
+            '(() => { const el = document.querySelector("[role=dialog]"); return !el || el.getAnimations({ subtree: true }).every((a) => a.playState === "finished"); })()',
+          );
+
+          return (
+            settled &&
+            box.x === prev.x &&
+            box.y === prev.y &&
+            box.width === prev.width &&
+            box.height === prev.height
+          );
         })
         .toBe(true);
       expect(box.x).toBeGreaterThanOrEqual(0);
@@ -489,6 +529,16 @@ test.describe('sandbox flows', () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.locator('.sim-session-panel')).toBeVisible();
     await expect(sheet.locator('.sim-session-panel h3').first()).toBeFocused();
+    // Tab from the heading stays in the sheet; Escape works even after focus wandered outside
+    await page.keyboard.press('Tab');
+    await expect(sheet.locator(':focus')).toHaveCount(1);
+    await page.locator('[data-region="field"]').focus();
+    await page.keyboard.press('Tab');
+    await expect(sheet.locator(':focus')).toHaveCount(1);
+    await page.locator('[data-region="field"]').focus();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await sessionTab.click();
     await sheet.getByRole('tab', { name: 'Menu' }).click();
     await expect(sheet.locator('.sim-menu')).toBeVisible();
     await expect(sheet.locator('.sim-session-panel')).toHaveCount(0);
@@ -518,6 +568,69 @@ test.describe('sandbox flows', () => {
     await page.mouse.move(x, y + 140, { steps: 4 });
     await page.mouse.up();
     await expect(sheet).toHaveCount(0);
+  });
+
+  test('share link: the menu copies a link that reproduces the layout and the next rolls', async ({
+    page,
+  }) => {
+    // capture the share text instead of the system share sheet / clipboard
+    await page.addInitScript(() => {
+      const w = globalThis as unknown as { __shared: string[] };
+      w.__shared = [];
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: (t: string) => Promise.resolve(void w.__shared.push(t)) },
+        configurable: true,
+      });
+    });
+    await page.goto(url('seed=11&' + dice('4-4')));
+    await place(page, 'pass');
+    await roll(page); // point 8 (forced), then the seed takes over
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await place(page, 'come');
+    await menu(page).click();
+    await page.getByRole('button', { name: 'Share table' }).click();
+    await expect(page.locator('.sim-toast').last()).toContainText('Link copied');
+    const shared = await page.evaluate(
+      () => (globalThis as unknown as { __shared: string[] }).__shared,
+    );
+    expect(shared[0]).toMatch(
+      /#\/play\?seed=11&rules=standard-vegas&bankroll=500&point=8&bets=pass-line:5,come:5$/,
+    );
+    await page.getByRole('button', { name: 'Copy as scene YAML' }).click();
+    const yaml = (
+      await page.evaluate(() => (globalThis as unknown as { __shared: string[] }).__shared)
+    )[1]!;
+    expect(yaml).toContain('point: 8');
+    expect(yaml).toContain('type: come, amount: 500');
+    // the original rolls on; the link opened elsewhere rolls the same dice
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
+    await roll(page);
+    // the live announcer keeps the last roll's text in both orientations
+    const announcer = page.getByTestId('roll-announcer');
+    await expect(announcer).not.toHaveText('');
+    const total = await announcer.innerText();
+    await page.goto('/');
+    await page.goto(shared[0]!.slice(shared[0]!.indexOf('#')));
+    await expect(bank(page)).resolves.toBe('$490');
+    await expect(page.locator('[data-stack]')).toHaveCount(2);
+    await expect(page.locator('.sim-puck.is-on')).toHaveCount(1);
+    await roll(page);
+    await expect(page.getByTestId('roll-announcer')).toHaveText(total);
+  });
+
+  test('share link: malformed parts are skipped with a toast', async ({ page }) => {
+    await page.goto(
+      url('seed=1&bankroll=200&point=9&bets=pass-line:5,hard-8:1,come-odds@6:10,junk:3'),
+    );
+    await expect(page.locator('.sim-toast').last()).toContainText('Skipped from the link');
+    await expect(page.locator('.sim-toast').last()).toContainText('junk');
+    await expect(page.locator('.sim-toast').last()).toContainText('come-odds');
+    await expect(bank(page)).resolves.toBe('$194');
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // pass line; hard 8 sits on the center panel
+    await expect(page.locator('.sim-center-ind')).toContainText('Center bets: $1');
+    await expect(page.locator('.sim-puck.is-on')).toHaveCount(1);
   });
 
   test('tapping the table skips the roll animation', async ({ page }) => {
@@ -583,9 +696,20 @@ test.describe('sandbox flows', () => {
     // the sheet covers the tab row: switch panels with the sheet's own tabs (I064)
     await page.getByRole('tab', { name: 'Auto-roll' }).click();
     const auto = page.locator('.sim-autoroll');
-    // inside the sheet the panel scrolls within its own body; the tall auto-roll section cannot
-    // show half of itself in a 390px-high landscape viewport, but its top is in view and focused
-    await expect(auto).toBeInViewport();
+    // What the reveal guarantees is where the panel starts, not how much of it fits: a tall panel can
+    // never be half in view. Its top sits at the top edge of the sheet body it scrolls in (I064;
+    // scroll-margin is 8px), its first control is fully visible and hit-testable, and the panel has
+    // focus.
     await expect(auto).toBeFocused();
+    const body = page.locator('.sim-panel-body');
+    await expect
+      .poll(async () => {
+        const y = (await auto.boundingBox())!.y;
+        const top = (await body.boundingBox())!.y;
+        return y >= top - 1 && y <= top + 24;
+      })
+      .toBe(true);
+    // the panel's first control (strategy picker, or a view toggle above it)
+    await clear('.sim-autoroll :is(select, button, input)');
   });
 });

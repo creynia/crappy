@@ -244,6 +244,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       <SweepPanel
         config={config.sweep}
         rules={props.rules}
+        bankroll={bankroll}
         initialSeed={props.initialSeed}
         unit={config.defaultStrategy?.unit}
       />

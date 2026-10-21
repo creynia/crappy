@@ -23,7 +23,7 @@ const pct = (x: number): string => `${(x * 100).toFixed(x < 0.01 ? 3 : 2)}%`;
 export function SweepPanel(props: SweepPanelProps) {
   const { config, rolls = 100, sessions = 100 } = props;
   const unit = props.unit ?? 1000;
-  const bankroll = props.bankroll ?? 100_000;
+  const bankroll = props.bankroll ?? 1_000_000;
   const [seed, setSeed] = useState(props.initialSeed ?? 1);
   const [rows, setRows] = useState<SweepRow[] | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -61,7 +61,7 @@ export function SweepPanel(props: SweepPanelProps) {
 
   const running = progress !== null;
   return (
-    <section class="sim-sweep" aria-label="Odds sweep" data-testid="sweep-panel">
+    <section class="sim-autoroll sim-sweep" aria-label="Odds sweep" data-testid="sweep-panel">
       <p class="sim-sweep-intro">
         {sessions} sessions of {rolls} rolls at a {fmtMoney(unit)} line bet, the same dice for every
         row. Only the odds change.
@@ -83,6 +83,7 @@ export function SweepPanel(props: SweepPanelProps) {
         {rows && (
           <button
             type="button"
+            class="sim-ar-btn"
             data-testid="sweep-reseed"
             disabled={running}
             onClick={() => {
@@ -107,8 +108,8 @@ export function SweepPanel(props: SweepPanelProps) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={String(r.multiple)} data-testid="sweep-row">
+            {rows.map((r, i) => (
+              <tr key={i} data-testid="sweep-row">
                 <th scope="row">{label(r.multiple)}</th>
                 <td>{pct(r.edgeOnAction)}</td>
                 <td>{fmtMoney(Math.round(r.expectedLossCents), { exact: true })}</td>
@@ -119,6 +120,12 @@ export function SweepPanel(props: SweepPanelProps) {
             ))}
           </tbody>
         </table>
+      )}
+      {rows && (
+        <p class="sim-sweep-intro">
+          A session that busts stops early, so with a small bankroll the bust rate and the average
+          loss can look larger than the edge suggests. Odds themselves cost nothing.
+        </p>
       )}
     </section>
   );

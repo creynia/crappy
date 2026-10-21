@@ -266,9 +266,12 @@ export async function simulateSweep(
   for (let i = 0; i < n; i++) {
     const m = cfg.oddsMultiples[i]!;
     let rules = base;
-    if (m !== 'max' && Object.values(base.maxOdds).some((cap) => cap < m)) {
+    if (
+      m !== 'max' &&
+      [...Object.values(base.maxOdds), ...Object.values(base.maxLayOdds)].some((cap) => cap < m)
+    ) {
       const uniform = { 4: m, 5: m, 6: m, 8: m, 9: m, 10: m };
-      rules = resolveRules({ ...base, maxOdds: uniform });
+      rules = resolveRules({ ...base, maxOdds: uniform, maxLayOdds: uniform });
     }
     const spec =
       m === 'max'

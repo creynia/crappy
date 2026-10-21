@@ -103,6 +103,34 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
+  test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
+    await page.goto(url());
+    const buy4 = async () => {
+      await page.locator('[data-region="box-4"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('radio', { name: /^Buy/ }).click();
+      const text = await sheet.locator('.sim-headline').innerText();
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      return text;
+    };
+    expect(await buy4()).toContain('1.67%');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const menu = page.locator('.sim-menu');
+    await menu.getByLabel('Rules').selectOption('custom');
+    const form = page.locator('form.sim-rules');
+    await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
+    await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    // (43.5 allows for sub-pixel rounding: a 44px control can measure 43.999969)
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
+    await form.getByRole('button', { name: /^Apply/ }).click();
+    await expect(form).toHaveCount(0);
+    await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    expect(await buy4()).toContain('4.76%');
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
@@ -173,6 +201,12 @@ test.describe('sandbox', () => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    // the table saves from an effect after render: wait for the bet on screen AND in storage
+    // before leaving, or a loaded CI machine can reload before the save
+    await expect(page.locator('.sim-status-money')).toContainText('On table $5');
+    await page.waitForFunction(
+      `Object.keys(localStorage).some((k) => /^crappy:sim:.*:v1$/.test(k) && (localStorage.getItem(k) || '').includes('"pass-line"'))`,
+    );
     await page.goto('/');
     await page.goto(url());
     await expect(page.locator('.sim-status-money')).toContainText('On table $5');
@@ -351,13 +385,24 @@ test.describe('sandbox flows', () => {
       await page.locator('[data-region="pass"]').click();
       const sheet = page.getByRole('dialog');
       await expect(sheet).toContainText('Pass line');
-      // wait out the slide-in transition before measuring
+      // wait out the slide-in transition before measuring: every animation finished and the box
+      // (position AND size) unchanged between two polls
       let box = (await sheet.boundingBox())!;
       await expect
         .poll(async () => {
           const prev = box;
           box = (await sheet.boundingBox())!;
-          return box.x === prev.x && box.y === prev.y && box.width === prev.width;
+          const settled = await page.evaluate<boolean>(
+            '(() => { const el = document.querySelector("[role=dialog]"); return !el || el.getAnimations({ subtree: true }).every((a) => a.playState === "finished"); })()',
+          );
+
+          return (
+            settled &&
+            box.x === prev.x &&
+            box.y === prev.y &&
+            box.width === prev.width &&
+            box.height === prev.height
+          );
         })
         .toBe(true);
       expect(box.x).toBeGreaterThanOrEqual(0);
@@ -468,5 +513,64 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
+  });
+
+  test('roll log keeps every roll and a history pill opens it at that roll', async ({ page }) => {
+    await page.goto('/#/play?speed=instant&seed=1&' + dice('3-3', '2-2', '3-4'));
+    await place(page, 'pass');
+    await roll(page); // point 6
+    await roll(page); // 4: nothing
+    await roll(page); // 7: seven out
+    await page.getByRole('button', { name: 'Log' }).click();
+    const items = page.getByRole('list', { name: /Rolls, newest first/ }).getByRole('listitem');
+    await expect(items).toHaveCount(3);
+    await expect(items.first()).toContainText('Seven out.');
+    await expect(items.last()).toContainText('Point is 6.');
+    await page.getByRole('button', { name: 'Losses' }).click();
+    await expect(items).toHaveCount(1);
+    // tapping the oldest pill in the status strip focuses that roll (the compact landscape rail has no strip)
+    await page.getByRole('button', { name: 'All' }).click();
+    const pill = page.locator('.sim-history [data-roll="1"]');
+    if (await pill.isVisible()) {
+      await pill.click();
+      await expect(page.locator('.sim-log-entry.is-focus')).toContainText('Point is 6.');
+    }
+  });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await clear('.sim-session-panel h3');
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    // What the reveal guarantees is where the panel starts, not how much of it fits: a tall panel can
+    // never be half in view. Its top sits at the top edge (scroll-margin is 8px), its first control is
+    // fully visible and hit-testable, and the panel has focus.
+    await expect(auto).toBeFocused();
+    await expect
+      .poll(async () => {
+        const y = (await auto.boundingBox())!.y;
+        return y >= 0 && y <= 24;
+      })
+      .toBe(true);
+    // the panel's first control (strategy picker, or a view toggle above it)
+    await clear('.sim-autoroll :is(select, button, input)');
   });
 });

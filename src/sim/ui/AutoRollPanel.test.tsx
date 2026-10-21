@@ -96,8 +96,8 @@ describe('AutoRollPanel', () => {
     await click(group, 'button:nth-of-type(2)');
     await click(el, '[data-testid="auto-roll-run"]');
     expect(spies.simulateSession!.mock.calls.at(-1)![0]).toMatchObject({ stopWin: 5000 });
-    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain(
-      'Ended by',
+    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toMatch(
+      /Stopped: up \$\d|All 100 rolls/,
     );
   });
 

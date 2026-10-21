@@ -117,9 +117,9 @@ function endedByText(r: SessionResult, cfg: SessionConfig): string {
     case 'bust':
       return `Busted at roll ${r.bustedAtRoll ?? r.rollsPlayed}`;
     case 'stop-win':
-      return `Stopped: up ${money(cfg.stopWin ?? 0)} at roll ${r.rollsPlayed}`;
+      return `Stopped: up ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
     case 'stop-loss':
-      return `Stopped: down ${money(cfg.stopLoss ?? 0)} at roll ${r.rollsPlayed}`;
+      return `Stopped: down ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
     default:
       return `All ${r.rollsPlayed} rolls`;
   }
@@ -343,6 +343,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           )}
         </fieldset>
 
+        {fixedSpecs && (config?.stopWin !== undefined || config?.stopLoss !== undefined) ? (
+          <p class="sim-ar-desc">
+            Scene stop rules:{' '}
+            {[
+              config?.stopWin !== undefined ? `stop if up ${money(config.stopWin)}` : null,
+              config?.stopLoss !== undefined ? `stop if down ${money(config.stopLoss)}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            .
+          </p>
+        ) : null}
         {!fixedSpecs && (
           <>
             <div class="sim-ar-group" role="group" aria-label="Unit">
@@ -356,7 +368,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
             </div>
             <div class="sim-ar-group" role="group" aria-label="Stop when ahead by">
-              <span>Stop when ahead by</span>
+              <span>Stop if up</span>
               {STOP_OPTIONS.map((v) =>
                 button(
                   stopWin === v,
@@ -367,7 +379,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               )}
             </div>
             <div class="sim-ar-group" role="group" aria-label="Stop when behind by">
-              <span>Stop when behind by</span>
+              <span>Stop if down</span>
               {STOP_OPTIONS.map((v) =>
                 button(
                   stopLoss === v,
@@ -557,6 +569,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             ))}
           </tbody>
         </table>
+        {o.cfg.stopWin !== undefined || o.cfg.stopLoss !== undefined ? (
+          <p class="sim-ar-desc">
+            Stops don't change the edge; they only cut how many rolls you play.
+          </p>
+        ) : null}
       </>
     );
   }
@@ -568,13 +585,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
     // learner-facing cost rows come from the run's OWN expected loss, so they agree with the
     // "Expected loss" / "Expected final bankroll" rows (the analytic steady-layout figure is not shown)
+    // Per roll PLAYED: stopped sessions play fewer rolls, so divide by the rolls actually played.
     const lossPerRoll = (): number[] =>
       o.kind === 'single'
         ? o.results.map((r) => (r.rollsPlayed > 0 ? r.expectedLoss / r.rollsPlayed : 0))
-        : o.results.map((r) => {
-            const n = Math.max(1, r.expected.length - 1);
-            return (bankroll - r.expected[r.expected.length - 1]!) / n;
-          });
+        : o.results.map((r) => r.meanExpectedLoss / Math.max(1, r.meanRollsPlayed));
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
@@ -594,6 +609,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ['Biggest drop from a peak', rs.map((r) => money2(r.maxDrawdown))],
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
         ['Ended by', rs.map((r) => endedByText(r, o.cfg))],
+        ['Rolls played', rs.map((r) => String(r.rollsPlayed))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
         ['Rolls per $1 of expected loss', perDollar],
@@ -616,6 +632,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (o.cfg.stopLoss !== undefined)
       rows.push(['% ended by stop-loss', rs.map((r) => pct(r.stopLossRate))]);
     rows.push(
+      ['Average rolls played', rs.map((r) => r.meanRollsPlayed.toFixed(1))],
       ['Edge on action', edge],
       ['Rolls per $1 of expected loss', perDollar],
       [`Expected cost per ${rollsPerHour} rolls`, perHour],

@@ -69,6 +69,13 @@ export function PanelSheet(p: PanelSheetProps) {
   // Escape closes from anywhere.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const root = rootRef.current;
+      if (!root) return;
+      // a bet sheet opened over the panel owns the keys: its own Escape and Tab trap apply
+      const other = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].some(
+        (d) => d !== root && !root.contains(d),
+      );
+      if (other) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -76,8 +83,6 @@ export function PanelSheet(p: PanelSheetProps) {
         return;
       }
       if (e.key !== 'Tab') return;
-      const root = rootRef.current;
-      if (!root) return;
       const nodes = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
       if (!nodes.length) return;
       const first = nodes[0]!;

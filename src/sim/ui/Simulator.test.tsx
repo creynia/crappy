@@ -310,6 +310,37 @@ describe('sandbox panel sheet (I064)', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Table panels');
   });
 
+  it('arrow keys keep focus on the tab strip: switching a panel does not move focus', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const session = screen.getByRole('tab', { name: 'Session' });
+    session.focus();
+    fireEvent.keyDown(session, { key: 'ArrowRight' });
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(document.activeElement?.textContent).toBe('Log');
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(document.activeElement?.textContent).toBe('Menu');
+    expect(screen.getByRole('dialog').querySelector('.sim-menu')).not.toBeNull();
+  });
+
+  it('a bet sheet opened over the panel owns Escape and Tab', () => {
+    const { container } = openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    fireEvent.click(container.querySelector('[data-region="pass"]')!);
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(2);
+    const bet = dialogs.find((d) => d.textContent?.includes('house edge'))!;
+    const confirm = screen.getByRole('button', { name: 'Confirm' });
+    confirm.focus();
+    fireEvent.keyDown(confirm, { key: 'Tab' });
+    expect(bet.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(confirm, { key: 'Escape' });
+    // the bet sheet closed; the panel sheet is still open
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog').querySelector('.sim-session-panel')).not.toBeNull();
+  });
+
   it('a short drag on the handle is not a tap: the sheet stays', () => {
     // happy-dom reports landscape by default; the handle only exists on the portrait sheet
     const mm = vi.spyOn(window, 'matchMedia').mockImplementation(

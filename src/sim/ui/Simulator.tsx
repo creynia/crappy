@@ -108,10 +108,9 @@ export function Simulator(props: SimulatorInternalProps) {
     requestReveal(name);
     setPanels((p) => (sheetPanels ? { ...CLOSED, [name]: !p[name] } : { ...p, [name]: !p[name] }));
   };
-  const selectPanel = (name: PanelId) => {
-    requestReveal(name);
-    setPanels({ ...CLOSED, [name]: true });
-  };
+  // Switching with the sheet's own tab strip keeps focus on the tab (arrow keys keep working), so
+  // no reveal: the sheet is already in view.
+  const selectPanel = (name: PanelId) => setPanels({ ...CLOSED, [name]: true });
   const closePanels = () => setPanels(CLOSED);
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);

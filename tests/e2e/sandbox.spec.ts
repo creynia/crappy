@@ -698,9 +698,9 @@ test.describe('sandbox flows', () => {
     const auto = page.locator('.sim-autoroll');
     // What the reveal guarantees is where the panel starts, not how much of it fits: a tall panel can
     // never be half in view. Its top sits at the top edge of the sheet body it scrolls in (I064;
-    // scroll-margin is 8px), its first control is fully visible and hit-testable, and the panel has
-    // focus.
-    await expect(auto).toBeFocused();
+    // scroll-margin is 8px) and its first control is fully visible and hit-testable. Switching with
+    // the sheet's tab strip keeps focus on the tab so the arrow keys keep working.
+    await expect(page.getByRole('tab', { name: 'Auto-roll' })).toBeFocused();
     const body = page.locator('.sim-panel-body');
     await expect
       .poll(async () => {

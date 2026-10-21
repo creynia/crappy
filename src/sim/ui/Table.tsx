@@ -103,7 +103,7 @@ export function Table({
   );
   const { w, h } = layout.viewBox;
   const hasPuck = layout.puckRadius > 0;
-  const puckPos = point ? layout.puck[point] : layout.puck.off;
+  const puckPos = point ? (layout.puck[point] ?? layout.puck.off) : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
   const wonIds = new Set((wonBets ?? []).map((x) => x.bet.id));
 

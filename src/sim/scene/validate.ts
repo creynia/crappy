@@ -1,6 +1,7 @@
 import { isBetTypeId } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS } from '../engine/rules';
+import type { RulePresetId } from '../engine/types';
 import { listStrategies } from '../strategy/presets';
 import type { SceneConfig } from './types';
 
@@ -8,6 +9,7 @@ type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const isInt = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x);
 const POINTS = [4, 5, 6, 8, 9, 10];
+const CRAPLESS_POINTS = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
 const ACTION_TYPES = ['place-bet', 'set-amount', 'remove-bet', 'set-working', 'roll'];
 const EVENT_TYPES = [
   'bet-placed',
@@ -28,6 +30,7 @@ const EVENT_TYPES = [
 ];
 const RULE_KEYS = [
   'presetId',
+  'variant',
   'tableMin',
   'tableMax',
   'propMin',
@@ -44,6 +47,8 @@ const RULE_KEYS = [
 
 class Ctx {
   errors: string[] = [];
+  /** a crapless scene (rules.variant 'crapless') also allows the points 2, 3, 11 and 12 */
+  crapless = false;
   err(path: string, msg: string) {
     this.errors.push(`${path}: ${msg}`);
   }
@@ -73,7 +78,10 @@ class Ctx {
     v.forEach((b, i) => this.bet(`${path}[${i}]`, b));
   }
   point(path: string, v: unknown) {
-    if (!POINTS.includes(v as number)) this.err(path, 'must be one of 4, 5, 6, 8, 9, 10');
+    if (this.crapless) {
+      if (!CRAPLESS_POINTS.includes(v as number))
+        this.err(path, 'must be a total from 2 to 12 but 7');
+    } else if (!POINTS.includes(v as number)) this.err(path, 'must be one of 4, 5, 6, 8, 9, 10');
   }
   dice(path: string, v: unknown) {
     if (!Array.isArray(v)) return this.err(path, 'must be an array of [die, die] pairs');
@@ -289,6 +297,13 @@ export function validateScene(
         c.err('rules', `unknown rules preset "${s.rules}"`);
     } else if (isObj(s.rules)) c.keys('rules', s.rules, RULE_KEYS);
     else c.err('rules', 'must be a preset id or an object');
+    const variant =
+      typeof s.rules === 'string'
+        ? RULE_PRESETS[s.rules as RulePresetId]?.variant
+        : isObj(s.rules)
+          ? s.rules.variant
+          : undefined;
+    c.crapless = variant === 'crapless';
   }
   if (s.bankroll !== undefined) c.cents('bankroll', s.bankroll);
   if (s.phase !== undefined) c.phase('phase', s.phase);

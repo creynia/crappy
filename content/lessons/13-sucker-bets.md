@@ -42,6 +42,24 @@ Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% o
 
 They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy.
 
+**Crapless craps** is a whole table that looks friendlier: the Pass Line can't lose on the come-out. A 7 still wins, but 2, 3, 11 and 12 become points instead of craps. There is no Don't side, and you can place the 2, 3, 11 and 12.
+
+| Bet | Pays | House edge |
+|---|---|---|
+| Pass Line / Come (crapless) | 1:1 | **5.38%** (normal table: 1.41%) |
+| Place 2 / Place 12 | 11:2 | 7.14% |
+| Place 3 / Place 11 | 11:4 | 6.25% |
+| Odds on 2/12, 3/11 | 6:1, 3:1 | 0% |
+
+You give up the sure win on 11 (2 ways in 36): it becomes a point that usually loses to the 7. In return the 2, 3 and 12 no longer lose at once, but as points they usually lose to the 7 too. The Pass Line looks safer but costs almost **4x** as much.
+
+:::math Crapless Pass Line
+Come-out 7 wins: 6/36. A point n made before 7: P(n) × w/(w + 6), where w is the number of ways to roll n.
+2 or 12: 1/36 × 1/7 each. 3 or 11: 2/36 × 2/8 each. 4 or 10: 3/36 × 3/9 each. 5 or 9: 4/36 × 4/10 each. 6 or 8: 5/36 × 5/11 each.
+P(win) = 6557/13860 ≈ 47.31%. Edge = 1 − 2 × P(win) = 373/6930 ≈ **5.38%**.
+Place 2: wins 1 way vs 6, pays 5.5 → (5.5 − 6)/7 = −1/14 ≈ **−7.14%**. Place 3: 2 ways vs 6, pays 2.75 → (5.5 − 6)/8 = −1/16 = **−6.25%**.
+:::
+
 :::math Prop-bet edges
 For a one-roll bet that wins on w of 36 ways and pays k:1: EV = (w × k − (36 − w))/36.
 Any 7: (6 × 4 − 30)/36 = −6/36 = −16.67%. Any Craps: (4 × 7 − 32)/36 = −4/36 = −11.11%.
@@ -105,6 +123,34 @@ steps:
     completeWhen: { autoRollCompleted: { minRolls: 1000 } }
   - id: compare
     text: "Expected loss: 1,000 × $1 × 16.67% ≈ $167. How close did you get?"
+    advance: button
+    completeWhen: { acknowledged: true }
+```
+
+```scene
+id: l13-s3
+version: 1
+title: Crapless craps
+rules: crapless
+bankroll: 50000
+phase: come-out
+forcedDice: [[1, 1]]
+allowedBets: [pass-line, pass-odds, place-2, place-3, place-11, place-12]
+highlightedBets: [pass-line]
+showEV: true
+steps:
+  - id: preview
+    text: "This table is **crapless**: 2, 3, 11 and 12 become points, so the come-out never loses. Tap the **Pass Line** and read its edge."
+    completeWhen: { previewed: pass-line }
+  - id: bet
+    text: "Place $10 on the Pass Line."
+    completeWhen: { betOnTable: { type: pass-line, minAmount: 1000 } }
+  - id: roll
+    text: "Roll. On a normal table a 2 is craps and the Pass Line loses."
+    allowedActions: [roll]
+    completeWhen: { point: 2 }
+  - id: why
+    text: "The point is 2. Your bet survived, but a 2 rolls 1 way against six 7s, so it now loses 6 times in 7. Over a whole hand the crapless Pass Line costs 5.38%, against 1.41% on a normal table: it looks safer and costs almost 4x."
     advance: button
     completeWhen: { acknowledged: true }
 ```

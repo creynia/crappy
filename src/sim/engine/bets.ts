@@ -56,6 +56,28 @@ export const BET_TYPE_IDS: readonly BetTypeId[] = [
   'world',
 ];
 
+/** Bets that exist only on a crapless table (rules.variant 'crapless'); not in the standard catalogue. */
+export const CRAPLESS_BET_TYPE_IDS: readonly BetTypeId[] = [
+  'place-2',
+  'place-3',
+  'place-11',
+  'place-12',
+];
+
+/** Don't-side bets: unavailable in crapless craps. */
+const DONT_SIDE = new Set<BetTypeId>([
+  'dont-pass',
+  'dont-come',
+  'dont-pass-odds',
+  'dont-come-odds',
+]);
+
+/** Whether a bet type exists under these rules (crapless: no don't side; place 2/3/11/12 only there). */
+export function betTypeAvailable(type: BetTypeId, rules: Pick<TableRules, 'variant'>): boolean {
+  if (rules.variant === 'crapless') return !DONT_SIDE.has(type);
+  return !CRAPLESS_BET_TYPE_IDS.includes(type);
+}
+
 // ---------------------------------------------------------------------------
 // Payout helpers
 // ---------------------------------------------------------------------------
@@ -76,30 +98,42 @@ type Ratio = readonly [number, number];
 const R = (x: number, y: number): Ratio => [x, y];
 
 const PLACE: Record<PointNumber, Ratio> = {
+  2: R(11, 2),
+  3: R(11, 4),
   4: R(9, 5),
   5: R(7, 5),
   6: R(7, 6),
   8: R(7, 6),
   9: R(7, 5),
   10: R(9, 5),
+  11: R(11, 4),
+  12: R(11, 2),
 };
 /** True odds: buy / pass-odds / come-odds. */
 const TRUE_ODDS: Record<PointNumber, Ratio> = {
+  2: R(6, 1),
+  3: R(3, 1),
   4: R(2, 1),
   5: R(3, 2),
   6: R(6, 5),
   8: R(6, 5),
   9: R(3, 2),
   10: R(2, 1),
+  11: R(3, 1),
+  12: R(6, 1),
 };
 /** True odds against: lay / dont odds. */
 const LAY_ODDS: Record<PointNumber, Ratio> = {
+  2: R(1, 6),
+  3: R(1, 3),
   4: R(1, 2),
   5: R(2, 3),
   6: R(5, 6),
   8: R(5, 6),
   9: R(2, 3),
   10: R(1, 2),
+  11: R(1, 3),
+  12: R(1, 6),
 };
 
 /** Ratio [profit, stake] for point-based bets; null for the rest. */
@@ -200,12 +234,15 @@ function def(s: Spec): BetTypeDef {
 
 const flat = (text: string) => () => text;
 
-function passLike(r: RollContext): Resolution | null {
+/** Come-out (or come box) result for pass/come; null = the total becomes the bet's point. */
+function passLike(r: RollContext, rules: TableRules): Resolution | null {
+  if (rules.variant === 'crapless') return r.total === 7 ? win(0) : null;
   if (r.total === 7 || r.total === 11) return win(0);
   if (r.total === 2 || r.total === 3 || r.total === 12) return LOSE;
   return null;
 }
-function dontLike(r: RollContext): Resolution | null {
+function dontLike(r: RollContext, rules: TableRules): Resolution | null {
+  if (rules.variant === 'crapless') return r.total === 7 ? LOSE : null; // not offered; kept total
   if (r.total === 2 || r.total === 3) return win(0);
   if (r.total === 12) return PUSH;
   if (r.total === 7 || r.total === 11) return LOSE;
@@ -224,7 +261,7 @@ specs.push({
   describePayout: flat('1 to 1'),
   resolve(bet, r, rules) {
     if (r.phase === 'come-out') {
-      const o = passLike(r);
+      const o = passLike(r, rules);
       if (!o) return NONE;
       return o.kind === 'win' ? win(even(bet, rules)) : o;
     }
@@ -241,7 +278,7 @@ specs.push({
   describePayout: flat('1 to 1'),
   resolve(bet, r, rules) {
     if (r.phase === 'come-out') {
-      const o = dontLike(r);
+      const o = dontLike(r, rules);
       if (!o) return NONE;
       return o.kind === 'win' ? win(even(bet, rules)) : o;
     }
@@ -258,7 +295,7 @@ specs.push({
   describePayout: flat('1 to 1'),
   resolve(bet, r, rules) {
     if (bet.point === null) {
-      const o = passLike(r);
+      const o = passLike(r, rules);
       if (o) return o.kind === 'win' ? win(even(bet, rules)) : o;
       return { kind: 'travel', point: r.total as PointNumber };
     }
@@ -275,7 +312,7 @@ specs.push({
   describePayout: flat('1 to 1'),
   resolve(bet, r, rules) {
     if (bet.point === null) {
-      const o = dontLike(r);
+      const o = dontLike(r, rules);
       if (o) return o.kind === 'win' ? win(even(bet, rules)) : o;
       return { kind: 'travel', point: r.total as PointNumber };
     }
@@ -298,10 +335,10 @@ function oddsSpec(
     shortLabel,
     category: 'odds',
     afterWin: 'comes-down',
-    describePayout(_rules, point) {
+    describePayout(rules, point) {
       if (point === null)
         return good
-          ? '2 to 1 on 4/10, 3 to 2 on 5/9, 6 to 5 on 6/8'
+          ? `2 to 1 on 4/10, 3 to 2 on 5/9, 6 to 5 on 6/8${rules.variant === 'crapless' ? ', 3 to 1 on 3/11, 6 to 1 on 2/12' : ''}`
           : '1 to 2 on 4/10, 2 to 3 on 5/9, 5 to 6 on 6/8';
       return ratioStr((good ? TRUE_ODDS : LAY_ODDS)[point]);
     },
@@ -323,9 +360,8 @@ specs.push(oddsSpec('dont-pass-odds', "Don't Pass Odds", 'DP ODDS', false, false
 specs.push(oddsSpec('come-odds', 'Come Odds', 'C ODDS', true, true));
 specs.push(oddsSpec('dont-come-odds', "Don't Come Odds", 'DC ODDS', false, false));
 
-const NUMS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
-for (const n of NUMS) {
-  specs.push({
+function placeSpec(n: PointNumber): Spec {
+  return {
     id: `place-${n}` as BetTypeId,
     label: `Place ${n}`,
     shortLabel: `P${n}`,
@@ -338,7 +374,12 @@ for (const n of NUMS) {
       if (r.total === n) return win(payout(bet.amount, PLACE[n][0], PLACE[n][1], rules.payoutUnit));
       return r.total === 7 ? LOSE : NONE;
     },
-  });
+  };
+}
+
+const NUMS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
+for (const n of NUMS) {
+  specs.push(placeSpec(n));
   specs.push({
     id: `buy-${n}` as BetTypeId,
     label: `Buy ${n}`,
@@ -544,11 +585,17 @@ specs.push(
   ),
 );
 
+for (const n of [2, 3, 11, 12] as const) specs.push(placeSpec(n));
+
 export const BET_TYPES = Object.fromEntries(specs.map((s) => [s.id, def(s)])) as Record<
   BetTypeId,
   BetTypeDef
 >;
 
 export function isBetTypeId(x: unknown): x is BetTypeId {
-  return typeof x === 'string' && (BET_TYPE_IDS as readonly string[]).includes(x);
+  return (
+    typeof x === 'string' &&
+    ((BET_TYPE_IDS as readonly string[]).includes(x) ||
+      (CRAPLESS_BET_TYPE_IDS as readonly string[]).includes(x))
+  );
 }

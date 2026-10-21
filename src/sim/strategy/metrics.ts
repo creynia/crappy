@@ -1,10 +1,22 @@
+import { pointsFor } from '../engine/rules';
 import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
 import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
 /** P(each point is established) given a decision of a line/come bet, in 36ths. */
-const POINT_WAYS: Record<PointNumber, number> = { 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3 };
+const POINT_WAYS: Record<PointNumber, number> = {
+  2: 1,
+  3: 2,
+  4: 3,
+  5: 4,
+  6: 5,
+  8: 5,
+  9: 4,
+  10: 3,
+  11: 2,
+  12: 1,
+};
 
 /**
  * Expected odds wagered per decision, as a multiple of the flat bet, when odds are always taken at the table
@@ -12,7 +24,7 @@ const POINT_WAYS: Record<PointNumber, number> = { 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 
  */
 export function oddsMultiplePerDecision(rules: TableRules, lay: boolean): number {
   let t = 0;
-  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[])
+  for (const n of pointsFor(rules))
     t += (POINT_WAYS[n] / 36) * (lay ? rules.maxLayOdds[n] : rules.maxOdds[n]);
   return t;
 }

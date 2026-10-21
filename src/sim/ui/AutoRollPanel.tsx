@@ -77,6 +77,7 @@ const PRESET_LABEL: Record<RulePresetId, string> = {
   'field-3x-12': 'Field pays 3x on 12',
   'odds-10x': '10x odds',
   'odds-100x': '100x odds',
+  crapless: 'Crapless craps',
 };
 const COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
 

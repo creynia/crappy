@@ -26,7 +26,7 @@ const KNOWN_STRATEGIES = new Set([
   'my-layout',
   'martingale-pass',
 ]);
-const PRESETS = new Set(['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x']);
+const PRESETS = new Set(['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x', 'crapless']);
 
 function split(src: string) {
   const m = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(src);

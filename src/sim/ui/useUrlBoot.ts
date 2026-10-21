@@ -8,7 +8,13 @@ import { resolveSettings, type ResolvedSimSettings } from './settings';
 import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
 
-const PRESETS: RulePresetId[] = ['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x'];
+const PRESETS: RulePresetId[] = [
+  'standard-vegas',
+  'field-3x-12',
+  'odds-10x',
+  'odds-100x',
+  'crapless',
+];
 
 /** Sandbox URL params (supported in production): seed, dice, rules, speed. Read from ?search and #/path?query. */
 export function readUrlParams(): URLSearchParams {

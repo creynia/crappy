@@ -1,8 +1,10 @@
 export * from './types';
-export { DEFAULT_RULES, RULE_PRESETS, resolveRules } from './rules';
+export { DEFAULT_RULES, RULE_PRESETS, resolveRules, pointsFor } from './rules';
 export { seedRng, nextU32, rollDie, rollDice } from './rng';
 export {
   BET_TYPE_IDS,
+  CRAPLESS_BET_TYPE_IDS,
+  betTypeAvailable,
   BET_TYPES,
   isBetTypeId,
   payout,

@@ -4,14 +4,23 @@
 export type Cents = number;               // integer cents; $10 = 1000
 export type Die = 1 | 2 | 3 | 4 | 5 | 6;
 export type Dice = readonly [Die, Die];
-export type PointNumber = 4 | 5 | 6 | 8 | 9 | 10;
+/** Standard points. Crapless craps (rules.variant 'crapless') adds 2, 3, 11 and 12. */
+export type StandardPoint = 4 | 5 | 6 | 8 | 9 | 10;
+export type PointNumber = 2 | 3 | StandardPoint | 11 | 12;
 export const POINT_NUMBERS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
+/** Every point in crapless craps: any come-out total but 7. */
+export const CRAPLESS_POINTS: readonly PointNumber[] = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+/** A per-point table (odds multiples). Standard tables never reach 2, 3, 11 or 12. */
+export type PointTable = Record<PointNumber, number>;
+/** 'standard' craps, or 'crapless' (come-out: 7 wins, nothing loses, every other total is a point; no don't side). */
+export type RulesVariant = 'standard' | 'crapless';
 export type Phase = 'come-out' | 'point';
 
 export type BetTypeId =
   | 'pass-line' | 'dont-pass' | 'come' | 'dont-come'
   | 'pass-odds' | 'dont-pass-odds' | 'come-odds' | 'dont-come-odds'
   | 'place-4' | 'place-5' | 'place-6' | 'place-8' | 'place-9' | 'place-10'
+  | 'place-2' | 'place-3' | 'place-11' | 'place-12'   // crapless only
   | 'buy-4' | 'buy-5' | 'buy-6' | 'buy-8' | 'buy-9' | 'buy-10'
   | 'lay-4' | 'lay-5' | 'lay-6' | 'lay-8' | 'lay-9' | 'lay-10'
   | 'field' | 'big-6' | 'big-8'
@@ -41,13 +50,14 @@ export interface Bet {
 
 export interface TableRules {
   presetId: RulePresetId;
+  variant: RulesVariant;      // EXTENSION (crapless craps); default 'standard'
   tableMin: Cents;            // line, come, place, buy, lay, field, big, hardway minimum
   tableMax: Cents;            // per-bet maximum (odds excluded)
   propMin: Cents;             // one-roll center bets minimum
   /** max odds as a multiple of the flat bet, per point */
-  maxOdds: Record<PointNumber, number>;
+  maxOdds: PointTable;
   /** max lay odds (don't side) as a multiple of the flat bet, per point */
-  maxLayOdds: Record<PointNumber, number>;
+  maxLayOdds: PointTable;
   fieldPays: { 2: number; 12: number };          // multipliers (to 1)
   vig: {
     rate: number;                                // 0.05
@@ -62,7 +72,8 @@ export interface TableRules {
   allowPutBets: boolean;                         // default false (pass/come flat after point)
 }
 
-export type RulePresetId = 'standard-vegas' | 'field-3x-12' | 'odds-10x' | 'odds-100x';
+export type RulePresetId =
+  | 'standard-vegas' | 'field-3x-12' | 'odds-10x' | 'odds-100x' | 'crapless';
 
 export interface RollRecord {
   n: number;                   // 1-based roll number
@@ -161,7 +172,7 @@ export type GameEvent =
   | { type: 'bet-returned'; betId: string; betType: BetTypeId; amount: Cents; reason: 'odds-off' | 'parent-gone' }
   | { type: 'bet-travelled'; betId: string; betType: 'come' | 'dont-come'; point: PointNumber }
   | { type: 'natural'; total: 7 | 11 }
-  | { type: 'craps'; total: 2 | 3 | 12 }
+  | { type: 'craps'; total: 2 | 3 | 12 }     // never in crapless
   | { type: 'point-established'; point: PointNumber }
   | { type: 'point-made'; point: PointNumber }
   | { type: 'seven-out'; point: PointNumber };

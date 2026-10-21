@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, betTypeAvailable } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
 import type { Bet, Cents, RulePresetId } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
@@ -16,7 +16,7 @@ import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
 import { toastDurationMs } from './animation';
-import { landscapeLayout, portraitLayout } from './layouts';
+import { feltLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
 import { fmtMoney } from './text';
@@ -127,12 +127,14 @@ export function Simulator(props: SimulatorInternalProps) {
     () => new Set(game.bets.filter((b) => !isWorking(b, game)).map((b) => b.id)),
     [game],
   );
+  const rules = liveGame.rules;
   const disabledRegions = useMemo(() => {
     const set = new Set<RegionId>();
     for (const r of ALL_REGIONS)
-      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t))) set.add(r.id);
+      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t) && betTypeAvailable(t, rules)))
+        set.add(r.id);
     return set;
-  }, [scene, rt]);
+  }, [scene, rt, rules]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
   const lock = rollLock(scene, rt, liveGame);
@@ -268,7 +270,7 @@ export function Simulator(props: SimulatorInternalProps) {
             {view === 'center' ? (
               <CenterPanel {...tableProps} />
             ) : (
-              <Table {...tableProps} layout={landscape ? landscapeLayout : portraitLayout} />
+              <Table {...tableProps} layout={feltLayout(landscape, rules.variant)} />
             )}
             {view === 'table' && centerTotal > 0 ? (
               <button type="button" class="sim-center-ind" onClick={() => setView('center')}>

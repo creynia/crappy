@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   centerLayout,
+  craplessLandscapeLayout,
+  craplessPortraitLayout,
+  feltLayout,
   landscapeLayout,
   portraitLayout,
   regionIdForBet,
@@ -80,3 +83,39 @@ describe('main layouts', () => {
     expect(spotPosition(box, 'lay-6')).toEqual(box.chipSpots.lay);
   });
 });
+
+describe.each([craplessPortraitLayout, craplessLandscapeLayout])(
+  'crapless layout $id',
+  (layout) => {
+    it('keeps 44px tap targets, no overlaps, unique ids', () => {
+      const rs = layout.regions;
+      for (const r of rs) {
+        const short = Math.min(r.rect.w, r.rect.h);
+        expect(short, r.id).toBeGreaterThanOrEqual(layout.minTapUnits);
+        expect(short * VIEWPORT[layout.id], r.id).toBeGreaterThanOrEqual(44);
+        expect(r.rect.x + r.rect.w).toBeLessThanOrEqual(layout.viewBox.w);
+        expect(r.rect.y + r.rect.h).toBeLessThanOrEqual(layout.viewBox.h);
+      }
+      for (let i = 0; i < rs.length; i++)
+        for (let j = i + 1; j < rs.length; j++)
+          expect(overlap(rs[i]!.rect, rs[j]!.rect), `${rs[i]!.id} vs ${rs[j]!.id}`).toBe(false);
+      expect(new Set(rs.map((r) => r.id)).size).toBe(rs.length);
+    });
+    it('has the ten boxes in 2 3 | 4 5 6 8 9 10 | 11 12 order and a puck for each', () => {
+      const boxes = layout.regions.filter((r) => r.id.startsWith('box-'));
+      expect(boxes.map((r) => r.id)).toEqual(
+        [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map((n) => `box-${n}`),
+      );
+      for (const n of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const)
+        expect(layout.puck[n]).toBeDefined();
+      expect(boxes.find((r) => r.id === 'box-2')!.betTypes).toEqual(['place-2', 'come-odds']);
+      expect(boxes.find((r) => r.id === 'box-12')!.sublabel).toBe('Place pays 11 to 2');
+      expect(boxes.find((r) => r.id === 'box-3')!.sublabel).toBe('Place pays 11 to 4');
+    });
+    it('is chosen by feltLayout for the crapless variant only', () => {
+      const land = layout.id === 'landscape';
+      expect(feltLayout(land, 'crapless')).toBe(layout);
+      expect(feltLayout(land, 'standard')).toBe(land ? landscapeLayout : portraitLayout);
+    });
+  },
+);

@@ -420,3 +420,20 @@
 .sim-ar-summary td {
   text-align: right;
 }
+
+.sim-sweep-intro {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+.sim-sweep-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sim-sweep-table {
+  font-size: 0.8rem;
+}
+.sim-sweep-table th,
+.sim-sweep-table td {
+  padding: 4px 3px;
+}

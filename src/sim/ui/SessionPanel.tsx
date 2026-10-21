@@ -1,5 +1,6 @@
 import type { BetTypeId, SessionStats } from '../engine/types';
 import { luckOf, luckText } from '../math/luck';
+import { lossBreakdown } from './lossShare';
 import { betLabel, fmtMoney, fmtPct } from './text';
 
 export interface SessionPanelProps {
@@ -14,6 +15,7 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
   const luck = actual - expected;
   const band = luckOf(stats);
   const edge = stats.totalWagered > 0 ? stats.expectedLoss / stats.totalWagered : null;
+  const breakdown = lossBreakdown(stats.byType, stats.totalWagered);
   const rows = (
     Object.entries(stats.byType) as [BetTypeId, NonNullable<SessionStats['byType'][BetTypeId]>][]
   )
@@ -90,6 +92,7 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
                 <th scope="col">Expected</th>
                 <th scope="col">Actual</th>
                 <th scope="col">Edge (5+ bets)</th>
+                <th scope="col">Share of loss</th>
               </tr>
             </thead>
             <tbody>
@@ -102,10 +105,12 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
                   <td>
                     {s.wagered > 0 && s.count >= 5 ? fmtPct(s.expectedLoss / s.wagered) : '–'}
                   </td>
+                  <td data-k="loss-share">{fmtPct(breakdown.loss[t] ?? 0, 0)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {breakdown.sentence ? <p class="sim-session-note">{breakdown.sentence}</p> : null}
         </div>
       ) : null}
     </section>

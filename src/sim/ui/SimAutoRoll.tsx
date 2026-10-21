@@ -3,7 +3,7 @@ import { equity } from '../engine/game';
 import { resolveRules } from '../engine/rules';
 import type { GameState, RulePresetId } from '../engine/types';
 import type { SceneConfig, SceneInput } from '../scene/types';
-import type { ManyResult, SessionResult, StrategySpec } from '../strategy/types';
+import type { ManyResult, SessionConfig, SessionResult, StrategySpec } from '../strategy/types';
 import { decodeCustom } from '../strategy/custom';
 import { AutoRollPanel } from './AutoRollPanel';
 import { readUrlParams } from './useUrlBoot';
@@ -17,6 +17,8 @@ export interface SimAutoRollProps {
   rollsPerHour: number;
   emit: (e: SimulatorEvent) => void;
   feedInput: (input: SceneInput) => void;
+  /** replay a single short run on the table (Watch mode) */
+  onWatch?: (cfg: SessionConfig) => void;
   /** a finished run, for the roll log */
   onResult?: (result: SessionResult | ManyResult) => void;
   /** sandbox only: remember the starting-bankroll pick for this viewer */
@@ -31,6 +33,7 @@ export function SimAutoRoll({
   rollsPerHour,
   emit,
   feedInput,
+  onWatch,
   onResult,
   persistKey,
 }: SimAutoRollProps) {
@@ -109,6 +112,7 @@ export function SimAutoRoll({
         layout={layoutBets}
         rollsPerHour={rollsPerHour}
         onCompleted={onCompleted}
+        {...(onWatch ? { onWatch } : {})}
         onSweepCompleted={(rolls) =>
           feedInput({ kind: 'auto-roll-completed', rolls, oddsMultiple: 'default' })
         }

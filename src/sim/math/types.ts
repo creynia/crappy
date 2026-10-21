@@ -15,8 +15,8 @@ export interface BetCtx {
   point: PointNumber | null;
   rules: TableRules;
 }
-/** `working` is the player's ON/OFF setting; omitted means 'auto'. */
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'progress'> & {
+/** `hop` is the dice pair of a hop bet (I035); `working` is the player's ON/OFF setting, omitted means 'auto'. */
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'hop' | 'progress'> & {
   working?: Bet['working'];
 };
 

@@ -48,9 +48,7 @@ export function StatusBar({
         <span class={`sim-point${point ? ' has-point' : ''}`}>
           {point ? `Point: ${point}` : 'Come-out roll'}
         </span>
-        <span class="sim-last" aria-live="polite">
-          {last ? <Dice dice={last.dice} size="sm" /> : null}
-        </span>
+        <span class="sim-last">{last ? <Dice dice={last.dice} size="sm" /> : null}</span>
         {compact ? null : <HistoryStrip history={history} onOpenAll={onOpenHistory} />}
       </div>
     </div>

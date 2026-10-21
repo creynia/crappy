@@ -22,8 +22,10 @@ const big8Rect: Rect = { x: 675, y: 850, w: 205, h: 115 };
 const dpRect: Rect = { x: 20, y: 980, w: 860, h: 110 };
 const passRect: Rect = { x: 20, y: 1105, w: 860, h: 135 };
 
+const CHIP_R = 34;
+
 const regions: RegionDef[] = [
-  ...boxes.map(([n, r]) => numberBox(n, r)),
+  ...boxes.map(([n, r]) => numberBox(n, r, CHIP_R)),
   {
     id: 'come',
     rect: comeRect,
@@ -72,7 +74,7 @@ const regions: RegionDef[] = [
     betTypes: ['dont-pass', 'dont-pass-odds'],
     chipSpots: {
       main: { x: dpRect.x + 150, y: dpRect.y + 56 },
-      odds: { x: dpRect.x + 215, y: dpRect.y + 40 },
+      odds: { x: dpRect.x + 250, y: dpRect.y + 56 },
     },
   },
   {
@@ -84,7 +86,7 @@ const regions: RegionDef[] = [
     shape: 'pass-arc',
     chipSpots: {
       main: { x: passRect.x + 150, y: passRect.y + 62 },
-      odds: { x: passRect.x + 215, y: passRect.y + 44 },
+      odds: { x: passRect.x + 250, y: passRect.y + 62 },
     },
   },
 ];
@@ -99,6 +101,6 @@ export const portraitLayout: TableLayout = {
   regions,
   puck,
   puckRadius: 42,
-  chipRadius: 34,
+  chipRadius: CHIP_R,
   minTapUnits: 102,
 };

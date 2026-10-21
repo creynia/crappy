@@ -1098,6 +1098,50 @@
   transform: translateX(-50%);
 }
 
+/* Streak lab */
+.sim-streak-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 8px 0;
+}
+.sim-streak-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+.sim-streak-form select,
+.sim-streak-form input {
+  min-height: 44px;
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+}
+.sim-streak-form input {
+  width: 5rem;
+}
+.sim-streak-list {
+  margin: 0 0 8px;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+}
+.sim-demo-captions {
+  margin: 4px 0;
+  padding-left: 1.3rem;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 2px;
+}
+.sim-step .sim-replay {
+  min-height: 44px;
+  min-width: 44px;
+}
+
 /* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
 .sim-calls {
   pointer-events: none;

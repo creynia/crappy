@@ -773,9 +773,14 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
-    const edge = metrics.map((m) =>
-      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
-    );
+    // a progression has no fixed layout: a single run reports its own expected loss over what it
+    // actually wagered (I013 "simulated"); otherwise the analytic edge of the starting layout
+    const edge = metrics.map((m, i) => {
+      const r = o.kind === 'single' ? o.results[i] : undefined;
+      if (m.approximate && r && r.totalWagered > 0)
+        return `${pct(r.expectedLoss / r.totalWagered)} (simulated)`;
+      return m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction);
+    });
     if (o.kind === 'single') {
       const rs = o.results;
       const rows: Array<[string, string[]]> = [

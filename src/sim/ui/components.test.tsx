@@ -4,6 +4,7 @@ import { BetSheet, type BetSheetProps, type SheetPreview } from './BetSheet';
 import { CenterPanel } from './CenterPanel';
 import { ChipRack } from './ChipRack';
 import { ChipStack, chipBreakdown } from './ChipStack';
+import { DiceGrid } from './DiceGrid';
 import { HistoryStrip, rollOutcome } from './HistoryStrip';
 import { Puck } from './Puck';
 import { RollButton } from './RollButton';
@@ -58,7 +59,7 @@ function preview(tier: EdgeTier, over: Partial<SheetPreview> = {}): SheetPreview
   };
 }
 
-function sheet_props(over: Partial<BetSheetProps> = {}): BetSheetProps {
+function sheetProps(over: Partial<BetSheetProps> = {}): BetSheetProps {
   return {
     title: 'Place 6',
     preview: preview('good'),
@@ -484,7 +485,7 @@ describe('BetSheet', () => {
     const onCopy = 'Working on the come-out. Turning it OFF saves about $0.06.';
     const { rerender } = render(
       <BetSheet
-        {...sheet_props()}
+        {...sheetProps()}
         mode="manage"
         working={{ value: false, canToggle: true, copy: offCopy }}
       />,
@@ -492,7 +493,7 @@ describe('BetSheet', () => {
     expect(screen.getByText(offCopy)).toBeTruthy();
     rerender(
       <BetSheet
-        {...sheet_props()}
+        {...sheetProps()}
         mode="manage"
         working={{ value: true, canToggle: true, copy: onCopy }}
       />,
@@ -518,5 +519,24 @@ describe('BetSheet', () => {
     expect(onRemove).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('checkbox'));
     expect(onToggleWorking).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('DiceGrid', () => {
+  it('renders a labelled table, legend and caption', () => {
+    const g = Array.from({ length: 36 }, (_, i) =>
+      i < 4 ? 'win' : i < 10 ? 'lose' : 'none',
+    ) as import('../math/outcomes').RollEffect[];
+    render(<DiceGrid grid={g} note="extra" />);
+    expect(screen.getByRole('table').getAttribute('aria-label')).toContain('36 dice');
+    expect(screen.getAllByRole('cell').filter((c) => c.hasAttribute('data-effect'))).toHaveLength(
+      36,
+    );
+    expect(
+      screen.getByText('Wins on 4 of 36, loses on 6 of 36, 26 rolls change nothing'),
+    ).toBeTruthy();
+    expect(screen.getByText('Win (4)')).toBeTruthy();
+    expect(screen.getByText('extra')).toBeTruthy();
+    expect(screen.getAllByLabelText(/1 and 1, total 2: wins/)).toHaveLength(1);
   });
 });

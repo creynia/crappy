@@ -49,3 +49,34 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report
+
+  visual:
+    needs: check
+    runs-on: ubuntu-latest
+    # Advisory: pixel baselines are environment-sensitive, so this never blocks merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # No committed baselines yet: write them (tests pass) so humans can review the images.
+      - name: Run visual tests
+        run: |
+          if [ -d tests/e2e/__screenshots__ ]; then
+            VISUAL=1 npx playwright test --project=visual
+          else
+            VISUAL=1 npx playwright test --project=visual --update-snapshots
+          fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: |
+            playwright-report
+            test-results
+            tests/e2e/__screenshots__
+          if-no-files-found: ignore

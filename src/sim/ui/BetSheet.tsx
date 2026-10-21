@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Action, BetTypeId, Cents } from '../engine/types';
 import type { ActionPreview } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
+import { DiceGrid } from './DiceGrid';
 import './sim.css';
 
 export type SheetPreview = ActionPreview;
@@ -209,12 +210,17 @@ export function BetSheet(p: BetSheetProps) {
               type="checkbox"
               checked={p.working.value}
               disabled={!p.working.canToggle}
+              aria-describedby={p.working.copy ? 'working-copy' : undefined}
               onChange={(e) => p.onToggleWorking?.(e.currentTarget.checked)}
             />
             Working: {p.working.value ? 'ON' : 'OFF'}
           </label>
         ) : null}
-        {p.working?.copy ? <p class="sim-working-copy">{p.working.copy}</p> : null}
+        {p.working?.copy ? (
+          <p id="working-copy" class="sim-working-copy">
+            {p.working.copy}
+          </p>
+        ) : null}
 
         {!valid ? (
           <p class="sim-invalid" role="alert">
@@ -290,6 +296,9 @@ export function BetSheet(p: BetSheetProps) {
                     ))}
                   </tbody>
                 </table>
+                {preview.explanation.grid ? (
+                  <DiceGrid grid={preview.explanation.grid} note={preview.explanation.gridNote} />
+                ) : null}
                 <p class="sim-formula">{preview.explanation.evFormula}</p>
                 {preview.explanation.note ? (
                   <p class="sim-note">{preview.explanation.note}</p>

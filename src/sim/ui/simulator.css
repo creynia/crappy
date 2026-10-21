@@ -650,3 +650,19 @@
 .sim-cost-cycle-empty {
   visibility: hidden;
 }
+
+/* narrow portrait phones: the cost button sits directly above Roll, so Roll keeps its full width */
+@media (max-width: 600px) and (orientation: portrait) {
+  .sim-roll-row {
+    flex-direction: column-reverse;
+  }
+  .sim-roll-row .sim-roll {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  .sim-roll-row .sim-cost-cycle {
+    flex-direction: row;
+    width: 100%;
+    gap: 6px;
+  }
+}

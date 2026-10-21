@@ -19,22 +19,32 @@ import type {
   SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
+import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { matchingPreset } from './customRules';
+import { RulesEditor } from './RulesEditor';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
-import { fmtMoney } from './text';
+import { luckFrom } from '../math/luck';
+import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
 const MAX_ODDS_BY_DEFAULT = new Set<string>([
   'pass-max-odds',
   'dont-pass-max-lay',
   'three-point-molly',
+  'dont-come-molly',
 ]);
 
 // Strategies with no line bet, so an odds setting means nothing for them.
 const NO_ODDS_STRATEGIES = new Set<string>([
   'place-6-8',
+  'buy-4-10',
+  'lay-4-10',
+  'place-6-8-press',
+  'inside-regress',
+  'pass-hedge-any-craps',
   'iron-cross',
   'across',
   'field-every-roll',
@@ -56,6 +66,11 @@ export interface AutoRollPanelProps {
     compareMode?: boolean;
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
+    stopWin?: Cents;
+    stopLoss?: Cents;
+    /** starting bankroll chosen by the scene, in cents; the learner can change it in the panel */
+    bankroll?: Cents;
     /** show the odds-multiple sweep table instead of the run form */
     sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
@@ -73,6 +88,8 @@ export interface AutoRollPanelProps {
   onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
+  /** localStorage key for the last starting-bankroll pick; set only in the sandbox */
+  persistKey?: string;
 }
 
 const LENS_LABEL = { 'lowest-edge': 'Lowest edge', practical: 'Practical', fun: 'Fun per dollar' };
@@ -86,6 +103,8 @@ const PRESET_LABEL: Record<RulePresetId, string> = {
   'odds-100x': '100x odds',
 };
 const COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
+// Stop-rule chips: undefined means no stop.
+const STOP_OPTIONS: Array<Cents | undefined> = [undefined, 5000, 10_000, 25_000];
 
 type Metrics = ReturnType<typeof strategyMetrics>;
 type Outcome =
@@ -113,6 +132,20 @@ function money2(c: number, sign = false): string {
   return fmtMoney(c, { sign, exact: true });
 }
 
+/** How one session ended, using the stop amounts it ran with, e.g. "Stopped: up $100 at roll 37". */
+function endedByText(r: SessionResult, cfg: SessionConfig): string {
+  switch (r.endedBy) {
+    case 'bust':
+      return `Busted at roll ${r.bustedAtRoll ?? r.rollsPlayed}`;
+    case 'stop-win':
+      return `Stopped: up ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    case 'stop-loss':
+      return `Stopped: down ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    default:
+      return `All ${r.rollsPlayed} rolls`;
+  }
+}
+
 function randomSeed(): number {
   try {
     const a = new Uint32Array(1);
@@ -123,9 +156,38 @@ function randomSeed(): number {
   }
 }
 
+/** Last starting-bankroll pick for this viewer (sandbox only). Storage can be blocked, so every access is guarded. */
+function readStoredBankroll(key: string | undefined): 'table' | Cents | null {
+  if (!key) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === 'table') return 'table';
+    const n = Number(raw);
+    return Number.isSafeInteger(n) && n > 0 && n <= MAX_BANKROLL ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBankroll(key: string | undefined, pick: 'table' | Cents): void {
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, String(pick));
+  } catch {
+    /* storage unavailable: the pick still works for this session */
+  }
+}
+
 export function AutoRollPanel(props: AutoRollPanelProps) {
   const { config, layout, rollsPerHour = 100 } = props;
-  const bankroll = props.bankroll ?? 50_000;
+  const tableBankroll = props.bankroll ?? 50_000;
+  const [bankrollPick, setBankrollPick] = useState<'table' | Cents>(
+    () => readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table',
+  );
+  const [bankrollText, setBankrollText] = useState<string>(() => {
+    const pick = readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table';
+    return pick !== 'table' && !BANKROLL_CHIPS.includes(pick) ? String(pick / 100) : '';
+  });
   const all = useMemo(() => {
     const l = listStrategies();
     return config?.strategies ? l.filter((s) => config.strategies!.includes(s.id)) : l;
@@ -144,6 +206,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [oddsMultiple, setOddsMultiple] = useState<number | undefined>(
     config?.defaultStrategy?.oddsMultiple,
   );
+  const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
+  const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
   const [rolls, setRolls] = useState<number>(rollOptions.includes(100) ? 100 : rollOptions[0]!);
   const [custom, setCustom] = useState('');
   const [sessions, setSessions] = useState<number>(sessionOptions[0] ?? 1);
@@ -158,8 +222,29 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
+  // I033: "Custom…" in the Rules select edits a rules object for the runs in this panel
+  const [customRules, setCustomRules] = useState<TableRules | null>(null);
+  const [editingRules, setEditingRules] = useState(false);
+  const rulesInput = typeof props.rules === 'object' ? props.rules : (customRules ?? preset);
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
+  const bankrollParse =
+    bankrollText.trim() === '' ? null : parseBankroll(bankrollText, rules.tableMin);
+  const bankrollError = bankrollParse && !bankrollParse.ok ? bankrollParse.message : null;
+  const tableTooSmall = tableBankroll < rules.tableMin;
+  // Below the table minimum the Table chip is disabled and the run uses $500 instead of blocking.
+  const bankroll =
+    bankrollPick === 'table' ? (tableTooSmall ? 50_000 : tableBankroll) : bankrollPick;
+  // Below the table minimum the run starts at $500 and the $500 chip shows pressed.
+  useEffect(() => {
+    if (tableTooSmall && bankrollPick === 'table') setBankrollPick(50_000);
+  }, [tableTooSmall, bankrollPick]);
+  // A fallback to $500 is not the learner's choice, so it is not remembered.
+  useEffect(() => {
+    if (!tableTooSmall) writeStoredBankroll(props.persistKey, bankrollPick);
+  }, [bankrollPick, tableTooSmall, props.persistKey]);
+  useEffect(() => {
+    if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
+  }, [bankroll, stopLoss]);
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -181,6 +266,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
+    if (bankrollError) return;
+    if (stopLoss !== undefined && stopLoss > bankroll) {
+      setError(
+        'Stop if down is more than the starting bankroll. Pick a smaller stop or a larger bankroll.',
+      );
+      return;
+    }
     // computed once per run, with the rules this run uses
     const metricsFor = (specs: StrategySpec[]): Metrics[] =>
       specs.map((s) => strategyMetrics(s, rules));
@@ -192,6 +284,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       seed,
       bankroll,
       rules: rulesInput,
+      ...(stopWin !== undefined ? { stopWin } : {}),
+      ...(stopLoss !== undefined ? { stopLoss } : {}),
     };
     const cfg: SessionConfig = { ...base, strategy: specs[0]! };
     try {
@@ -333,12 +427,24 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
           )}
           {needsLayout && (
-            <p role="status" class="sim-ar-desc">
+            <p class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
             </p>
           )}
         </fieldset>
 
+        {fixedSpecs && (config?.stopWin !== undefined || config?.stopLoss !== undefined) ? (
+          <p class="sim-ar-desc">
+            Scene stop rules:{' '}
+            {[
+              config?.stopWin !== undefined ? `stop if up ${money(config.stopWin)}` : null,
+              config?.stopLoss !== undefined ? `stop if down ${money(config.stopLoss)}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            .
+          </p>
+        ) : null}
         {!fixedSpecs && (
           <>
             <div class="sim-ar-group" role="group" aria-label="Unit">
@@ -350,6 +456,32 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
               {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
               {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
+            </div>
+            <div class="sim-ar-group" role="group" aria-label="Stop when ahead by">
+              <span>Stop if up</span>
+              {STOP_OPTIONS.map((v) =>
+                button(
+                  stopWin === v,
+                  v === undefined ? 'None' : money(v),
+                  () => setStopWin(v),
+                  String(v),
+                ),
+              )}
+            </div>
+            <div class="sim-ar-group" role="group" aria-label="Stop when behind by">
+              <span>Stop if down</span>
+              {STOP_OPTIONS.map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  aria-pressed={stopLoss === v}
+                  disabled={running || (v !== undefined && v > bankroll)}
+                  class="sim-ar-btn"
+                  onClick={() => setStopLoss(v)}
+                >
+                  {v === undefined ? 'None' : money(v)}
+                </button>
+              ))}
             </div>
           </>
         )}
@@ -386,6 +518,70 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             />
           </label>
         </div>
+        <div class="sim-ar-group" role="group" aria-label="Starting bankroll">
+          <span>Bankroll</span>
+          <button
+            type="button"
+            aria-pressed={bankrollPick === 'table' && bankrollText === ''}
+            disabled={running || tableTooSmall}
+            title={
+              tableTooSmall
+                ? `Table bankroll is below the ${money(rules.tableMin)} minimum`
+                : undefined
+            }
+            class="sim-ar-btn"
+            onClick={() => {
+              setBankrollText('');
+              setBankrollPick('table');
+            }}
+          >
+            Table ({money(tableBankroll)})
+          </button>
+          {BANKROLL_CHIPS.map((c) =>
+            button(
+              bankrollPick === c && bankrollText === '',
+              money(c),
+              () => {
+                setBankrollText('');
+                setBankrollPick(c);
+              },
+              c,
+            ),
+          )}
+          <label>
+            <span class="sim-sr">Custom starting bankroll in whole dollars</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Custom"
+              value={bankrollText}
+              disabled={running}
+              aria-invalid={bankrollError !== null}
+              aria-describedby={bankrollError ? 'bankroll-error' : undefined}
+              class="sim-ar-num"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setBankrollText(v);
+                if (v.trim() === '') {
+                  setBankrollPick('table');
+                  return;
+                }
+                const r = parseBankroll(v, rules.tableMin);
+                if (r.ok) setBankrollPick(r.cents);
+              }}
+            />
+          </label>
+          {tableTooSmall ? (
+            <p class="sim-ar-desc">
+              Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
+          {bankrollError ? (
+            <p id="bankroll-error" role="alert" class="sim-invalid">
+              {bankrollError}
+            </p>
+          ) : null}
+        </div>
         <div class="sim-ar-group" role="group" aria-label="Sessions">
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
@@ -394,18 +590,51 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <label class="sim-ar-group">
             Rules
             <select
-              value={preset}
+              value={editingRules || customRules ? 'custom' : preset}
               disabled={running}
-              onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                if (v === 'custom') return setEditingRules(true);
+                setEditingRules(false);
+                setCustomRules(null);
+                setPreset(v as RulePresetId);
+              }}
             >
               {PRESET_IDS.map((id) => (
                 <option key={id} value={id}>
                   {PRESET_LABEL[id]}
                 </option>
               ))}
+              <option value="custom">Custom…</option>
             </select>
           </label>
         )}
+        {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <button
+            type="button"
+            class="sim-ar-btn"
+            disabled={running}
+            onClick={() => setEditingRules(true)}
+          >
+            Edit custom rules
+          </button>
+        ) : null}
+        {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <RulesEditor
+            initial={rules}
+            disabled={running}
+            onCancel={() => setEditingRules(false)}
+            onApply={(r) => {
+              setEditingRules(false);
+              // a form equal to a preset is that preset
+              const m = matchingPreset(r);
+              if (m) {
+                setPreset(m);
+                setCustomRules(null);
+              } else setCustomRules(r);
+            }}
+          />
+        ) : null}
         <div class="sim-ar-group">
           <label>
             Seed{' '}
@@ -464,7 +693,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
 
   function renderOutput(o: Outcome) {
-    const start = bankroll;
+    const start = o.cfg.bankroll;
     const noBet = o.specs.length === 1 && o.specs[0]!.id === 'no-bet';
     if (noBet && o.kind === 'single') return <TotalsHistogram counts={o.results[0]!.totals} />;
     let series: ChartSeries[];
@@ -545,6 +774,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </tbody>
           </table>
         </div>
+        {o.cfg.stopWin !== undefined || o.cfg.stopLoss !== undefined ? (
+          <p class="sim-ar-desc">
+            Stops don't change the edge; they only cut how many rolls you play.
+          </p>
+        ) : null}
       </>
     );
   }
@@ -556,49 +790,83 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
     // learner-facing cost rows come from the run's OWN expected loss, so they agree with the
     // "Expected loss" / "Expected final bankroll" rows (the analytic steady-layout figure is not shown)
+    // Per roll PLAYED: stopped sessions play fewer rolls, so divide by the rolls actually played.
     const lossPerRoll = (): number[] =>
       o.kind === 'single'
         ? o.results.map((r) => (r.rollsPlayed > 0 ? r.expectedLoss / r.rollsPlayed : 0))
-        : o.results.map((r) => {
-            const n = Math.max(1, r.expected.length - 1);
-            return (bankroll - r.expected[r.expected.length - 1]!) / n;
-          });
+        : o.results.map((r) => r.meanExpectedLoss / Math.max(1, r.meanRollsPlayed));
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
-    const edge = metrics.map((m) => pct(m.edgeOnAction));
+    const edge = metrics.map((m) =>
+      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
+    );
     if (o.kind === 'single') {
       const rs = o.results;
-      return [
+      const rows: Array<[string, string[]]> = [
+        ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
         ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
-        ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
+        ['Actual result', rs.map((r) => money2(r.finalEquity - o.cfg.bankroll, true))],
         ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
         [
           'Luck (actual minus expected)',
-          rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
+          rs.map((r) => money2(r.finalEquity - o.cfg.bankroll + r.expectedLoss, true)),
+        ],
+        [
+          'Luck in typical swings',
+          rs.map((r) => {
+            const l = luckFrom(r.finalEquity - bankroll, r.expectedLoss, r.variance);
+            return l.z === null ? 'n/a' : `${l.z > 0 ? '+' : ''}${l.z.toFixed(1)} (${l.verdict})`;
+          }),
         ],
         ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],
         ['Biggest drop from a peak', rs.map((r) => money2(r.maxDrawdown))],
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
+        ['Ended by', rs.map((r) => endedByText(r, o.cfg))],
+        ['Rolls played', rs.map((r) => String(r.rollsPlayed))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
+        ...(rs.some((r) => r.bonusHits?.length)
+          ? [
+              [
+                'Bonus bet hits',
+                rs.map((r) =>
+                  r.bonusHits?.length
+                    ? r.bonusHits
+                        .map((h) => `${betLabel(h.type)} ${h.pays}:1 x${h.count}`)
+                        .join(', ')
+                    : 'none',
+                ),
+              ] as [string, string[]],
+            ]
+          : []),
         ['Rolls per $1 of expected loss', perDollar],
         [`Expected cost per ${rollsPerHour} rolls`, perHour],
       ];
+      return rows;
     }
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
-    return [
+    const rows: Array<[string, string[]]> = [
+      ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
       ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
       ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
       ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],
       ['Expected final bankroll', rs.map((r) => money2(last(r.expected)))],
       ['Chance of finishing ahead', rs.map((r) => pct(r.probAhead))],
       ['Busted sessions', rs.map((r) => pct(r.bustRate))],
+    ];
+    if (o.cfg.stopWin !== undefined)
+      rows.push(['% ended by stop-win', rs.map((r) => pct(r.stopWinRate))]);
+    if (o.cfg.stopLoss !== undefined)
+      rows.push(['% ended by stop-loss', rs.map((r) => pct(r.stopLossRate))]);
+    rows.push(
+      ['Average rolls played', rs.map((r) => r.meanRollsPlayed.toFixed(1))],
       ['Edge on action', edge],
       ['Rolls per $1 of expected loss', perDollar],
       [`Expected cost per ${rollsPerHour} rolls`, perHour],
-    ];
+    );
+    return rows;
   }
 }

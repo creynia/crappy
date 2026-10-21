@@ -105,6 +105,7 @@ function satisfy(run: Run, c: Condition, why: string): void {
   }
   if ('previewed' in c) return run.feed({ kind: 'previewed', betType: c.previewed });
   if ('acknowledged' in c) return run.feed({ kind: 'acknowledged' });
+  if ('answered' in c) return run.feed({ kind: 'answered', correct: true });
   if ('autoRollCompleted' in c)
     return run.feed({
       kind: 'auto-roll-completed',
@@ -137,6 +138,8 @@ function solve(scene: SceneConfig): Run {
       run.feed({ kind: 'acknowledged' });
       continue;
     }
+    // a step with a question is answered (correctly) before anything else
+    if (step.ask && !(run.rt.counters.ansOk ?? 0)) run.feed({ kind: 'answered', correct: true });
     if (step.expect && !conditionNeedsRoll(step.completeWhen)) {
       for (const m of step.expect) placeFor(run, m, why);
       if (run.rt.stepIndex === idx && !run.rt.done && !run.rt.satisfied)

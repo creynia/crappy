@@ -1,4 +1,5 @@
-import { BET_TYPES, isToggleable, upfrontVig } from '../engine/bets';
+import { BET_TYPES, hopText, isBonusType, isToggleable, upfrontVig } from '../engine/bets';
+import { bonusDistribution } from './bonus';
 import type {
   Bet,
   BetTypeId,
@@ -24,6 +25,8 @@ export interface RawOutcome {
   /** Dice combinations producing this row, out of the deciding combinations (unreduced). Absent for compound rows. */
   ways?: number;
   outOf?: number;
+  /** The point this row went through before resolving (line and come bets). */
+  via?: PointNumber;
 }
 export interface Distribution {
   rows: RawOutcome[];
@@ -45,7 +48,13 @@ export function isLineLike(t: BetTypeId): boolean {
   return LINES.has(t) || COMES.has(t);
 }
 
-function synth(type: BetTypeId, amount: Cents, point: PointNumber | null, vigPaid: Cents): Bet {
+function synth(
+  type: BetTypeId,
+  amount: Cents,
+  point: PointNumber | null,
+  vigPaid: Cents,
+  hop?: Dice,
+): Bet {
   return {
     id: 'math',
     type,
@@ -55,6 +64,7 @@ function synth(type: BetTypeId, amount: Cents, point: PointNumber | null, vigPai
     working: 'on',
     placedOnRoll: 0,
     vigPaid,
+    ...(hop ? { hop } : {}),
   };
 }
 
@@ -122,7 +132,7 @@ function distribution(
   const { groups, none } = enumerate(bet, phase, point, rules);
   const vigPaid = bet.vigPaid;
   const immediate: { w: number; row: Omit<RawOutcome, 'probability'> }[] = [];
-  const continuing: { w: number; sub: Distribution }[] = [];
+  const continuing: { w: number; sub: Distribution; point: PointNumber }[] = [];
   let resolvingWays = 0;
 
   for (const g of groups) {
@@ -136,11 +146,16 @@ function distribution(
         rules,
         `${prefix}Point ${res.point}, then `,
       );
-      continuing.push({ w, sub });
+      continuing.push({ w, sub, point: res.point });
       continue;
     }
     resolvingWays += w;
-    const text = totalsText(g.dice);
+    // A hop is decided by one exact pair, which totals cannot describe ("easy 6" would include 1-5).
+    const text = bet.hop
+      ? res.kind === 'win'
+        ? hopText(bet.hop) + (bet.hop[0] === bet.hop[1] ? '' : ' (either way round)')
+        : 'any other roll'
+      : totalsText(g.dice);
     if (res.kind === 'win') {
       immediate.push({
         w,
@@ -175,7 +190,7 @@ function distribution(
         rules,
         `${prefix}Point ${n}, then `,
       );
-      continuing.push({ w, sub });
+      continuing.push({ w, sub, point: n });
     }
   }
 
@@ -191,7 +206,7 @@ function distribution(
       const p = frac(c.w, 36);
       for (const r of c.sub.rows) {
         const { ways: _w, outOf: _o, ...rest } = r;
-        rows.push({ ...rest, probability: mul(r.probability, p) });
+        rows.push({ ...rest, via: rest.via ?? c.point, probability: mul(r.probability, p) });
       }
       rolls = add(rolls, mul(p, c.sub.expectedRolls));
     }
@@ -224,7 +239,10 @@ function rulesKey(rules: TableRules): string {
 }
 
 export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
-  const key = `${bet.type}|${bet.amount}|${bet.point}|${ctx.phase}|${ctx.point}|${rulesKey(ctx.rules)}`;
+  if (isBonusType(bet.type)) return bonusDistribution(bet.type, bet.amount, bet.progress);
+  if (bet.type === 'hop' && !bet.hop) throw new Error('hop needs a dice pair');
+  const hop = bet.type === 'hop' ? bet.hop : undefined;
+  const key = `${bet.type}|${bet.amount}|${bet.point}|${hop ? hopText(hop) : ''}|${ctx.phase}|${ctx.point}|${rulesKey(ctx.rules)}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const vigPaid = upfrontVig(bet.type, bet.amount, ctx.rules);
@@ -249,7 +267,7 @@ export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
     d = distribution(synth(t, bet.amount, p, vigPaid), 'point', p, ctx.rules, '');
   } else {
     d = distribution(
-      synth(t, bet.amount, bet.point, vigPaid),
+      synth(t, bet.amount, bet.point, vigPaid, hop),
       'point',
       ctx.point ?? 6,
       ctx.rules,
@@ -270,6 +288,7 @@ export function toOutcomes(d: Distribution): Outcome[] {
     outOf: r.outOf ?? Number(r.probability.d),
     probability: r.probability,
     net: r.net,
+    ...(r.via === undefined ? {} : { via: r.via }),
   }));
 }
 
@@ -297,7 +316,7 @@ export function worksNow(bet: BetLike, ctx: BetCtx): boolean {
 export function rollEffectGrid(bet: BetLike, ctx: BetCtx): RollEffect[] {
   const working = worksNow(bet, ctx);
   const point = isOddsType(bet.type) ? (bet.point ?? ctx.point) : ctx.point;
-  const full = synth(bet.type, bet.amount, bet.point, 0);
+  const full = synth(bet.type, bet.amount, bet.point, 0, bet.hop);
   const def = BET_TYPES[bet.type];
   return ALL_DICE.map((dice): RollEffect => {
     const res = def.resolve(full, rollCtx(dice, ctx.phase, point), ctx.rules, working);

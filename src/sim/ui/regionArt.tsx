@@ -2,6 +2,7 @@ import type { JSX } from 'preact';
 import { memo } from 'preact/compat';
 import type { PointNumber } from '../engine/types';
 import { DieFaceSvg } from './Dice';
+import { HOP_BAND } from './layouts/hopSlots';
 import { NUMBER_WORD } from './layouts/shared';
 import type { RegionDef } from './layouts/types';
 
@@ -54,12 +55,113 @@ function outline(r: RegionDef, stroke: string, fill: string, rx = 14): JSX.Eleme
   );
 }
 
+const BONUS_PIPS: Record<'fire' | 'all' | 'tall' | 'small', readonly number[]> = {
+  fire: [4, 5, 6, 8, 9, 10],
+  all: [2, 3, 4, 5, 6, 8, 9, 10, 11, 12],
+  tall: [8, 9, 10, 11, 12],
+  small: [2, 3, 4, 5, 6],
+};
+
+/** Bonus side-bet cell: title, paytable line and one pip per number still to collect / collected. */
+function BonusArt({ region, progress }: { region: RegionDef; progress: readonly number[] }) {
+  const { x, y, w, h } = region.rect;
+  const id = region.id as keyof typeof BONUS_PIPS;
+  const pips = BONUS_PIPS[id];
+  const fire = id === 'fire';
+  const accent = fire ? '#ff9a3c' : YELLOW;
+  const have = new Set(progress);
+  const left = x + 24;
+  const right = x + w * 0.72;
+  const perRow = pips.length > 6 ? Math.ceil(pips.length / 2) : pips.length;
+  const rows = Math.ceil(pips.length / perRow);
+  const step = (right - left) / perRow;
+  const r = Math.min(rows > 1 ? 15 : 16, step * 0.42);
+  const rowY = (row: number) => (rows > 1 ? y + h * (0.64 + row * 0.23) : y + h * 0.78);
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx="14"
+        fill={fire ? 'rgba(200,70,20,0.3)' : 'rgba(20,20,20,0.22)'}
+        stroke={accent}
+        stroke-width="3.5"
+      />
+      <text
+        x={left}
+        y={y + h * 0.3}
+        class="sim-label"
+        font-size={h * 0.24}
+        text-anchor="start"
+        fill={accent}
+      >
+        {region.label.toUpperCase()}
+      </text>
+      <text
+        x={left}
+        y={y + h * (rows > 1 ? 0.47 : 0.52)}
+        class="sim-tiny"
+        font-size={h * 0.12}
+        text-anchor="start"
+        fill={WHITE}
+        opacity="0.9"
+      >
+        {(region.sublabel ?? '').toUpperCase()}
+      </text>
+      <g class="sim-pips" aria-hidden="true">
+        {pips.map((n, i) => {
+          const px = left + step * (i % perRow) + r;
+          const py = rowY(Math.floor(i / perRow));
+          const on = have.has(n);
+          return (
+            <g key={n} class={on ? 'is-hit' : ''}>
+              <circle
+                cx={px}
+                cy={py}
+                r={r}
+                fill={on ? accent : 'rgba(0,0,0,0.25)'}
+                stroke={on ? accent : WHITE}
+                stroke-width="2"
+                opacity={on ? 1 : 0.7}
+              />
+              <text
+                x={px}
+                y={py + r * 0.4}
+                class="sim-tiny"
+                font-size={r * 1.15}
+                text-anchor="middle"
+                fill={on ? '#1a1a1a' : WHITE}
+                font-weight={on ? 700 : 400}
+              >
+                {n}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    </g>
+  );
+}
+
 /** Visual content of a betting region: borders, numerals, printed labels. No interaction here. */
-function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
+function RegionArtImpl({
+  region,
+  ctx,
+  progress,
+}: {
+  region: RegionDef;
+  ctx: ArtCtx;
+  /** bonus side bets: numbers collected so far (undefined for every other region) */
+  progress?: readonly number[];
+}) {
   const { x, y, w, h } = region.rect;
   const cx = x + w / 2;
   const cy = y + h / 2;
   const id = region.id;
+  if (id === 'fire' || id === 'all' || id === 'tall' || id === 'small')
+    return <BonusArt region={region} progress={progress ?? []} />;
 
   if (id.startsWith('box-')) {
     const n = Number(id.slice(4)) as PointNumber;
@@ -342,6 +444,69 @@ function RegionArtImpl({ region, ctx }: { region: RegionDef; ctx: ArtCtx }) {
     }
   }
 
+  // ---- hop bets (I035): title in a top band, the rest holds one chip stack per pair ----
+  if (id === 'hop') {
+    return (
+      <g>
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx="14"
+          fill="rgba(20,20,20,0.22)"
+          stroke={WHITE}
+          stroke-width="3.5"
+        />
+        <text x={x + 28} y={y + 42} class="sim-label" font-size="36" fill={WHITE}>
+          HOP BETS
+        </text>
+        {/* the title band never holds chips, so it stays a tap target for a new hop */}
+        <g opacity="0.9">
+          <rect
+            x={x + 236}
+            y={y + 12}
+            width={150}
+            height={34}
+            rx={17}
+            fill="none"
+            stroke={WHITE}
+            stroke-width="2"
+          />
+          <text
+            x={x + 311}
+            y={y + 35}
+            class="sim-tiny"
+            font-size="17"
+            text-anchor="middle"
+            fill={WHITE}
+          >
+            + ADD A HOP
+          </text>
+        </g>
+        <text
+          x={x + w - 28}
+          y={y + 40}
+          class="sim-tiny"
+          font-size="17"
+          text-anchor="end"
+          fill={WHITE}
+        >
+          {(region.sublabel ?? '').toUpperCase()}
+        </text>
+        <line
+          x1={x + 20}
+          x2={x + w - 20}
+          y1={y + HOP_BAND}
+          y2={y + HOP_BAND}
+          stroke={WHITE}
+          stroke-opacity="0.25"
+          stroke-width="2"
+        />
+      </g>
+    );
+  }
+
   // ---- center (proposition) cells ----
   const hard = /^hard-(\d+)$/.exec(id);
   let dice: [number, number] | null = null;
@@ -420,5 +585,6 @@ export const RegionArt = memo(
     a.region === b.region &&
     a.ctx.point === b.ctx.point &&
     a.ctx.fieldPays[2] === b.ctx.fieldPays[2] &&
-    a.ctx.fieldPays[12] === b.ctx.fieldPays[12],
+    a.ctx.fieldPays[12] === b.ctx.fieldPays[12] &&
+    (a.progress ?? []).join() === (b.progress ?? []).join(),
 );

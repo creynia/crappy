@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
 
@@ -8,11 +8,12 @@ async function bankroll(page: Page): Promise<number> {
 }
 
 test.describe('sandbox', () => {
-  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page }) => {
+  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page, guard }) => {
     await page.goto(url('seed=1&dice=3-4'));
     await page.locator('[data-region="pass"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('house edge 1.41%');
+    await guard.check('sheet-open');
     await expect(sheet).toContainText('Good bet');
     await sheet.getByRole('button', { name: 'Confirm' }).click();
     await expect(sheet).toHaveCount(0);
@@ -37,12 +38,13 @@ test.describe('sandbox', () => {
     await expect(sheet.locator('.sim-oneroll')).toHaveCount(0);
   });
 
-  test('center prop needs Place anyway', async ({ page }) => {
+  test('center prop needs Place anyway', async ({ page, guard }) => {
     await page.goto(url());
     await page.getByRole('button', { name: 'Center' }).click();
     await page.locator('[data-region="any-7"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('Sucker bet');
+    await guard.check('center');
     await sheet.getByRole('button', { name: 'Place anyway' }).click();
     await expect(sheet.getByRole('button', { name: /again to place anyway/i })).toBeVisible();
     await sheet.getByRole('button', { name: /again to place anyway/i }).click();
@@ -51,13 +53,91 @@ test.describe('sandbox', () => {
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
   });
 
-  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
+  test('hop bet: pick a hard hop in the 21-pair picker, win 30 to 1', async ({ page }) => {
+    await page.goto(url('seed=1&dice=3-3'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="hop"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.locator('.sim-hop-cell')).toHaveCount(21);
+    await expect(sheet).toContainText('11.11%'); // starts on the 2-4 easy hop
+    await sheet.locator('[data-hop="3-3"]').click();
+    await expect(sheet.locator('[data-hop="3-3"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(sheet).toContainText('13.89%');
+    await expect(sheet.locator('.sim-hop-note')).toContainText('pays 30 to 1 · edge 13.89%');
+    const amount = Number(
+      (await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9.]/g, ''),
+    );
+    await sheet.getByRole('button', { name: 'Place anyway' }).click();
+    await sheet.getByRole('button', { name: /again to place anyway/i }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Edit Hop 3-3 bet/ })).toBeVisible();
+    const before = await bankroll(page);
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    await expect.poll(() => bankroll(page)).toBe(before + amount * 31);
+  });
+
+  test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
+    page,
+  }) => {
+    await page.goto(url('seed=1&dice=1-1,1-2,3-4'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="fire"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toContainText('house edge 20.76%');
+    await expect(sheet).toContainText('Sucker bet');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.locator('[data-region="small"]').click();
+    await expect(sheet).toContainText('house edge 7.76%');
+    await expect(sheet).toContainText('Costly');
+    await expect(sheet.getByLabel('Bet amount')).toHaveText('$5');
+    await sheet.getByRole('button', { name: 'Confirm' }).click();
+    await expect(sheet).toHaveCount(0);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 2
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 3
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(2);
+    await page.locator('[data-stack]').first().click();
+    await expect(sheet).toContainText('stays up until the hand decides it');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 7: Small loses
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
+  test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
+    await page.goto(url());
+    const buy4 = async () => {
+      await page.locator('[data-region="box-4"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('radio', { name: /^Buy/ }).click();
+      const text = await sheet.locator('.sim-headline').innerText();
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      return text;
+    };
+    expect(await buy4()).toContain('1.67%');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const menu = page.locator('.sim-menu');
+    await menu.getByLabel('Rules').selectOption('custom');
+    const form = page.locator('form.sim-rules');
+    await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
+    await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await form.getByRole('button', { name: /^Apply/ }).click();
+    await expect(form).toHaveCount(0);
+    await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    expect(await buy4()).toContain('4.76%');
+  });
+
+  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
     await expect(panel).toBeVisible();
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await guard.check('auto-roll-done');
   });
 
   test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
@@ -93,13 +173,37 @@ test.describe('sandbox', () => {
     }
   });
 
-  test('sandbox state persists across reload', async ({ page }) => {
+  test('auto-roll starting bankroll picker sets the run bankroll without page overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/play?speed=fast');
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const panel = page.locator('.sim-auto');
+    await panel
+      .getByRole('group', { name: 'Starting bankroll' })
+      .getByRole('button', { name: '$5,000' })
+      .click();
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('region', { name: 'Strategy summary' })).toContainText(
+      '$5,000.00',
+    );
+    const scroll = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+      '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+    );
+    expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
+  });
+
+  test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     await page.goto('/');
     await page.goto(url());
     await expect(page.locator('.sim-status-money')).toContainText('On table $5');
+    await guard.check('sandbox-reloaded');
   });
 });
 
@@ -314,6 +418,67 @@ test.describe('sandbox flows', () => {
     expect(await run('Max')).toBe(max); // same seed, same settings: identical result
   });
 
+  test('a come bet slides from the box to its number, then sweeps on the seven-out', async ({
+    page,
+  }) => {
+    // Drive the animation timeline with a controlled clock so each step is observable.
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '2-3', '3-4'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await place(page, 'come');
+    await roll(page); // 5: the come bet travels
+    await page.clock.runFor(700); // dice 650: the travel step (no puck on a 5) is under way
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).toHaveClass(/is-moving/);
+    await expect(ghost).toHaveAttribute('style', /--dx: -?\d.*--dy: -?\d/);
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // only the pass line while the chips move
+    await page.clock.runFor(300);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await roll(page); // seven-out: both bets are swept
+    await page.clock.runFor(700); // dice settled, puck moving: the chips still sit on their spots
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(2);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(0);
+    await page.clock.runFor(100);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(2);
+    await page.clock.runFor(1000);
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
+  test('point made with a come bet in the box: the chip waits at the box until the travel step', async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '5-3'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await place(page, 'come');
+    const comeBox = await page.locator('[data-stack="b2"] .sim-stack').getAttribute('transform');
+    await roll(page); // 8: point made, pass wins, the come bet travels to the 8
+    await page.clock.runFor(700); // dice settled (650), puck step running: nothing has moved yet
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).not.toHaveClass(/is-moving/);
+    await expect(ghost.locator('.sim-stack')).toHaveAttribute('transform', comeBox!);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(0); // never drawn at the 8 early
+    await page.clock.runFor(100); // the travel step starts at 750
+    await expect(ghost).toHaveClass(/is-moving/);
+    await page.clock.runFor(250);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(1);
+    await page.clock.runFor(1000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+  });
+
   test('tapping the table skips the roll animation', async ({ page }) => {
     // Freeze time so only the tap can finish the roll: with the clock paused the animation timers
     // never fire, so "Roll is enabled again" proves the skip, not a fast machine.
@@ -330,5 +495,32 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
+  });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await clear('.sim-session-panel h3');
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    await expect(auto).toBeInViewport({ ratio: 0.5 });
+    await expect(auto).toBeFocused();
   });
 });

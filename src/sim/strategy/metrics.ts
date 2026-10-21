@@ -63,8 +63,24 @@ function materialize(state: GameState, actions: Action[]): GameState {
   return { ...state, bets, nextBetId };
 }
 
+const ONE_ROLL: ReadonlySet<BetTypeId> = new Set<BetTypeId>([
+  'field',
+  'any-7',
+  'any-craps',
+  'yo-11',
+  'aces-2',
+  'boxcars-12',
+  'ace-deuce-3',
+  'horn',
+  'c-e',
+  'world',
+]);
+
 /** The strategy's steady-state layout in the point phase (point 6), built via its own `decide`. */
-function steadyState(spec: StrategySpec, rules: TableRules): GameState {
+function steadyState(
+  spec: StrategySpec,
+  rules: TableRules,
+): { state: GameState; comeOutOnly: Bet[] } {
   const impl = getImpl(spec.id);
   let s = {
     version: 1,
@@ -79,23 +95,39 @@ function steadyState(spec: StrategySpec, rules: TableRules): GameState {
     seed: 0,
     forcedDice: [],
     nextBetId: 1,
-    stats: { totalWagered: 0, totalWon: 0, totalLost: 0, totalVig: 0, expectedLoss: 0, byType: {} },
+    stats: {
+      totalWagered: 0,
+      totalWon: 0,
+      totalLost: 0,
+      totalVig: 0,
+      expectedLoss: 0,
+      variance: 0,
+      byType: {},
+    },
   } as GameState;
   s = materialize(s, impl.decide(s, spec));
-  s = { ...s, phase: 'point', point: 6 };
+  // One-roll bets placed on the come-out (an Any Craps hedge) are gone after that roll. Take them out
+  // of the point-phase layout; they are costed once per decision instead (see strategyMetrics). A
+  // one-roll bet the strategy re-places every roll (field, any 7) stays in the layout.
+  const oneRoll = s.bets.filter((b) => ONE_ROLL.has(b.type));
+  s = { ...s, phase: 'point', point: 6, bets: s.bets.filter((b) => !ONE_ROLL.has(b.type)) };
   for (let i = 0; i < 4; i++) {
     const acts = impl.decide(s, spec);
     if (acts.length === 0) break;
     s = materialize(s, acts);
   }
-  return s;
+  const comeOutOnly = oneRoll.filter((b) => !s.bets.some((x) => x.type === b.type));
+  return { state: s, comeOutOnly };
 }
+
+/** Strategies that change their layout over time: metrics describe the starting layout (approximate). */
+const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-regress']);
 
 /** Analytic cost of keeping the strategy's layout up (see simulator.md §2.4). */
 export function strategyMetrics(spec: StrategySpec, rules: TableRules): StrategyMetrics {
   const r = rules;
-  const state = steadyState(spec, r);
-  const lossCents = toNumber(tableExpectedLossPerRoll(state));
+  const { state, comeOutOnly } = steadyState(spec, r);
+  let lossCents = toNumber(tableExpectedLossPerRoll(state));
   // action per roll = sum of amounts / expected rolls until each resolves
   let action = 0;
   for (const b of state.bets) {
@@ -120,11 +152,27 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const e = betEdge(b.type, b.amount, { ...ctx, rules: r });
     action += b.amount / toNumber(e.expectedRolls);
   }
+  if (comeOutOnly.length > 0) {
+    // one come-out roll per decision: spread the bet over the rolls a decision lasts
+    const line = state.bets.find((b) => LINE_TYPES.has(b.type));
+    const perDecision = line
+      ? toNumber(
+          betEdge(line.type, line.amount, { phase: 'come-out', point: null, rules: r })
+            .expectedRolls,
+        )
+      : 1;
+    for (const b of comeOutOnly) {
+      const e = betEdge(b.type, b.amount, { phase: 'come-out', point: null, rules: r });
+      lossCents += (toNumber(e.perResolved) * b.amount) / perDecision;
+      action += b.amount / perDecision;
+    }
+  }
   const expectedLossPerRoll = lossCents / 100;
   return {
     edgeOnAction: action > 0 ? lossCents / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
+    ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
   };
 }
 

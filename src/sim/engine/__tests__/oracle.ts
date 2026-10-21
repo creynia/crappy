@@ -16,7 +16,8 @@ export type OracleOut =
   | { kind: 'push' }
   | { kind: 'win'; profit: number; vig: number }
   | { kind: 'travel'; point: number }
-  | { kind: 'return'; reason: string };
+  | { kind: 'return'; reason: string }
+  | { kind: 'advance'; progress: readonly number[] };
 
 export interface OracleIn {
   type: string; // bet type id
@@ -29,6 +30,9 @@ export interface OracleIn {
   upfrontPaid?: boolean; // upfront vig already paid and not yet consumed by a win
   working: boolean; // already decided by the caller (only matters for toggleable bets)
   rules: OracleRules;
+  hop?: [number, number]; // hop bets: the chosen pair, in either order
+  /** bonus bets: numbers already collected */
+  progress?: number[];
 }
 
 const WIN: OracleOut = { kind: 'win', profit: 0, vig: 0 };
@@ -126,6 +130,35 @@ export function oracle(i: OracleIn): OracleOut {
     return N;
   }
 
+  // Bonus side bets (rules as plain data): Fire counts distinct points made this hand, paid when the
+  // shooter sevens out with 4 or 5 of them (24/249 to 1) or at once on the 6th (999 to 1). Small/Tall/All
+  // need every number of their set before any 7 (34/34/175 to 1) and lose on any 7, come-out included.
+  if (i.type === 'fire') {
+    const have = i.progress ?? [];
+    if (i.phase !== 'point') return N;
+    if (t === i.point) {
+      if (have.includes(t)) return N;
+      const next = [...have, t].sort((x, y) => x - y);
+      return next.length === 6 ? winAt(999, 1) : { kind: 'advance', progress: next };
+    }
+    if (t === 7) return have.length === 4 ? winAt(24, 1) : have.length === 5 ? winAt(249, 1) : L;
+    return N;
+  }
+  if (i.type === 'small' || i.type === 'tall' || i.type === 'all') {
+    const set =
+      i.type === 'small'
+        ? [2, 3, 4, 5, 6]
+        : i.type === 'tall'
+          ? [8, 9, 10, 11, 12]
+          : [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+    const pays = i.type === 'all' ? 175 : 34;
+    const have = i.progress ?? [];
+    if (t === 7) return L;
+    if (!set.includes(t) || have.includes(t)) return N;
+    const next = [...have, t].sort((x, y) => x - y);
+    return next.length === set.length ? winAt(pays, 1) : { kind: 'advance', progress: next };
+  }
+
   switch (i.type) {
     case 'pass-line':
       if (i.phase === 'come-out') {
@@ -212,6 +245,15 @@ export function oracle(i: OracleIn): OracleOut {
       if (t === 3 || t === 11) return { kind: 'win', profit: 15 * u - 4 * u, vig: 0 };
       if (t === 7) return { kind: 'push' };
       return L;
+    }
+    case 'hop': {
+      // One exact pair on the next roll. A pair (3-3) is one of 36 rolls and pays 30 to 1;
+      // two different dice (2-4) can land either way round, two of 36 rolls, paying 15 to 1.
+      if (!i.hop) throw new Error('oracle: hop needs a pair');
+      const [h1, h2] = i.hop;
+      const hit = (i.d1 === h1 && i.d2 === h2) || (i.d1 === h2 && i.d2 === h1);
+      if (!hit) return L;
+      return h1 === h2 ? winAt(30, 1) : winAt(15, 1);
     }
   }
   throw new Error(`oracle: unknown bet ${i.type}`);

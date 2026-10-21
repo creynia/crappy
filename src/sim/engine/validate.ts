@@ -1,12 +1,16 @@
 import {
   BET_TYPES,
   isBetTypeId,
+  isDicePair,
   isToggleable,
+  normalizeHop,
+  sameHop,
   nominalVig,
   payRatio,
   payout,
   upfrontVig,
 } from './bets';
+import { isHandStart } from './hand';
 import { formatMoney } from './money';
 import { isWorking } from './working';
 import type {
@@ -15,6 +19,7 @@ import type {
   BetTypeDef,
   BetTypeId,
   Cents,
+  Dice,
   GameState,
   PointNumber,
   Validation,
@@ -63,12 +68,15 @@ export function findParent(
   return undefined;
 }
 
-/** The existing instance a new placement of this type merges into, if any. */
+/** The existing instance a new placement of this type merges into, if any (hop: the same pair). */
 export function findMergeTarget(
   state: GameState,
   betType: BetTypeId,
   parent?: Bet,
+  hop?: Dice,
 ): Bet | undefined {
+  if (betType === 'hop')
+    return hop ? state.bets.find((b) => b.type === 'hop' && sameHop(b.hop, hop)) : undefined;
   if (BET_TYPES[betType].category === 'odds')
     return parent
       ? state.bets.find((b) => b.type === betType && b.parentId === parent.id)
@@ -113,8 +121,14 @@ export function maxOddsAmount(state: GameState, parentId: string): Cents {
 
 function minFor(state: GameState, def: BetTypeDef): Cents {
   if (def.category === 'odds') return 100;
-  if (def.category === 'prop' || def.category === 'hardway') return state.rules.propMin;
+  if (def.category === 'prop' || def.category === 'hardway' || def.category === 'bonus')
+    return state.rules.propMin;
   return state.rules.tableMin;
+}
+
+function bonusTiming(state: GameState, def: BetTypeDef, verb: string): Fail | null {
+  if (def.category !== 'bonus' || isHandStart(state)) return null;
+  return fail('wrong-phase', `${def.label} can only be ${verb} before a new shooter's first roll.`);
 }
 
 function shape(def: BetTypeDef, amount: Cents): Fail | null {
@@ -242,13 +256,24 @@ function validatePlace(
   const { betType, amount, parentId } = action;
   if (!isBetTypeId(betType)) return fail('unknown-bet', `Unknown bet "${String(betType)}".`);
   const def = BET_TYPES[betType];
+  if (betType === 'hop') {
+    if (!isDicePair(action.hop))
+      return fail('bad-dice', 'A hop bet needs a pair of dice, each showing 1 to 6, such as 2-4.');
+  } else if (action.hop !== undefined) {
+    return fail('bad-dice', `${def.label} does not take a dice pair; only hop bets do.`);
+  }
   const shapeErr = shape(def, amount);
   if (shapeErr) return shapeErr;
   const { rules } = state;
 
   const isOdds = def.category === 'odds';
   const parent = isOdds ? findParent(state, betType, parentId) : undefined;
-  const existing = findMergeTarget(state, betType, parent);
+  const existing = findMergeTarget(
+    state,
+    betType,
+    parent,
+    action.hop ? normalizeHop(action.hop) : undefined,
+  );
   const total = (existing?.amount ?? 0) + amount;
 
   // 3. min / max
@@ -275,7 +300,10 @@ function validatePlace(
       if (state.phase === 'come-out')
         return fail('wrong-phase', `${def.label} bets can only be made after a point is set.`);
       break;
-    default:
+    default: {
+      const bt = bonusTiming(state, def, 'placed');
+      if (bt) return bt;
+    }
   }
   // 6. odds
   let point: PointNumber | null = def.number;
@@ -357,7 +385,10 @@ function validateSetAmount(
           });
         }
         break;
-      default:
+      default: {
+        const bt = bonusTiming(state, def, 'changed');
+        if (bt) return bt;
+      }
     }
   }
   const mm = minMax(state, def, amount);
@@ -406,6 +437,11 @@ function validateRemove(
     return fail('contract-bet', 'The Pass Line cannot be taken down once a point is set.');
   if (bet.type === 'come' && bet.point !== null)
     return fail('contract-bet', 'A Come bet on a number cannot be taken down.');
+  if (BET_TYPES[bet.type].category === 'bonus')
+    return fail(
+      'not-removable',
+      `${BET_TYPES[bet.type].label} stays up until the hand decides it.`,
+    );
   const w: Warning[] = [];
   if (
     (bet.type === 'dont-pass' && state.phase === 'point') ||
@@ -470,7 +506,12 @@ export function legalBetTypes(state: GameState): BetTypeId[] {
             validateAction(rich, { type: 'place-bet', betType: id, amount: probe, parentId: b.id })
               .ok,
         )
-      : validateAction(rich, { type: 'place-bet', betType: id, amount: probe }).ok;
+      : validateAction(rich, {
+          type: 'place-bet',
+          betType: id,
+          amount: probe,
+          ...(id === 'hop' ? { hop: [1, 2] as Dice } : {}),
+        }).ok;
     if (ok) out.push(id);
   }
   return out;

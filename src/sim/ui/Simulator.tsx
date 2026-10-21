@@ -40,7 +40,7 @@ export interface SimulatorInternalProps extends SimulatorProps {
 
 const isCenterBet = (b: Bet) => {
   const c = BET_TYPES[b.type].category;
-  return c === 'prop' || c === 'hardway';
+  return c === 'prop' || c === 'hardway' || c === 'bonus';
 };
 
 export function Simulator(props: SimulatorInternalProps) {

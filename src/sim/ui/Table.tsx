@@ -38,6 +38,8 @@ export interface TableProps {
   class?: string;
 }
 
+const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', 'tall', 'small']);
+
 interface Placed {
   key: string;
   region: RegionDef;
@@ -122,6 +124,11 @@ export function Table({
   const hasPuck = layout.puckRadius > 0;
   const puckPos = point ? layout.puck[point] : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
+  // bonus side bets draw their collected numbers as pips inside the cell
+  const progressFor = (region: RegionDef): readonly number[] | undefined => {
+    if (!BONUS_REGIONS.has(region.id)) return undefined;
+    return bets.find((b) => b.type === region.id)?.progress ?? [];
+  };
   const wonIds = new Set((wonBets ?? []).map((x) => x.bet.id));
 
   const moveFocus = (from: Element, dir: 1 | -1) => {
@@ -183,7 +190,11 @@ export function Table({
               onClick={() => onRegionTap?.(region.id)}
               onKeyDown={(e) => onKey(e, region.id)}
             >
-              <RegionArt region={region} ctx={{ fieldPays, point }} />
+              <RegionArt
+                region={region}
+                ctx={{ fieldPays, point }}
+                progress={progressFor(region)}
+              />
               <rect class="sim-hit" x={x} y={y} width={rw} height={rh} rx="14" />
               <rect
                 class="sim-focus-ring"

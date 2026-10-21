@@ -87,3 +87,36 @@ test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ pa
   await sheet.getByRole('button', { name: 'Confirm' }).click();
   await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
 });
+
+test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/#/learn/sucker-bets');
+  const scene = await openScene(page, 2); // opens on the Center panel (ui.view: center)
+  await scene.getByRole('radio', { name: '$1 chip' }).click();
+  const sheet = page.getByRole('dialog');
+  await scene.locator('[data-region="fire"]').click();
+  await expect(sheet.getByLabel('Bet amount')).toHaveText('$1');
+  await expect(sheet).toContainText('about 1 in');
+  await expect(sheet.locator('.sim-alt')).toHaveCount(0); // the scene allows no cheaper alternative
+  await sheet.getByRole('button', { name: 'Place anyway' }).click();
+  await sheet.getByRole('button', { name: /again to place anyway/i }).click();
+  await scene.locator('[data-region="small"]').click();
+  await expect(sheet.getByLabel('Bet amount')).toHaveText('$1');
+  await sheet.getByRole('button', { name: 'Confirm' }).click();
+  await expect(scene.locator('.sim-step-text')).toContainText('My layout');
+  await scene.getByRole('button', { name: /^Auto-roll 8500/ }).click();
+  await expect(scene.locator('.sim-step-text')).toContainText('Bonus bet hits', {
+    timeout: 90_000,
+  });
+  const summary = scene.getByTestId('auto-roll-summary');
+  const row = (label: string) =>
+    summary
+      .locator('tr', { has: page.locator('th', { hasText: label }) })
+      .locator('td')
+      .first();
+  await expect(row('Bonus bet hits')).toContainText(/Small 34:1 x\d+/);
+  const expected = Number((await row('Expected loss').innerText()).replace(/[^0-9.-]/g, ''));
+  expect(expected).toBeLessThan(-230); // about -$285 over 1,000 hands at $1 + $1
+  expect(expected).toBeGreaterThan(-330);
+  await expect(row('Busted')).toHaveText('No');
+});

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Action, BetTypeId, Cents } from '../engine/types';
 import type { ActionPreview } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
+import { DiceGrid } from './DiceGrid';
 import './sim.css';
 
 export type SheetPreview = ActionPreview;
@@ -289,6 +290,9 @@ export function BetSheet(p: BetSheetProps) {
                     ))}
                   </tbody>
                 </table>
+                {preview.explanation.grid ? (
+                  <DiceGrid grid={preview.explanation.grid} note={preview.explanation.gridNote} />
+                ) : null}
                 <p class="sim-formula">{preview.explanation.evFormula}</p>
                 {preview.explanation.note ? (
                   <p class="sim-note">{preview.explanation.note}</p>

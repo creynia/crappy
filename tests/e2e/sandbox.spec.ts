@@ -1,5 +1,11 @@
 import { expect, test, type Page } from './helpers';
 
+/** the odds nudge hides roll toasts while it is up; a test that reads a roll toast dismisses it first */
+async function dismissNudge(page: Page) {
+  const got = page.getByRole('button', { name: 'Got it' });
+  if ((await got.count()) > 0) await got.click();
+}
+
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
 
 async function bankroll(page: Page): Promise<number> {
@@ -295,6 +301,7 @@ test.describe('sandbox flows', () => {
     // 5:5 even money on the flat bet, 3:2 on the odds, both returned
     const won = 5 + Math.floor((Number(odds) * 3) / 2);
     await expect.poll(() => bank(page)).toBe(`$${490 - Number(odds) + 5 + Number(odds) + won}`);
+    await dismissNudge(page);
     await expect(page.locator('.sim-toast').first()).toContainText(/^5\b/);
   });
 
@@ -366,6 +373,7 @@ test.describe('sandbox flows', () => {
       for (let i = 0; i < 5; i++) {
         await roll(page);
         await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+        await dismissNudge(page);
         seen.push(await page.locator('.sim-toast').last().innerText());
       }
       return seen.join('|');
@@ -379,8 +387,10 @@ test.describe('sandbox flows', () => {
 
     await fresh(page, 'seed=1&' + dice('6-6', 'junk', '3-4'));
     await roll(page);
+    await dismissNudge(page);
     await expect(page.locator('.sim-toast').first()).toContainText('12');
     await roll(page);
+    await dismissNudge(page);
     await expect(page.locator('.sim-toast').last()).toContainText('7');
 
     await fresh(page, 'rules=odds-100x&seed=1&' + dice('3-3'));
@@ -648,6 +658,7 @@ test.describe('sandbox flows', () => {
     await page.getByRole('group', { name: 'Craps table' }).click({ position: { x: 4, y: 4 } });
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
+    await dismissNudge(page);
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
   });
 

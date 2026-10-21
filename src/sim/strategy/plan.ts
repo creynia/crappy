@@ -69,7 +69,7 @@ export async function planRisk(input: PlanInput, opts: PlanOptions = {}): Promis
       ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.schedule ? { schedule: opts.schedule } : {}),
       ...(opts.sliceMs !== undefined ? { sliceMs: opts.sliceMs } : {}),
-      ...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
+      ...(opts.onProgress ? { onProgress: (p: number) => opts.onProgress!(p) } : {}),
     },
   );
   return {

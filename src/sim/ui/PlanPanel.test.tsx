@@ -25,7 +25,7 @@ describe('PlanPanel', () => {
     );
     expect(el.querySelector('[data-testid="plan-risk"]')).toBeNull();
     await until(el, '[data-testid="plan-suggest"]');
-    const risk = el.querySelector('[data-testid="plan-risk"]')!.textContent!;
+    const risk = el.querySelector('[data-testid="plan-risk"]')!.textContent;
     expect(risk).toMatch(/Goes broke before the end: \d+(\.\d)?% of 500 simulated sessions/);
     expect(risk).toMatch(/Finishes ahead/);
     // $100 against $10 + max odds goes broke often, so a bigger bankroll is suggested
@@ -40,7 +40,7 @@ describe('PlanPanel', () => {
     render(<PlanPanel bankroll={100_000} debounceMs={0} />, el);
     await until(el, '[data-testid="plan-risk"]');
     const before = el.querySelector('[data-testid="plan-expected"]')!.textContent;
-    await act(async () => {
+    await act(() => {
       pressed(el, 'Hours', '8 h')!.click();
     });
     expect(el.querySelector('[data-testid="plan-risk"]')).toBeNull();
@@ -54,11 +54,11 @@ describe('PlanPanel', () => {
     const el = document.createElement('div');
     render(<AutoRollPanel />, el);
     expect(el.querySelector('[data-testid="plan-panel"]')).toBeNull();
-    await act(async () => {
+    await act(() => {
       pressed(el, 'Auto-roll mode', 'Plan')!.click();
     });
     expect(el.querySelector('[data-testid="plan-panel"]')).not.toBeNull();
-    await act(async () => {
+    await act(() => {
       pressed(el, 'Auto-roll mode', 'Run')!.click();
     });
     expect(el.querySelector('[data-testid="auto-roll-run"]')).not.toBeNull();

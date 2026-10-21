@@ -87,8 +87,20 @@ steps:
     completeWhen: { acknowledged: true }
     advance: button
   - id: seven
-    text: "Roll: 7. The $10 Come bet loses, but your $50 odds come back to you."
-    completeWhen: { event: bet-returned }
+    text: "A 7 is about to roll on this come-out. Call it before you roll."
+    ask:
+      q: "A 7 comes on the come-out. What happens to your $10 Come bet on 8 and its $50 odds?"
+      options:
+        - "Both lose"
+        - "The Come bet loses and the odds come back"
+        - "Both win"
+        - "The Come bet wins and the odds lose"
+      answer: 1
+      explain: "Your Come bet on 8 loses because a 7 came before the 8. Its odds are off on a come-out roll by default, so the $50 comes back to you."
+    completeWhen: { all: [{ answered: correct }, { event: bet-returned }] }
+  - id: recap
+    text: "Roll: 7. The $10 Come bet lost, and the $50 odds came back to you. That is the \"off\" marker at work."
+    completeWhen: { acknowledged: true }
 ```
 
 ```quiz

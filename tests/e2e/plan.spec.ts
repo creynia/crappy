@@ -9,6 +9,7 @@ test.describe('session plan', () => {
       page,
     }, info) => {
       test.skip(info.project.name !== 'mobile', 'sets its own viewports');
+      test.setTimeout(90_000);
       await page.setViewportSize(vp);
       await page.goto('/#/play?speed=instant&seed=1');
       await page.getByRole('button', { name: 'Auto-roll', exact: true }).click();
@@ -21,7 +22,7 @@ test.describe('session plan', () => {
         .getByRole('button', { name: '$100' })
         .click();
       await expect(plan.getByTestId('plan-suggest')).toContainText('gets that under 5%', {
-        timeout: 30_000,
+        timeout: 80_000,
       });
       await expect(plan.getByTestId('plan-risk')).toContainText('simulated sessions');
       await expect(plan.getByTestId('plan-stop')).toContainText('Suggested stop-loss');

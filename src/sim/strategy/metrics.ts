@@ -79,7 +79,15 @@ function steadyState(spec: StrategySpec, rules: TableRules): GameState {
     seed: 0,
     forcedDice: [],
     nextBetId: 1,
-    stats: { totalWagered: 0, totalWon: 0, totalLost: 0, totalVig: 0, expectedLoss: 0, byType: {} },
+    stats: {
+      totalWagered: 0,
+      totalWon: 0,
+      totalLost: 0,
+      totalVig: 0,
+      expectedLoss: 0,
+      variance: 0,
+      byType: {},
+    },
   } as GameState;
   s = materialize(s, impl.decide(s, spec));
   s = { ...s, phase: 'point', point: 6 };

@@ -1,4 +1,5 @@
 import type { BetTypeId, SessionStats } from '../engine/types';
+import { luckOf, luckText } from '../math/luck';
 import { betLabel, fmtMoney, fmtPct } from './text';
 
 export interface SessionPanelProps {
@@ -11,6 +12,7 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
   const actual = stats.totalWon - stats.totalLost;
   const expected = -stats.expectedLoss;
   const luck = actual - expected;
+  const band = luckOf(stats);
   const edge = stats.totalWagered > 0 ? stats.expectedLoss / stats.totalWagered : null;
   const rows = (
     Object.entries(stats.byType) as [BetTypeId, NonNullable<SessionStats['byType'][BetTypeId]>][]
@@ -54,6 +56,22 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
           <dd data-k="edge">{edge === null ? 'n/a' : fmtPct(edge)}</dd>
         </div>
       </dl>
+      <p class={`sim-luck-text is-${band.verdict}`} data-k="luck-band">
+        Luck: {fmtMoney(luck, { sign: true })} — {luckText(band)}
+      </p>
+      {band.z !== null ? (
+        <div
+          class="sim-luck-bar"
+          role="img"
+          aria-label={`Luck is ${band.z.toFixed(1)} typical swings from expected, on a scale from -2 to +2`}
+        >
+          <span class="sim-luck-mid" />
+          <span
+            class="sim-luck-marker"
+            style={{ left: `${(Math.max(-2.5, Math.min(2.5, band.z)) + 2.5) * 20}%` }}
+          />
+        </div>
+      ) : null}
       {rows.length ? (
         <div class="sim-session-table-wrap">
           <table class="sim-session-table">

@@ -18,6 +18,8 @@ export function loadSandbox(key: string): PersistedSandbox | null {
     if (!raw) return null;
     const p = JSON.parse(raw) as PersistedSandbox;
     if (p?.v !== 1 || p.game?.version !== 1 || !Array.isArray(p.game.bets)) return null;
+    // saves from before the luck band have no variance
+    if (typeof p.game.stats.variance !== 'number') p.game.stats.variance = 0;
     return p;
   } catch {
     return null;

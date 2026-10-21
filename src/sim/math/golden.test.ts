@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BET_TYPES } from '../engine/bets';
 import { DEFAULT_RULES, RULE_PRESETS } from '../engine/rules';
 import type { Bet, BetTypeId, Dice, Die, PointNumber, TableRules } from '../engine/types';
-import { betEV, betOutcomes } from './ev';
+import { betEV, betOutcomes, betVariance } from './ev';
 import { toNumber } from './fraction';
 import type { BetCtx } from './types';
 
@@ -88,6 +88,11 @@ function simulate(
   const r = lcg(seed);
   const def = BET_TYPES[type];
   let sum = 0;
+  let sumSq = 0;
+  const record = (x: number) => {
+    sum += x;
+    sumSq += x * x;
+  };
   for (let i = 0; i < trials; i++) {
     let bet: Bet = {
       id: 'x',
@@ -112,11 +117,11 @@ function simulate(
         true,
       );
       if (res.kind === 'win') {
-        sum += res.profit - res.vig;
+        record(res.profit - res.vig);
         break;
       }
       if (res.kind === 'lose') {
-        sum -= amount;
+        record(-amount);
         break;
       }
       if (res.kind === 'push') break;
@@ -130,7 +135,7 @@ function simulate(
       }
     }
   }
-  return sum / trials;
+  return { mean: sum / trials, meanSq: sumSq / trials };
 }
 
 describe('Monte Carlo agrees with exact EV', () => {
@@ -146,8 +151,27 @@ describe('Monte Carlo agrees with exact EV', () => {
     ['horn', 400, ctx('point', 6)],
   ] as const)('%s', (type, amount, c) => {
     const exact = toNumber(betEV({ type, amount, point: null }, c));
-    const mc = simulate(type, amount, N, 12345);
+    const mc = simulate(type, amount, N, 12345).mean;
     // std of a single trial is at most ~amount*2; allow 4.5 sigma
     expect(Math.abs(mc - exact)).toBeLessThan((4.5 * amount * 1.5) / Math.sqrt(N));
+  });
+});
+
+describe('Monte Carlo agrees with exact variance (sample variance within 5%)', () => {
+  const N = 200_000;
+  it.each([
+    ['pass-line', 1000, ctx('come-out', null)],
+    ['dont-pass', 1000, ctx('come-out', null)],
+    ['come', 1000, ctx('point', 6)],
+    ['field', 500, ctx('point', 6)],
+    ['place-5', 1000, ctx('point', 6)],
+    ['buy-4', 2000, ctx('point', 6)],
+    ['hard-8', 500, ctx('point', 6)],
+    ['horn', 400, ctx('point', 6)],
+  ] as const)('%s', (type, amount, c) => {
+    const exact = toNumber(betVariance({ type, amount, point: null }, c));
+    const { mean, meanSq } = simulate(type, amount, N, 54321);
+    const sample = meanSq - mean * mean;
+    expect(Math.abs(sample - exact) / exact).toBeLessThan(0.05);
   });
 });

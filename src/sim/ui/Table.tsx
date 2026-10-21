@@ -20,6 +20,8 @@ export interface TableProps {
   offBetIds?: ReadonlySet<string>;
   /** regions dimmed to 40% (scene allowedBets); they stay focusable and announce why */
   disabledRegions?: ReadonlySet<RegionId>;
+  /** the subset of disabledRegions the rules don't offer (announced as "not offered", not "this lesson") */
+  unofferedRegions?: ReadonlySet<RegionId>;
   highlightedBets?: readonly BetTypeId[];
   fieldPays?: { 2: number; 12: number };
   /** bets that just lost: ghost stacks slide to the dealer and fade */
@@ -109,6 +111,7 @@ export function Table({
   point,
   offBetIds,
   disabledRegions,
+  unofferedRegions,
   highlightedBets,
   fieldPays = { 2: 2, 12: 2 },
   lostBets,
@@ -203,7 +206,12 @@ export function Table({
               role="button"
               tabindex={0}
               data-region={region.id}
-              aria-label={regionAriaLabel(region, { bets: rbets, offIds, disabled })}
+              aria-label={regionAriaLabel(region, {
+                bets: rbets,
+                offIds,
+                disabled,
+                notOffered: unofferedRegions?.has(region.id) ?? false,
+              })}
               aria-disabled={disabled || undefined}
               onClick={() => onRegionTap?.(region.id)}
               onKeyDown={(e) => onKey(e, region.id)}

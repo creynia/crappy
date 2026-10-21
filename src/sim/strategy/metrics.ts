@@ -1,3 +1,4 @@
+import { betTypeAvailable } from '../engine/bets';
 import { pointsFor } from '../engine/rules';
 import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
 import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
@@ -139,6 +140,8 @@ const APPROXIMATE: ReadonlySet<string> = new Set(['place-6-8-press', 'inside-reg
 export function strategyMetrics(spec: StrategySpec, rules: TableRules): StrategyMetrics {
   const r = rules;
   const { state, comeOutOnly } = steadyState(spec, r);
+  if ([...state.bets, ...comeOutOnly].some((b) => !betTypeAvailable(b.type, r)))
+    return { edgeOnAction: 0, expectedLossPerRoll: 0, rollsPerDollar: 0, unavailable: true };
   let lossCents = toNumber(tableExpectedLossPerRoll(state));
   // action per roll = sum of amounts / expected rolls until each resolves
   let action = 0;

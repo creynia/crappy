@@ -648,7 +648,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <button
             type="button"
             data-testid="auto-roll-run"
-            disabled={running}
+            disabled={running || strategyIds.some((id) => unavailable.has(id))}
             onClick={() => void run()}
             class="sim-ar-run"
           >
@@ -788,7 +788,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
     const edge = metrics.map((m) =>
-      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
+      m.unavailable
+        ? 'Not offered'
+        : m.approximate
+          ? `≈ ${pct(m.edgeOnAction)} (starting layout)`
+          : pct(m.edgeOnAction),
     );
     if (o.kind === 'single') {
       const rs = o.results;

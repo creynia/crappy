@@ -343,6 +343,11 @@ describe('crapless in auto-roll and scenes', () => {
     }
     for (const id of ['pass-max-odds', 'place-6-8', 'lay-4-10'] as const)
       expect(strategyAvailable({ id, unit: 1000 }, 'crapless')).toBe(true);
+    const { strategyMetrics } = await import('../../strategy');
+    const m = strategyMetrics({ id: 'dont-pass-max-lay', unit: 1000 }, resolveRules('crapless'));
+    expect(m.unavailable).toBe(true);
+    expect(m.edgeOnAction).toBe(0);
+    expect(strategyMetrics({ id: 'pass-max-odds', unit: 1000 }, CR).unavailable).toBeUndefined();
   });
 
   it('scene rules: variant must be standard or crapless; crapless scenes may use point 2', async () => {

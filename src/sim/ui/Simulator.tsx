@@ -141,6 +141,12 @@ export function Simulator(props: SimulatorInternalProps) {
         set.add(r.id);
     return set;
   }, [scene, rt, rules]);
+  const unofferedRegions = useMemo(() => {
+    const set = new Set<RegionId>();
+    for (const r of ALL_REGIONS)
+      if (!r.betTypes.some((t) => betTypeAvailable(t, rules))) set.add(r.id);
+    return set;
+  }, [rules]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
   const lock = rollLock(scene, rt, liveGame);
@@ -195,6 +201,7 @@ export function Simulator(props: SimulatorInternalProps) {
     point: game.point,
     offBetIds: offIds,
     disabledRegions,
+    unofferedRegions,
     highlightedBets: highlighted,
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,

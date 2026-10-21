@@ -18,6 +18,10 @@ test.describe('crapless craps', () => {
       'aria-disabled',
       'true',
     );
+    await expect(page.locator('[data-region="dont-pass"]')).toHaveAttribute(
+      'aria-label',
+      /Not offered on crapless craps\./,
+    );
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.locator('[data-region="dont-pass"]').click({ force: true }); // dimmed (aria-disabled) but tappable
     await expect(page.locator('.sim-toast').first()).toContainText("no don't side");

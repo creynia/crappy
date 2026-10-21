@@ -239,7 +239,9 @@ export function useSheetModel(d: SheetDeps) {
     if (!offered.length) {
       // the rules don't offer it (crapless: no don't side): say so, in the engine's words
       const v = validateAction(g, { type: 'place-bet', betType: region.betTypes[0]!, amount: 500 });
-      d.pushToast(v.ok ? 'That bet is not offered at this table.' : v.message, 'info');
+      const msg = v.ok ? 'That bet is not offered at this table.' : v.message;
+      d.pushToast(msg, 'info');
+      d.announce(msg);
       return;
     }
     const allowedTypes = offered.filter((t) => betTypeAllowed(sceneRef.current, r, t));

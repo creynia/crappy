@@ -128,6 +128,8 @@ export interface StrategyMetrics {
   rollsPerDollar: number;
   /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
   approximate?: boolean;
+  /** True when the rules don't offer a bet the strategy makes (crapless: no don't side): no edge to show. */
+  unavailable?: boolean;
 }
 
 /** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */

@@ -408,6 +408,8 @@ export interface RegionLabelOpts {
   /** ids of bets that are not working */
   offIds?: ReadonlySet<string>;
   disabled?: boolean;
+  /** dimmed because the rules don't offer it (crapless: no don't side), not because of the lesson */
+  notOffered?: boolean;
 }
 
 export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): string {
@@ -431,7 +433,8 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   } else {
     parts.push('No bet.');
   }
-  if (opts.disabled) parts.push('Not available in this lesson.');
+  if (opts.notOffered) parts.push('Not offered on crapless craps.');
+  else if (opts.disabled) parts.push('Not available in this lesson.');
   return parts.join(' ');
 }
 

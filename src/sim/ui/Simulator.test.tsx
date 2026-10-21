@@ -229,7 +229,7 @@ describe('odds nudge', () => {
   it('appears after the point is set, with focus left on Roll, and is announced once', async () => {
     const { container } = render(
       <Simulator
-        scene={{ ...base, ui: { hints: true } }}
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
         initialSettings={instant}
         onEvent={() => {}}
       />,
@@ -250,7 +250,7 @@ describe('odds nudge', () => {
   it('"Got it" dismisses it, and it does not come back on the next roll', async () => {
     const { container } = render(
       <Simulator
-        scene={{ ...base, ui: { hints: true } }}
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
         initialSettings={instant}
         onEvent={() => {}}
       />,
@@ -268,7 +268,7 @@ describe('odds nudge', () => {
   it('is not sticky: the next roll takes it away and that roll shows its own toast', async () => {
     const { container } = render(
       <Simulator
-        scene={{ ...base, ui: { hints: true } }}
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
         initialSettings={instant}
         onEvent={() => {}}
       />,
@@ -283,10 +283,25 @@ describe('odds nudge', () => {
     );
   });
 
+  it('landscape shows no card: the odds spot outline carries the hint', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'landscape' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(container.querySelector('.is-odds-spot')).not.toBeNull());
+    expect(nudge()).toBeNull();
+    expect(live(container)).toMatch(/Add up to \$25 odds behind your Pass line on 6/);
+  });
+
   it('"Don\'t show again" persists across a remount', async () => {
     const first = render(
       <Simulator
-        scene={{ ...base, ui: { hints: true } }}
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
         initialSettings={instant}
         onEvent={() => {}}
       />,
@@ -299,7 +314,7 @@ describe('odds nudge', () => {
     first.unmount();
     const second = render(
       <Simulator
-        scene={{ ...base, ui: { hints: true } }}
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
         initialSettings={instant}
         onEvent={() => {}}
       />,

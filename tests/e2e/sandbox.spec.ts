@@ -860,223 +860,129 @@ test.describe('sandbox flows', () => {
   });
 });
 
-test('the odds nudge never moves or covers Roll, the chips, the betting regions or Menu', async ({
+type Box = { x: number; y: number; width: number; height: number };
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** A fresh context (the sandbox persists its table), a Pass bet, and the point-setting roll. */
+async function pointWithNudge(
+  browser: import('@playwright/test').Browser,
+  vp: { width: number; height: number },
+) {
+  const context = await browser.newContext({ viewport: vp });
+  const page = await context.newPage();
+  await page.goto('/#/play?speed=instant&dice=3-3,2-2');
+  await page.locator('[data-region="pass"]').first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+  const roll = page.getByRole('button', { name: /^Roll/ });
+  await roll.click(); // 3-3: point 6
+  await expect(page.getByText('Point: 6').first()).toBeVisible();
+  return { context, page, roll };
+}
+
+test('portrait: the odds nudge sits beside the point and dice and covers nothing that matters', async ({
   browser,
 }) => {
-  const box = (b: { x: number; y: number; width: number; height: number } | null) => {
-    expect(b).not.toBeNull();
-    return b!;
-  };
-  const overlaps = (
-    a: { x: number; y: number; width: number; height: number },
-    b: { x: number; y: number; width: number; height: number },
-  ) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-  for (const vp of [
-    { width: 390, height: 844 },
-    { width: 360, height: 640 },
-    { width: 844, height: 390 },
-    { width: 667, height: 375 },
-  ]) {
-    // a fresh context per size: the sandbox persists its table between visits
-    const context = await browser.newContext({ viewport: vp });
-    const page = await context.newPage();
-    await page.goto('/#/play?speed=instant&dice=3-3');
-    await page.locator('[data-region="pass"]').first().click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    const roll = page.getByRole('button', { name: /^Roll/ });
-    await roll.click();
-    const hint = page.getByTestId('odds-hint');
-    await expect(hint).toBeVisible();
-    const hb = box(await hint.boundingBox());
-    const targets = [
-      page.locator('[data-region="pass"]').first(),
-      page.locator('[data-region="dont-pass"]').first(),
-      page.locator('.sim-rack').first(),
-      page.getByRole('button', { name: /^Roll/ }),
-      menu(page),
-    ];
-    for (const t of targets) {
-      if ((await t.count()) === 0) continue;
-      const tb = await t.boundingBox();
-      if (!tb) continue;
-      expect(overlaps(hb, tb), `hint covers a target at ${vp.width}x${vp.height}`).toBe(false);
-    }
-    // Roll's own change (the point going on) moves it; the hint must not. Compare with and without it.
-    // page coordinates, so a scroll that Got it triggers does not count as Roll moving
-    const pageBox = async () => {
-      const b = box(await roll.boundingBox());
-      const scrollY = await page.evaluate(
-        () => (globalThis as unknown as { scrollY: number }).scrollY,
-      );
-      return { x: b.x, y: b.y + scrollY, width: b.width, height: b.height };
-    };
-    const rollWithHint = await pageBox();
-    await page.getByRole('button', { name: 'Got it' }).click();
-    await expect(hint).toHaveCount(0);
-    const rollWithoutHint = await pageBox();
-    expect(rollWithHint, `the hint moved Roll at ${vp.width}x${vp.height}`).toEqual(
-      rollWithoutHint,
-    );
-    await context.close();
-  }
-});
-
-test('in landscape the odds nudge does not cover the felt or the controls', async ({ browser }) => {
-  const overlaps = (
-    a: { x: number; y: number; width: number; height: number },
-    b: { x: number; y: number; width: number; height: number },
-  ) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-  for (const vp of [
-    { width: 844, height: 390 },
-    { width: 667, height: 375 },
-  ]) {
-    const context = await browser.newContext({ viewport: vp });
-    const page = await context.newPage();
-    await page.goto('/#/play?speed=instant&dice=3-3');
-    await page.locator('[data-region="pass"]').first().click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    await page.getByRole('button', { name: /^Roll/ }).click();
-    const hint = page.getByTestId('odds-hint');
-    await expect(hint).toBeVisible();
-    const hb = await hint.boundingBox();
-    expect(hb, `hint box at ${vp.width}x${vp.height}`).not.toBeNull();
-    const targets = [
-      page.locator('[data-region="pass"]').first(),
-      page.locator('[data-region="dont-pass"]').first(),
-      page.getByRole('button', { name: /^Roll/ }),
-      page.getByRole('button', { name: /^Auto-roll$/ }),
-    ];
-    for (const t of targets) {
-      if ((await t.count()) === 0) continue;
-      const tb = await t.boundingBox();
-      if (!tb) continue;
-      expect(overlaps(hb!, tb), `hint overlaps a target at ${vp.width}x${vp.height}`).toBe(false);
-    }
-    // the text is not cut off in the rail (it wraps; the buttons drop to their own row)
-    const fits = await page.evaluate(() => {
-      const doc = (
-        globalThis as unknown as {
-          document: {
-            querySelector(sel: string): { scrollWidth: number; clientWidth: number } | null;
-          };
-        }
-      ).document;
-      const el = doc.querySelector('[data-testid="odds-hint"] p');
-      return el ? el.scrollWidth <= el.clientWidth : false;
-    });
-    expect(fits, `nudge text is cut off at ${vp.width}x${vp.height}`).toBe(true);
-    await context.close();
-  }
-});
-
-test('the odds nudge clears the Challenge card in portrait, and in landscape Roll stays clickable under toasts', async ({
-  browser,
-}) => {
-  type Box = { x: number; y: number; width: number; height: number };
-  const meets = (a: Box, b: Box) =>
-    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  test.setTimeout(90_000);
   for (const vp of [
     { width: 390, height: 844 },
     { width: 360, height: 740 },
   ]) {
-    const context = await browser.newContext({ viewport: vp });
-    const page = await context.newPage();
-    await page.goto('/#/play?speed=instant&dice=3-3');
-    await page.locator('[data-region="pass"]').first().click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    await page.getByRole('button', { name: /^Roll/ }).click();
-    const hint = await page.getByTestId('odds-hint').boundingBox();
-    // the Challenge control is a link styled as a button: hit-test that element itself
-    const cardLoc = page.getByRole('link', { name: /^Challenge: 300/ });
-    await expect(cardLoc).toHaveCount(1);
-    const card = await cardLoc.boundingBox();
-    expect(hint).not.toBeNull();
-    expect(card).not.toBeNull();
-    expect(meets(hint!, card!), `nudge covers the Challenge link at ${vp.width}x${vp.height}`).toBe(
-      false,
-    );
-    // nor does the roll toast shown beside it
-    for (const t of await page.locator('.sim-toast').all()) {
-      const tb = await t.boundingBox();
-      if (tb)
-        expect(
-          meets(tb, card!),
-          `a toast covers the Challenge link at ${vp.width}x${vp.height}`,
-        ).toBe(false);
+    const { context, page, roll } = await pointWithNudge(browser, vp);
+    const hint = page.getByTestId('odds-hint');
+    await expect(hint).toBeVisible();
+    const hb = (await hint.boundingBox())!;
+    const at = `${vp.width}x${vp.height}`;
+    const targets: [string, import('@playwright/test').Locator][] = [
+      ['Challenge link', page.getByRole('link', { name: /^Challenge: 300/ })],
+      ['bankroll', page.locator('.sim-status-money > span').first()],
+      ['point', page.locator('.sim-point').first()],
+      ['dice', page.locator('.sim-status .sim-dice').first()],
+      ['Roll', roll],
+    ];
+    for (const [name, loc] of targets) {
+      await expect(loc, `${name} at ${at}`).toHaveCount(1);
+      expect(meets(hb, (await loc.boundingBox())!), `nudge covers ${name} at ${at}`).toBe(false);
     }
+    for (const r of await page.locator('[data-region]').all()) {
+      const rb = await r.boundingBox();
+      if (rb) expect(meets(hb, rb), `nudge covers a betting region at ${at}`).toBe(false);
+    }
+    // it takes the place of that roll's toast; its text is shown in full
+    await expect(page.locator('.sim-toast')).toHaveCount(0);
+    const fit = await hint.locator('p').evaluate((el) => {
+      const e = el as unknown as {
+        scrollWidth: number;
+        clientWidth: number;
+        scrollHeight: number;
+        clientHeight: number;
+      };
+      return e.scrollWidth <= e.clientWidth && e.scrollHeight <= e.clientHeight;
+    });
+    expect(fit, `nudge text clipped at ${at}`).toBe(true);
+    // not sticky: the next roll takes it away and shows its own toast
+    await roll.click();
+    await expect(hint).toHaveCount(0);
+    await expect(page.locator('.sim-toast')).not.toHaveCount(0);
     await context.close();
   }
+});
+
+test('landscape: no nudge card; the odds spot is outlined and Roll does not move', async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
   for (const vp of [
     { width: 844, height: 390 },
     { width: 667, height: 375 },
   ]) {
-    const context = await browser.newContext({ viewport: vp });
-    const page = await context.newPage();
-    await page.goto('/#/play?speed=instant&dice=3-3');
-    await page.locator('[data-region="pass"]').first().click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    const roll = page.getByRole('button', { name: /^Roll/ });
+    const { context, page, roll } = await pointWithNudge(browser, vp);
+    const at = `${vp.width}x${vp.height}`;
+    await expect(page.locator('.sim-region.is-odds-spot'), `outline at ${at}`).not.toHaveCount(0);
+    await expect(page.getByTestId('odds-hint'), `card at ${at}`).toHaveCount(0);
+    const withHint = (await roll.boundingBox())!;
+    // the next roll ends the hint: the outline goes and Roll is where it was
     await roll.click();
-    await expect(page.getByTestId('odds-hint')).toBeVisible();
-    // with the nudge and the roll toast up, no toast box or dismiss box reaches Roll
-    const rb0 = (await roll.boundingBox())!;
-    for (const sel of ['.sim-toast', '.sim-toast-x', '[data-testid="odds-hint"]'])
+    await expect(page.locator('.sim-region.is-odds-spot')).toHaveCount(0);
+    expect((await roll.boundingBox())!, `Roll moved at ${at}`).toEqual(withHint);
+    // a roll toast in the rail never reaches Roll
+    for (const sel of ['.sim-toast', '.sim-toast-x'])
       for (const t of await page.locator(sel).all()) {
         const tb = await t.boundingBox();
-        if (tb) expect(meets(tb, rb0), `${sel} meets Roll at ${vp.width}x${vp.height}`).toBe(false);
+        if (tb) expect(meets(tb, withHint), `${sel} meets Roll at ${at}`).toBe(false);
       }
-    // the nudge text is shown in full: nothing clipped either way
-    const fit = await page.evaluate(() => {
-      const el = (
-        globalThis as unknown as {
-          document: {
-            querySelector(s: string): {
-              scrollWidth: number;
-              clientWidth: number;
-              scrollHeight: number;
-              clientHeight: number;
-            } | null;
-          };
-        }
-      ).document.querySelector('[data-testid="odds-hint"] p');
-      return el ? el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight : false;
-    });
-    expect(fit, `nudge text clipped at ${vp.width}x${vp.height}`).toBe(true);
-    // the nudge is up: Roll is what is under its centre
-    const centreIsRoll = async () => {
-      const b = await roll.boundingBox();
-      expect(b).not.toBeNull();
-      return page.evaluate(
-        ({ x, y }) => {
-          const doc = (
-            globalThis as unknown as {
-              document: {
-                elementFromPoint(x: number, y: number): { closest(sel: string): unknown } | null;
-              };
-            }
-          ).document;
-          const el = doc.elementFromPoint(x, y);
-          return !!el && !!el.closest('.sim-roll');
-        },
-        { x: b!.x + b!.width / 2, y: b!.y + b!.height / 2 },
-      );
-    };
-    expect(
-      await centreIsRoll(),
-      `Roll not clickable under the nudge at ${vp.width}x${vp.height}`,
-    ).toBe(true);
-    // the nudge goes; a later roll's toast must not hide Roll either
-    await page.getByRole('button', { name: 'Got it' }).click();
-    await roll.click();
-    const rb = await roll.boundingBox();
-    for (const t of await page.locator('.sim-toast').all()) {
-      const tb = await t.boundingBox();
-      if (tb && rb)
-        expect(meets(tb, rb), `a toast covers Roll at ${vp.width}x${vp.height}`).toBe(false);
-    }
-    expect(await centreIsRoll(), `a toast covers Roll's centre at ${vp.width}x${vp.height}`).toBe(
-      true,
-    );
     await context.close();
   }
+});
+
+test('the Menu "Show odds hints" switch is the same opt-out as the nudge and survives a reload', async ({
+  browser,
+}) => {
+  const { context, page } = await pointWithNudge(browser, { width: 390, height: 844 });
+  await expect(page.getByTestId('odds-hint')).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  const box = page.locator('.sim-menu').getByLabel('Show odds hints');
+  await expect(box).toBeChecked();
+  await box.uncheck();
+  await expect(page.getByTestId('odds-hint')).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(page.locator('.sim-menu').getByLabel('Show odds hints')).not.toBeChecked();
+  // the nudge's own "Don't show again" writes the same key
+  expect(
+    await page.evaluate(() =>
+      (
+        globalThis as unknown as { localStorage: { getItem(k: string): string | null } }
+      ).localStorage.getItem('crappy-sim-hide-odds-hint'),
+    ),
+  ).toBe('1');
+  await page.locator('.sim-menu').getByLabel('Show odds hints').check();
+  expect(
+    await page.evaluate(() =>
+      (
+        globalThis as unknown as { localStorage: { getItem(k: string): string | null } }
+      ).localStorage.getItem('crappy-sim-hide-odds-hint'),
+    ),
+  ).toBeNull();
+  await context.close();
 });

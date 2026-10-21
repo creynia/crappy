@@ -1,4 +1,3 @@
-import type { ComponentChild } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ToastTone } from './text';
 import './sim.css';
@@ -15,8 +14,6 @@ export interface ToastsProps {
   onDismiss: (id: string) => void;
   /** auto-dismiss after this many ms (see toastDurationMs); omit to keep until dismissed */
   autoDismissMs?: number;
-  /** a sticky one-time message (the odds nudge) shown first in the same layer */
-  hint?: ComponentChild;
   /** keep the toasts (and their timers) but do not show them, e.g. while a prompt takes their place */
   hidden?: boolean;
 }
@@ -87,10 +84,9 @@ function ToastView({
   );
 }
 
-export function Toasts({ toasts, onDismiss, autoDismissMs, hint, hidden }: ToastsProps) {
+export function Toasts({ toasts, onDismiss, autoDismissMs, hidden }: ToastsProps) {
   return (
     <div class="sim-toasts" hidden={hidden}>
-      {hint}
       {toasts.map((t) => (
         <ToastView key={t.id} t={t} onDismiss={onDismiss} ms={autoDismissMs} />
       ))}

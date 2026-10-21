@@ -18,6 +18,8 @@ export interface SimMenuProps {
   /** sandbox only: share the table as a link / copy it as a lesson scene */
   onShare?: () => void;
   onCopyScene?: () => void;
+  /** scenes with hints: the odds nudge on/off (the same switch as its "Don't show again") */
+  oddsHints?: { on: boolean; onChange: (on: boolean) => void };
 }
 
 /** The sandbox table menu: rebet, reset, rules preset, speed and skip-preview. */
@@ -32,6 +34,7 @@ export function SimMenu({
   setSettings,
   onShare,
   onCopyScene,
+  oddsHints,
 }: SimMenuProps) {
   const [editing, setEditing] = useState(false);
   return (
@@ -130,6 +133,16 @@ export function SimMenu({
         />
         Ask what to do after a place or buy bet wins
       </label>
+      {oddsHints ? (
+        <label class="sim-menu-check">
+          <input
+            type="checkbox"
+            checked={oddsHints.on}
+            onChange={(e) => oddsHints.onChange(e.currentTarget.checked)}
+          />
+          Show odds hints
+        </label>
+      ) : null}
     </section>
   );
 }

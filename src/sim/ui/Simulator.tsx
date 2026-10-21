@@ -303,19 +303,25 @@ export function Simulator(props: SimulatorInternalProps) {
     chip,
   });
   const { sheet } = sh;
-  const oddsHintEl = oddsHintRoom ? (
+  // "Show odds hints" (Menu) and "Don't show again" (the nudge) share one per-viewer key
+  const setOddsHintsOn = (on: boolean) => {
+    try {
+      if (on) localStorage.removeItem('crappy-sim-hide-odds-hint');
+      else localStorage.setItem('crappy-sim-hide-odds-hint', '1');
+    } catch {
+      /* private mode: the choice just lasts for this session */
+    }
+    setHideOddsHint(!on);
+    if (!on) setOddsHint(null);
+  };
+  // The card is portrait only: it sits in the status block beside the point and dice and takes the
+  // place of that roll's toast. In landscape the outlined odds spot and the announcer carry the hint.
+  const oddsHintCard = !landscape && oddsHintRoom;
+  const oddsHintEl = oddsHintCard ? (
     <OddsHint
-      room={oddsHintRoom}
+      room={oddsHintCard}
       onDismiss={() => setOddsHint(null)}
-      onHideForever={() => {
-        try {
-          localStorage.setItem('crappy-sim-hide-odds-hint', '1');
-        } catch {
-          /* private mode: the hint just stays hidden for this session */
-        }
-        setHideOddsHint(true);
-        setOddsHint(null);
-      }}
+      onHideForever={() => setOddsHintsOn(false)}
     />
   ) : null;
 
@@ -566,11 +572,10 @@ export function Simulator(props: SimulatorInternalProps) {
   // text nothing taps, never a betting region or the lesson step card.
   const toastsEl = (
     <Toasts
-      // while the odds nudge is up, only the newest message shows beside it (the rest are kept)
-      toasts={oddsHintRoom ? toasts.slice(-1) : toasts}
+      // for its one roll the portrait nudge takes the place of that roll's toast (the roll is announced)
+      toasts={oddsHintCard ? [] : toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
-      hint={oddsHintEl}
       hidden={winShown}
     />
   );
@@ -637,12 +642,10 @@ export function Simulator(props: SimulatorInternalProps) {
 
       <div class="sim-main">
         <div class="sim-felt" {...(watching ? { inert: true } : {})}>
-          {/* portrait: the toast layer hangs from the top of the status row, so it never reaches
-              anything above the simulator (the page's Challenge link) */}
           {!landscape ? (
             <div class="sim-status-wrap sim-status-wrap-cost">
               {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
-              {toastsEl}
+              {oddsHintEl}
             </div>
           ) : null}
           <div class="sim-felt-body">
@@ -656,6 +659,7 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            {landscape ? null : toastsEl}
             {landscape ? null : winPromptEl}
           </div>
         </div>
@@ -692,6 +696,9 @@ export function Simulator(props: SimulatorInternalProps) {
                 currentRules={liveGame.rules}
                 settings={settings}
                 setSettings={setSettings}
+                {...(ui.hints === true
+                  ? { oddsHints: { on: !hideOddsHint, onChange: setOddsHintsOn } }
+                  : {})}
                 {...(sandbox
                   ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
                   : {})}

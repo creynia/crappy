@@ -361,11 +361,6 @@
 .sim-status-wrap {
   position: relative;
 }
-/* portrait: hang from the top of the status row and grow down, never up past the simulator's top */
-.sim-status-wrap > .sim-toasts {
-  top: 0;
-  bottom: auto;
-}
 .sim-land .sim-toasts {
   left: 0;
   right: 0;
@@ -1129,20 +1124,21 @@
   gap: 0;
   flex: 0 0 auto;
 }
-/* the narrow landscape rail: the text gets the full width (no clamp), the buttons their own row */
-.sim-land .sim-odds-hint {
-  flex-wrap: wrap;
-  row-gap: 0;
-  padding: 2px 2px 2px 6px;
-}
-.sim-land .sim-odds-hint p {
-  flex: 1 0 100%;
-  display: block;
-  -webkit-line-clamp: none;
-  overflow: visible;
-}
-.sim-land .sim-odds-hint-actions {
-  margin-left: auto;
+/* portrait: for its one roll the nudge sits in the status block, right of the point badge and the
+   dice (about 136px), on the status row's baseline: 44px tall, clear of the bankroll above-left and of
+   the felt below. It may cover the right of "On table / Session" for that roll. */
+.sim-status-wrap > .sim-odds-hint {
+  position: absolute;
+  /* above the status row's own controls (the cost toggle, the history pills) */
+  z-index: 30;
+  left: 140px;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 0 0 8px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--sim-border);
 }
 .sim-odds-hint-btn {
   width: 44px;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { answeredRequirements } from './conditions';
 import { applyAction } from '../engine';
 import { gateAction, initScene, observe, rollLock, validateScene, type SceneConfig } from './index';
 import type { Dice } from '../engine/types';
@@ -92,6 +93,15 @@ describe('scene runner', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('accepts autoRoll.chart edge and bankroll, rejects others', () => {
+    const base = { id: 'x', version: 1 as const };
+    for (const chart of ['edge', 'bankroll']) {
+      expect(validateScene({ ...base, autoRoll: { enabled: true, chart } }).ok).toBe(true);
+    }
+    const bad = validateScene({ ...base, autoRoll: { enabled: true, chart: 'pie' } });
+    expect(bad.ok).toBe(false);
+  });
+
   it('accepts autoRoll stopWin / stopLoss defaults in integer cents and rejects other values', () => {
     const ok = validateScene({
       id: 'x',
@@ -117,6 +127,161 @@ describe('scene runner', () => {
     expect(mk({ strategy: 'pass-max-odds', oddsMultiples: [0, 1, 'max', 100] }).ok).toBe(true);
     const bad = mk({ strategy: 'nope', oddsMultiples: [0, 'big'] });
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('answeredRequirements', () => {
+  it('finds answered conditions in nested trees and ignores bad shapes', () => {
+    expect(
+      answeredRequirements({
+        all: [{ any: [{ answered: 'correct' }, { rolls: 1 }] }, { answered: true }],
+      }),
+    ).toEqual(['correct', true]);
+    expect(answeredRequirements({ rolls: 2 })).toEqual([]);
+    expect(answeredRequirements({ all: 'x' })).toEqual([]);
+    expect(answeredRequirements(null)).toEqual([]);
+  });
+});
+
+describe('step ask (in-sim question)', () => {
+  const ask = {
+    q: 'What happens?',
+    options: ['a', 'b', 'c'],
+    answer: 1,
+    explain: 'because',
+  };
+  const scene = (cond: 'correct' | true, mode?: 'any'): SceneConfig => ({
+    id: 'q',
+    version: 1,
+    bankroll: 10000,
+    phase: 'come-out',
+    forcedDice: [[3, 4]],
+    allowedActions: ['roll'],
+    steps: [
+      {
+        id: 'ask',
+        text: 'call it',
+        ask: { ...ask, ...(mode ? { mode } : {}) },
+        completeWhen: { all: [{ answered: cond }, { rolls: 1 }] },
+      },
+      { id: 'end', text: 'end', completeWhen: { acknowledged: true } },
+    ],
+  });
+  it('locks Roll until answered, then unlocks (any answer)', () => {
+    const sc = scene(true);
+    const { game, runtime } = initScene(sc);
+    expect(rollLock(sc, runtime, game)).toBe('Answer the question first.');
+    const r = observe(sc, runtime, game, { kind: 'answered', correct: false });
+    expect(rollLock(sc, r.runtime, r.game)).toBeNull();
+  });
+  it("'correct' stays locked after a wrong answer and allows retry", () => {
+    const sc = scene('correct');
+    const { game, runtime } = initScene(sc);
+    let r = observe(sc, runtime, game, { kind: 'answered', correct: false });
+    expect(rollLock(sc, r.runtime, r.game)).toBe('Answer the question first.');
+    expect(r.runtime.stepIndex).toBe(0);
+    r = observe(sc, r.runtime, r.game, { kind: 'answered', correct: true });
+    expect(rollLock(sc, r.runtime, r.game)).toBeNull();
+    // answering alone does not complete the step: the roll still has to happen
+    expect(r.completedStep).toBeUndefined();
+    const roll = applyAction(r.game, { type: 'roll' });
+    if (!roll.ok) throw new Error('roll');
+    const done = observe(sc, r.runtime, roll.state, {
+      kind: 'action',
+      action: { type: 'roll' },
+      events: roll.events,
+    });
+    expect(done.completedStep).toBe('ask');
+  });
+  it("mode 'any' never locks the roll", () => {
+    const sc = scene(true, 'any');
+    const { game, runtime } = initScene(sc);
+    expect(rollLock(sc, runtime, game)).toBeNull();
+  });
+  it('validates ask shape, answer range and answered-without-ask', () => {
+    const mkScene = (a: unknown, cw: unknown = { answered: true }, advance?: 'button') => ({
+      id: 'v',
+      version: 1,
+      steps: [
+        {
+          id: 's',
+          text: 't',
+          ...(a === undefined ? {} : { ask: a }),
+          ...(advance ? { advance } : {}),
+          completeWhen: cw,
+        },
+      ],
+    });
+    // the feedback must be seen: a bare answered condition needs advance: button
+    expect(validateScene(mkScene(ask)).ok).toBe(false);
+    expect(validateScene(mkScene(ask, { answered: true }, 'button')).ok).toBe(true);
+    expect(validateScene(mkScene(ask, { all: [{ answered: true }, { rolls: 1 }] })).ok).toBe(true);
+    expect(validateScene(mkScene(ask, { all: [{ answered: true }] })).ok).toBe(false);
+    expect(validateScene(mkScene({ ...ask, answer: 3 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(validateScene(mkScene({ ...ask, answer: -1 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(
+      validateScene(mkScene({ ...ask, options: ['only'] }, { answered: true }, 'button')).ok,
+    ).toBe(false);
+    expect(validateScene(mkScene({ ...ask, mode: 'never' }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(validateScene(mkScene({ ...ask, extra: 1 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(validateScene(mkScene(undefined)).ok).toBe(false);
+    // an `all` of only answered conditions still has nothing to wait for
+    expect(
+      validateScene(mkScene(ask, { all: [{ answered: true }, { answered: 'correct' }] })).ok,
+    ).toBe(false);
+    // the walker finds answered conditions nested at any depth
+    expect(
+      validateScene(mkScene(undefined, { all: [{ any: [{ answered: 'correct' }] }, { rolls: 1 }] }))
+        .ok,
+    ).toBe(false); // answered without an ask
+    expect(
+      validateScene(mkScene(ask, { all: [{ any: [{ answered: 'correct' }] }, { rolls: 1 }] })).ok,
+    ).toBe(true);
+    expect(validateScene(mkScene(ask, { answered: 'wrong' }, 'button')).ok).toBe(false);
+    expect(validateScene(mkScene(ask, { answered: 'correct' }, 'button')).ok).toBe(true);
+  });
+});
+
+describe('autoRoll.bankroll', () => {
+  it('accepts integer cents from $5 to $1,000,000 and rejects others', () => {
+    expect(
+      validateScene({ id: 'x', version: 1, autoRoll: { enabled: true, bankroll: 50_000 } }).ok,
+    ).toBe(true);
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      autoRoll: { enabled: true, bankroll: 499.5 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
+  it('uses the scene table minimum for the bankroll floor', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      rules: { tableMin: 1000 },
+      autoRoll: { enabled: true, bankroll: 500 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
+  it('checks stopLoss against the auto-roll bankroll, not only the scene bankroll', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      bankroll: 100_000,
+      autoRoll: { enabled: true, bankroll: 20_000, stopLoss: 25_000 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.stopLoss');
   });
 });
 

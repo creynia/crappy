@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
+  edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   listStrategies,
   simulateCompare,
   simulateMany,
@@ -19,10 +21,15 @@ import type {
   SweepMultiple,
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
+import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { matchingPreset } from './customRules';
+import { RulesEditor } from './RulesEditor';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
+import { luckFrom } from '../math/luck';
 import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
@@ -60,11 +67,15 @@ export interface AutoRollPanelProps {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** which chart a single session opens with (default 'bankroll') */
+    chart?: 'bankroll' | 'edge';
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
     /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
     stopWin?: Cents;
     stopLoss?: Cents;
+    /** starting bankroll chosen by the scene, in cents; the learner can change it in the panel */
+    bankroll?: Cents;
     /** show the odds-multiple sweep table instead of the run form */
     sweep?: { strategy: StrategyId; oddsMultiples: SweepMultiple[] };
   };
@@ -82,6 +93,8 @@ export interface AutoRollPanelProps {
   onSweepCompleted?(rolls: number): void;
   /** One session of <= 100 rolls: let the container replay it on the table. */
   onWatch?(cfg: SessionConfig): void;
+  /** localStorage key for the last starting-bankroll pick; set only in the sandbox */
+  persistKey?: string;
 }
 
 const LENS_LABEL = { 'lowest-edge': 'Lowest edge', practical: 'Practical', fun: 'Fun per dollar' };
@@ -106,6 +119,8 @@ type Outcome =
       specs: StrategySpec[];
       cfg: SessionConfig;
       metrics: Metrics[];
+      /** spread of result per dollar wagered, only for a lone single-session run */
+      sigma?: number;
     }
   | {
       kind: 'many';
@@ -148,9 +163,38 @@ function randomSeed(): number {
   }
 }
 
+/** Last starting-bankroll pick for this viewer (sandbox only). Storage can be blocked, so every access is guarded. */
+function readStoredBankroll(key: string | undefined): 'table' | Cents | null {
+  if (!key) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === 'table') return 'table';
+    const n = Number(raw);
+    return Number.isSafeInteger(n) && n > 0 && n <= MAX_BANKROLL ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBankroll(key: string | undefined, pick: 'table' | Cents): void {
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, String(pick));
+  } catch {
+    /* storage unavailable: the pick still works for this session */
+  }
+}
+
 export function AutoRollPanel(props: AutoRollPanelProps) {
   const { config, layout, rollsPerHour = 100 } = props;
-  const bankroll = props.bankroll ?? 50_000;
+  const tableBankroll = props.bankroll ?? 50_000;
+  const [bankrollPick, setBankrollPick] = useState<'table' | Cents>(
+    () => readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table',
+  );
+  const [bankrollText, setBankrollText] = useState<string>(() => {
+    const pick = readStoredBankroll(props.persistKey) ?? config?.bankroll ?? 'table';
+    return pick !== 'table' && !BANKROLL_CHIPS.includes(pick) ? String(pick / 100) : '';
+  });
   const all = useMemo(() => {
     const l = listStrategies();
     return config?.strategies ? l.filter((s) => config.strategies!.includes(s.id)) : l;
@@ -180,13 +224,47 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [seed, setSeed] = useState<number>(props.initialSeed ?? 1);
   const [progress, setProgress] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
+  // paint, and never twice for the same strategy and rules (it is cached).
+  useEffect(() => {
+    if (chartKind !== 'edge' || outcome?.kind !== 'single' || outcome.sigma !== undefined) return;
+    if (outcome.specs.length !== 1) return;
+    const o = outcome;
+    const h = setTimeout(() => {
+      const sigma = edgeFunnelSigma(o.specs[0]!, o.cfg.rules);
+      setOutcome((cur) => (cur === o ? { ...o, sigma } : cur));
+    }, 30);
+    return () => clearTimeout(h);
+  }, [chartKind, outcome]);
 
-  const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
+  // I033: "Custom…" in the Rules select edits a rules object for the runs in this panel
+  const [customRules, setCustomRules] = useState<TableRules | null>(null);
+  const [editingRules, setEditingRules] = useState(false);
+  const rulesInput = typeof props.rules === 'object' ? props.rules : (customRules ?? preset);
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
+  const bankrollParse =
+    bankrollText.trim() === '' ? null : parseBankroll(bankrollText, rules.tableMin);
+  const bankrollError = bankrollParse && !bankrollParse.ok ? bankrollParse.message : null;
+  const tableTooSmall = tableBankroll < rules.tableMin;
+  // Below the table minimum the Table chip is disabled and the run uses $500 instead of blocking.
+  const bankroll =
+    bankrollPick === 'table' ? (tableTooSmall ? 50_000 : tableBankroll) : bankrollPick;
+  // Below the table minimum the run starts at $500 and the $500 chip shows pressed.
+  useEffect(() => {
+    if (tableTooSmall && bankrollPick === 'table') setBankrollPick(50_000);
+  }, [tableTooSmall, bankrollPick]);
+  // A fallback to $500 is not the learner's choice, so it is not remembered.
+  useEffect(() => {
+    if (!tableTooSmall) writeStoredBankroll(props.persistKey, bankrollPick);
+  }, [bankrollPick, tableTooSmall, props.persistKey]);
+  useEffect(() => {
+    if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
+  }, [bankroll, stopLoss]);
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -208,6 +286,13 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const run = async (): Promise<void> => {
     setError(null);
+    if (bankrollError) return;
+    if (stopLoss !== undefined && stopLoss > bankroll) {
+      setError(
+        'Stop if down is more than the starting bankroll. Pick a smaller stop or a larger bankroll.',
+      );
+      return;
+    }
     // computed once per run, with the rules this run uses
     const metricsFor = (specs: StrategySpec[]): Metrics[] =>
       specs.map((s) => strategyMetrics(s, rules));
@@ -226,7 +311,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
+        const sigma = specs.length === 1 ? peekEdgeFunnelSigma(specs[0]!, cfg.rules) : undefined;
+        setOutcome({
+          kind: 'single',
+          results,
+          specs,
+          cfg,
+          metrics: metricsFor(specs),
+          ...(sigma !== undefined ? { sigma } : {}),
+        });
         props.onCompleted?.(results[0]!, results, specs);
       } else {
         const ac = new AbortController();
@@ -405,14 +498,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </div>
             <div class="sim-ar-group" role="group" aria-label="Stop when behind by">
               <span>Stop if down</span>
-              {STOP_OPTIONS.map((v) =>
-                button(
-                  stopLoss === v,
-                  v === undefined ? 'None' : money(v),
-                  () => setStopLoss(v),
-                  String(v),
-                ),
-              )}
+              {STOP_OPTIONS.map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  aria-pressed={stopLoss === v}
+                  disabled={running || (v !== undefined && v > bankroll)}
+                  class="sim-ar-btn"
+                  onClick={() => setStopLoss(v)}
+                >
+                  {v === undefined ? 'None' : money(v)}
+                </button>
+              ))}
             </div>
           </>
         )}
@@ -449,6 +546,70 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             />
           </label>
         </div>
+        <div class="sim-ar-group" role="group" aria-label="Starting bankroll">
+          <span>Bankroll</span>
+          <button
+            type="button"
+            aria-pressed={bankrollPick === 'table' && bankrollText === ''}
+            disabled={running || tableTooSmall}
+            title={
+              tableTooSmall
+                ? `Table bankroll is below the ${money(rules.tableMin)} minimum`
+                : undefined
+            }
+            class="sim-ar-btn"
+            onClick={() => {
+              setBankrollText('');
+              setBankrollPick('table');
+            }}
+          >
+            Table ({money(tableBankroll)})
+          </button>
+          {BANKROLL_CHIPS.map((c) =>
+            button(
+              bankrollPick === c && bankrollText === '',
+              money(c),
+              () => {
+                setBankrollText('');
+                setBankrollPick(c);
+              },
+              c,
+            ),
+          )}
+          <label>
+            <span class="sim-sr">Custom starting bankroll in whole dollars</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Custom"
+              value={bankrollText}
+              disabled={running}
+              aria-invalid={bankrollError !== null}
+              aria-describedby={bankrollError ? 'bankroll-error' : undefined}
+              class="sim-ar-num"
+              onInput={(e) => {
+                const v = e.currentTarget.value;
+                setBankrollText(v);
+                if (v.trim() === '') {
+                  setBankrollPick('table');
+                  return;
+                }
+                const r = parseBankroll(v, rules.tableMin);
+                if (r.ok) setBankrollPick(r.cents);
+              }}
+            />
+          </label>
+          {tableTooSmall ? (
+            <p class="sim-ar-desc">
+              Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
+          {bankrollError ? (
+            <p id="bankroll-error" role="alert" class="sim-invalid">
+              {bankrollError}
+            </p>
+          ) : null}
+        </div>
         <div class="sim-ar-group" role="group" aria-label="Sessions">
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
@@ -457,18 +618,51 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <label class="sim-ar-group">
             Rules
             <select
-              value={preset}
+              value={editingRules || customRules ? 'custom' : preset}
               disabled={running}
-              onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                if (v === 'custom') return setEditingRules(true);
+                setEditingRules(false);
+                setCustomRules(null);
+                setPreset(v as RulePresetId);
+              }}
             >
               {PRESET_IDS.map((id) => (
                 <option key={id} value={id}>
                   {PRESET_LABEL[id]}
                 </option>
               ))}
+              <option value="custom">Custom…</option>
             </select>
           </label>
         )}
+        {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <button
+            type="button"
+            class="sim-ar-btn"
+            disabled={running}
+            onClick={() => setEditingRules(true)}
+          >
+            Edit custom rules
+          </button>
+        ) : null}
+        {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <RulesEditor
+            initial={rules}
+            disabled={running}
+            onCancel={() => setEditingRules(false)}
+            onApply={(r) => {
+              setEditingRules(false);
+              // a form equal to a preset is that preset
+              const m = matchingPreset(r);
+              if (m) {
+                setPreset(m);
+                setCustomRules(null);
+              } else setCustomRules(r);
+            }}
+          />
+        ) : null}
         <div class="sim-ar-group">
           <label>
             Seed{' '}
@@ -527,7 +721,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   );
 
   function renderOutput(o: Outcome) {
-    const start = bankroll;
+    const start = o.cfg.bankroll;
     const noBet = o.specs.length === 1 && o.specs[0]!.id === 'no-bet';
     if (noBet && o.kind === 'single') return <TotalsHistogram counts={o.results[0]!.totals} />;
     let series: ChartSeries[];
@@ -558,20 +752,44 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       }));
     }
     const metrics = o.metrics;
+    const canEdge = o.kind === 'single' && o.specs.length === 1 && o.results[0]!.rollsPlayed >= 2;
+    const edgeView = canEdge && chartKind === 'edge';
     return (
       <>
+        {canEdge && (
+          <div class="sim-ar-group" role="group" aria-label="Chart units">
+            {button(chartKind === 'bankroll', 'Bankroll', () => setChartKind('bankroll'))}
+            {button(chartKind === 'edge', 'Show as % of money bet', () => setChartKind('edge'))}
+          </div>
+        )}
         {o.kind === 'many' && (
           <div class="sim-ar-group" role="group" aria-label="Chart">
             {button(chartTab === 'results', 'Session results', () => setChartTab('results'))}
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
         )}
-        <BankrollChart
-          mode={mode}
-          series={series}
-          start={start}
-          sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
-        />
+        {edgeView && o.kind === 'single' && o.sigma === undefined ? (
+          <p class="sim-ar-note" role="status">
+            Working out the funnel…
+          </p>
+        ) : edgeView && o.kind === 'single' ? (
+          <EdgeChart
+            label={nameOf(o.specs[0]!.id)}
+            ratio={edgeSeries(o.results[0]!.equity, o.results[0]!.wagered)}
+            edge={o.metrics[0]!.edgeOnAction}
+            sigma={o.sigma!}
+            // bet sizes that grow with losses break the funnel's assumptions
+            funnel={all.find((x) => x.id === o.specs[0]!.id)?.escalating !== true}
+            approximate={o.metrics[0]!.approximate === true}
+          />
+        ) : (
+          <BankrollChart
+            mode={mode}
+            series={series}
+            start={start}
+            sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
+          />
+        )}
         {o.kind === 'many' && chartTab === 'results' && (
           <ResultsHistogram
             start={start}
@@ -638,12 +856,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (o.kind === 'single') {
       const rs = o.results;
       const rows: Array<[string, string[]]> = [
+        ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
         ['Final bankroll', rs.map((r) => money2(r.finalEquity))],
-        ['Actual result', rs.map((r) => money2(r.finalEquity - bankroll, true))],
+        ['Actual result', rs.map((r) => money2(r.finalEquity - o.cfg.bankroll, true))],
         ['Expected loss', rs.map((r) => money2(-r.expectedLoss, true))],
         [
           'Luck (actual minus expected)',
-          rs.map((r) => money2(r.finalEquity - bankroll + r.expectedLoss, true)),
+          rs.map((r) => money2(r.finalEquity - o.cfg.bankroll + r.expectedLoss, true)),
+        ],
+        [
+          'Luck in typical swings',
+          rs.map((r) => {
+            const l = luckFrom(r.finalEquity - bankroll, r.expectedLoss, r.variance);
+            return l.z === null ? 'n/a' : `${l.z > 0 ? '+' : ''}${l.z.toFixed(1)} (${l.verdict})`;
+          }),
         ],
         ['Total wagered', rs.map((r) => money2(r.totalWagered))],
         ['Edge on action', edge],
@@ -675,6 +901,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const rs = o.results;
     const last = (a: Float64Array) => a[a.length - 1]!;
     const rows: Array<[string, string[]]> = [
+      ['Starting bankroll', rs.map(() => money2(o.cfg.bankroll))],
       ['Median final bankroll', rs.map((r) => money2(last(r.p50)))],
       ['Middle 80% of finals', rs.map((r) => `${money2(last(r.p10))} to ${money2(last(r.p90))}`)],
       ['Average final bankroll', rs.map((r) => money2(r.meanFinal))],

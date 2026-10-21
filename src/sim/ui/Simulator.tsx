@@ -193,6 +193,7 @@ export function Simulator(props: SimulatorInternalProps) {
     wonBets: anim.won,
     travellingBets: anim.travelling,
     chipMs: anim.chipMs,
+    chipPhase: anim.chipPhase,
     rollingDice: anim.rolling,
     selectedRegion: sheet?.regionId ?? null,
     onRegionTap: sh.onRegionTap,

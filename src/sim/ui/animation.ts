@@ -16,8 +16,8 @@ export interface Timeline {
 }
 
 const DUR: Record<Exclude<Speed, 'instant'>, Record<StepKind, number>> = {
-  normal: { dice: 650, puck: 100, travel: 300, lose: 200, win: 250, push: 100 },
-  fast: { dice: 250, puck: 60, travel: 120, lose: 80, win: 100, push: 60 },
+  normal: { dice: 650, puck: 100, travel: 200, lose: 150, win: 200, push: 100 },
+  fast: { dice: 250, puck: 60, travel: 80, lose: 80, win: 100, push: 60 },
 };
 const TOAST_MS: Record<Speed, number> = { normal: 2500, fast: 1500, instant: 2500 };
 

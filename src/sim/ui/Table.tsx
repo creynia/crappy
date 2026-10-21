@@ -29,6 +29,8 @@ export interface TableProps {
   travellingBets?: readonly Bet[];
   /** duration of the current chip movement (lose / win / travel), ms; drives the CSS animations */
   chipMs?: number;
+  /** which overlay is animating right now; the others sit still at their spot */
+  chipPhase?: 'travel' | 'lose' | 'win' | null;
   /** dice overlay while rolling */
   rollingDice?: { dice: DicePair | null; durationMs: number } | null;
   selectedRegion?: RegionId | null;
@@ -60,11 +62,12 @@ function placeBets(
   const byRegion = new Map<RegionId, Bet[]>();
   const stacks = new Map<string, Placed>();
   for (const b of bets) {
-    if (hiddenIds.has(b.id)) continue;
     const rid = regionIdForBet(b.type, b.point);
     const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
     if (!region) continue;
     byRegion.set(region.id, [...(byRegion.get(region.id) ?? []), b]);
+    // a travelling bet keeps its accessible name here but its chips are drawn by the ghost
+    if (hiddenIds.has(b.id)) continue;
     const pos = spotPosition(region, b.type);
     const key = `${pos.x},${pos.y},${b.type}`;
     const prev = stacks.get(key);
@@ -101,6 +104,7 @@ export function Table({
   wonBets,
   travellingBets,
   chipMs,
+  chipPhase,
   rollingDice,
   selectedRegion,
   onRegionTap,
@@ -112,10 +116,7 @@ export function Table({
   const empty = useMemo(() => new Set<string>(), []);
   const offIds = offBetIds ?? empty;
   const travelling = travellingBets ?? [];
-  const hiddenIds = useMemo(
-    () => new Set(travelling.map((b) => b.id)),
-    [travelling.map((b) => b.id).join()],
-  );
+  const hiddenIds = useMemo(() => new Set(travelling.map((b) => b.id)), [travellingBets]);
   const { byRegion, stacks } = useMemo(
     () => placeBets(layout, bets, offIds, hiddenIds),
     [layout, bets, offIds, hiddenIds],
@@ -258,7 +259,7 @@ export function Table({
             return from && to ? (
               <g
                 key={'travel-' + b.id}
-                class="sim-ghost sim-ghost-travel"
+                class={`sim-ghost sim-ghost-travel${chipPhase === 'travel' ? ' is-moving' : ''}`}
                 data-travel={b.id}
                 style={`--dx: ${to.x - from.x}px; --dy: ${to.y - from.y}px`}
               >
@@ -269,22 +270,37 @@ export function Table({
           {(lostBets ?? []).map((b) => {
             const p = ghostPos(b);
             return p ? (
-              <g key={'lost-' + b.id} class="sim-ghost sim-ghost-lose">
+              <g
+                key={'lost-' + b.id}
+                class={`sim-ghost sim-ghost-lose${chipPhase === 'lose' ? ' is-moving' : ''}`}
+                data-lost={b.id}
+              >
                 <ChipStack x={p.x} y={p.y} amount={b.amount} r={layout.chipRadius} />
               </g>
             ) : null;
           })}
           {(wonBets ?? []).map(({ bet, payout }) => {
             const p = ghostPos(bet);
-            return p && payout > 0 ? (
-              <g
-                key={'won-' + bet.id}
-                class="sim-ghost sim-ghost-win"
-                transform={`translate(${layout.chipRadius * 1.9} ${-layout.chipRadius * 0.6})`}
-              >
-                <ChipStack x={p.x} y={p.y} amount={payout} r={layout.chipRadius * 0.8} />
+            if (!p) return null;
+            // a winner that comes down keeps its chips on the spot until the payout step ends
+            const gone = !bets.some((b) => b.id === bet.id);
+            return (
+              <g key={'won-' + bet.id} data-won={bet.id}>
+                {gone ? (
+                  <g class="sim-ghost sim-ghost-settled">
+                    <ChipStack x={p.x} y={p.y} amount={bet.amount} r={layout.chipRadius} />
+                  </g>
+                ) : null}
+                {payout > 0 && chipPhase === 'win' ? (
+                  <g
+                    class="sim-ghost sim-ghost-win is-moving"
+                    transform={`translate(${layout.chipRadius * 1.9} ${-layout.chipRadius * 0.6})`}
+                  >
+                    <ChipStack x={p.x} y={p.y} amount={payout} r={layout.chipRadius * 0.8} />
+                  </g>
+                ) : null}
               </g>
-            ) : null;
+            );
           })}
         </g>
       </svg>

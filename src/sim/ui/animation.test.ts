@@ -44,10 +44,25 @@ describe('buildAnimationQueue', () => {
     expect(t.steps.map((s) => [s.kind, s.at, s.duration])).toEqual([
       ['dice', 0, 650],
       ['puck', 650, 100],
-      ['lose', 750, 200],
-      ['win', 950, 250],
+      ['lose', 750, 150],
+      ['win', 900, 200],
     ]);
-    expect(t.totalMs).toBe(1200);
+    expect(t.totalMs).toBe(1100);
+  });
+  it('normal totals for the common rolls are unchanged by the travel step', () => {
+    const dice = events[0]!;
+    const total = (evs: GameEvent[]) => buildAnimationQueue(evs, 'normal').totalMs;
+    const travel: GameEvent = { type: 'bet-travelled', betId: 'b3', betType: 'come', point: 6 };
+    // sweep (dice + lose), seven-out (dice + puck + lose), point made (dice + puck + win)
+    expect(total([dice, events[2]!])).toBe(800);
+    expect(total([dice, { type: 'seven-out', point: 6 }, events[2]!])).toBe(900);
+    expect(total([dice, events[1]!, events[3]!])).toBe(950);
+    // a come bet travelling on a plain number: just the dice plus a short slide
+    expect(total([dice, travel])).toBeLessThanOrEqual(650 + 200);
+    // the worst case (point made, travel, sweep and payout) grows by the travel step only
+    expect(total([dice, events[1]!, travel, events[2]!, events[3]!])).toBeLessThanOrEqual(
+      1100 + 200,
+    );
   });
   it('come-bet travel plays after the puck and before sweeps and payouts', () => {
     const withTravel: GameEvent[] = [
@@ -61,7 +76,7 @@ describe('buildAnimationQueue', () => {
     const t = buildAnimationQueue(withTravel, 'normal');
     expect(t.steps.map((s) => s.kind)).toEqual(['dice', 'puck', 'travel', 'lose', 'win', 'push']);
     expect(t.steps[2]!.events).toEqual([withTravel[1]]);
-    expect(t.totalMs).toBeLessThanOrEqual(1600);
+    expect(t.totalMs).toBeLessThanOrEqual(1400);
     expect(buildAnimationQueue(withTravel, 'fast').totalMs).toBeLessThan(700);
     expect(buildAnimationQueue(withTravel, 'instant').steps).toEqual([]);
   });

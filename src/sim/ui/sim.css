@@ -656,14 +656,14 @@
   .sim-dice.is-rolling .sim-die-1 {
     animation: sim-tumble-b var(--sim-tumble, 1000ms) ease-out both;
   }
-  .sim-ghost-lose {
-    animation: sim-lose var(--sim-chip-ms, 200ms) ease-in forwards;
+  .sim-ghost-lose.is-moving {
+    animation: sim-lose var(--sim-chip-ms, 150ms) ease-in forwards;
   }
-  .sim-ghost-win {
-    animation: sim-win var(--sim-chip-ms, 250ms) ease-out both;
+  .sim-ghost-win.is-moving {
+    animation: sim-win var(--sim-chip-ms, 200ms) ease-out both;
   }
-  .sim-ghost-travel {
-    animation: sim-travel var(--sim-chip-ms, 300ms) ease-in-out both;
+  .sim-ghost-travel.is-moving {
+    animation: sim-travel var(--sim-chip-ms, 200ms) ease-in-out both;
   }
   .sim-stack-hit.is-won {
     animation: sim-flash 600ms ease-out;

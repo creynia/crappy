@@ -15,6 +15,8 @@ export function useAnimationPlayer(
   const [won, setWon] = useState<{ bet: Bet; payout: Cents }[]>([]);
   const [travelling, setTravelling] = useState<Bet[]>([]);
   const [chipMs, setChipMs] = useState<number | undefined>(undefined);
+  /** the chip step currently animating; overlays are static outside their own step */
+  const [phase, setPhase] = useState<'travel' | 'lose' | 'win' | null>(null);
   const [busy, setBusy] = useState(false);
   const player = useRef<Player | null>(null);
 
@@ -34,6 +36,7 @@ export function useAnimationPlayer(
       setWon([]);
       setTravelling([]);
       setChipMs(undefined);
+      setPhase(null);
       setBusy(false);
       player.current = null;
       pushToast(text, tone);
@@ -42,42 +45,41 @@ export function useAnimationPlayer(
       finish();
       return;
     }
+    // Every overlay is computed up front and shown as soon as the dice settle, so a chip that is
+    // about to move, be swept or be paid stays where it was until its own step animates it.
+    const travelIds = new Set(events.map((e) => (e.type === 'bet-travelled' ? e.betId : '')));
+    const lostIds = new Set(events.map((e) => (e.type === 'bet-lost' ? e.betId : '')));
+    const travelBets = post.bets.filter((b) => travelIds.has(b.id));
+    const lostBets = pre.bets.filter((b) => lostIds.has(b.id));
+    const wonBets: { bet: Bet; payout: Cents }[] = [];
+    for (const e of events)
+      if (e.type === 'bet-won') {
+        const bet = pre.bets.find((b) => b.id === e.betId);
+        if (bet) wonBets.push({ bet, payout: e.profit - e.vig + (e.staysUp ? 0 : e.amount) });
+      }
     setBusy(true);
     setShown(pre);
+    setPhase(null);
     player.current = playTimeline(tl, {
       onStart: (s) => {
         if (s.kind === 'dice') setRolling({ dice: roll.roll.dice, durationMs: s.duration });
-        if (s.kind === 'travel' || s.kind === 'lose' || s.kind === 'win') setChipMs(s.duration);
-        if (s.kind === 'travel') {
-          // come / don't-come chips slide from the box to their number
-          const ids = new Set(s.events.map((e) => (e.type === 'bet-travelled' ? e.betId : '')));
-          setShown(post);
-          setTravelling(post.bets.filter((b) => ids.has(b.id)));
-        }
-        if (s.kind === 'lose') {
-          const ids = new Set(s.events.map((e) => (e.type === 'bet-lost' ? e.betId : '')));
-          setShown(post);
-          setLost(pre.bets.filter((b) => ids.has(b.id)));
-        }
-        if (s.kind === 'win') {
-          setShown(post);
-          const w: { bet: Bet; payout: Cents }[] = [];
-          for (const e of s.events)
-            if (e.type === 'bet-won') {
-              const bet = pre.bets.find((b) => b.id === e.betId);
-              if (bet) w.push({ bet, payout: e.profit - e.vig + (e.staysUp ? 0 : e.amount) });
-            }
-          setWon(w);
+        if (s.kind === 'travel' || s.kind === 'lose' || s.kind === 'win') {
+          setChipMs(s.duration);
+          setPhase(s.kind);
         }
       },
       onEnd: (s) => {
         if (s.kind === 'dice') {
           setRolling(null);
           setShown(post);
+          setTravelling(travelBets);
+          setLost(lostBets);
+          setWon(wonBets);
         }
         if (s.kind === 'travel') setTravelling([]);
         if (s.kind === 'lose') setLost([]);
         if (s.kind === 'win') setWon([]);
+        if (s.kind === 'travel' || s.kind === 'lose' || s.kind === 'win') setPhase(null);
       },
       onDone: finish,
     });
@@ -93,6 +95,7 @@ export function useAnimationPlayer(
     setWon([]);
     setTravelling([]);
     setChipMs(undefined);
+    setPhase(null);
   };
 
   return {
@@ -102,6 +105,7 @@ export function useAnimationPlayer(
     won,
     travelling,
     chipMs,
+    chipPhase: phase,
     busy,
     run,
     clear,

@@ -2,8 +2,9 @@
 // ../types.ts for the API) and append it here. Order = order on the practice hub.
 import type { AnyDrill } from '../types';
 import { lineCalls } from './lineCalls';
+import { ways } from './ways';
 
-export const DRILLS: readonly AnyDrill[] = [lineCalls];
+export const DRILLS: readonly AnyDrill[] = [lineCalls, ways];
 
 export function getDrill(id: string): AnyDrill | undefined {
   return DRILLS.find((d) => d.id === id);

@@ -55,7 +55,13 @@ export interface SessionConfig {
   bankroll: Cents;
   rules?: Partial<TableRules> | RulePresetId;
   stopAtBust?: boolean; // default true
+  /**
+   * Stop when equity is at least this far above the starting bankroll (cents). Checked after each roll;
+   * equity counts bets at face value; bets left up stay on the table. A stop that is reached before a
+   * bust ends the session as stop-win; a later bust never happens.
+   */
   stopWin?: Cents;
+  /** Stop when equity is at least this far below the starting bankroll (cents). Same rules as stopWin. */
   stopLoss?: Cents;
 }
 export interface SessionResult {
@@ -93,6 +99,13 @@ export interface ManyResult {
   finals: Int32Array;
   meanFinal: number;
   probAhead: number;
+  /** Share of sessions that ended by reaching SessionConfig.stopWin / stopLoss. */
+  stopWinRate: number;
+  stopLossRate: number;
+  /** Mean rolls actually played per session (fewer than the requested rolls when a stop or bust ends it). */
+  meanRollsPlayed: number;
+  /** Mean analytic expected loss per session (cents), summed over the rolls actually played. */
+  meanExpectedLoss: number;
 }
 export interface ManyOptions {
   onProgress?(p: number): void;

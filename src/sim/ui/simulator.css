@@ -221,6 +221,15 @@
 .sim-session-table th:first-child {
   text-align: left;
 }
+@media (max-width: 380px) {
+  .sim-session-table {
+    font-size: 0.74rem;
+  }
+  .sim-session-table th,
+  .sim-session-table td {
+    padding: 3px 3px;
+  }
+}
 .sim-hide-money .sim-status-money {
   display: none;
 }

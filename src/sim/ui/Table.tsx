@@ -7,6 +7,7 @@ import type { Dice as DicePair } from '../engine/types';
 import { hopText } from '../engine/bets';
 import { hopSpot, regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
+import { CalloutLayer, placeCallouts, type Callout } from './Callouts';
 import { Puck } from './Puck';
 import { layoutBadges } from './stackBadges';
 import { RegionArt } from './regionArt';
@@ -41,6 +42,8 @@ export interface TableProps {
   onRegionTap?: (id: RegionId) => void;
   /** `betId` is the first bet of that type at the spot; `allIds` lists every bet merged into the stack. */
   onStackTap?: (betId: string, allIds: readonly string[]) => void;
+  /** scene callouts: labelled pointers at regions (those this layout lacks are skipped) */
+  callouts?: readonly Callout[];
   /**
    * Read-only drill overlay, keyed by a stack's first bet id: a badge under the stack whose text
    * also ends the stack's accessible name (e.g. a learner's "Wins" call, marked right or wrong).
@@ -158,6 +161,7 @@ export function Table({
   selectedRegion,
   onRegionTap,
   onStackTap,
+  callouts,
   annotate,
   class: cls,
 }: TableProps) {
@@ -192,6 +196,10 @@ export function Table({
   const hasPuck = layout.puckRadius > 0;
   const puckPos = point ? layout.puck[point] : layout.puck.off;
   const hl = new Set<string>(highlightedBets ?? []);
+  const placed = useMemo(
+    () => placeCallouts(callouts ?? [], layout, feltId),
+    [callouts, layout, feltId],
+  );
   const badges = useMemo(
     () =>
       annotate
@@ -277,6 +285,12 @@ export function Table({
               data-region={region.id}
               aria-label={regionAriaLabel(region, { bets: rbets, offIds, disabled })}
               aria-disabled={disabled || undefined}
+              aria-describedby={
+                placed
+                  .filter((c) => c.regionId === region.id)
+                  .map((c) => c.id)
+                  .join(' ') || undefined
+              }
               onClick={() => onRegionTap?.(region.id)}
               onKeyDown={(e) => onKey(e, region.id)}
             >
@@ -446,6 +460,7 @@ export function Table({
             );
           })}
         </g>
+        <CalloutLayer callouts={placed} layout={layout} />
       </svg>
       {rollingDice ? (
         <div class="sim-dice-overlay" aria-hidden={rollingDice.dice ? undefined : true}>

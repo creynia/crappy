@@ -5,6 +5,7 @@ import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
 import { runScript, stageFor } from './runner';
 import { answeredRequirements } from './conditions';
+import { BET_TYPES_WITHOUT_REGION, REGION_IDS } from '../ui/layouts/types';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -67,6 +68,30 @@ class Ctx {
   }
   bet(path: string, v: unknown) {
     if (!isBetTypeId(v)) this.err(path, `unknown bet type id ${JSON.stringify(v)}`);
+  }
+  callouts(path: string, v: unknown) {
+    if (!Array.isArray(v)) return this.err(path, 'must be an array of callouts');
+    v.forEach((c: unknown, i) => {
+      const p = `${path}[${i}]`;
+      if (!isObj(c)) return this.err(p, 'must be an object');
+      this.keys(p, c, ['target', 'text', 'placement']);
+      const t = c.target;
+      if (typeof t === 'string') {
+        if (!(REGION_IDS as readonly string[]).includes(t))
+          this.err(`${p}.target`, `unknown table region "${t}"`);
+      } else if (isObj(t)) {
+        this.keys(`${p}.target`, t, ['betType']);
+        this.bet(`${p}.target.betType`, t.betType);
+        if ((BET_TYPES_WITHOUT_REGION as readonly unknown[]).includes(t.betType))
+          this.err(
+            `${p}.target.betType`,
+            `${String(t.betType)} has no fixed table region; target a number box instead, e.g. "box-6"`,
+          );
+      } else this.err(`${p}.target`, 'must be a region id or { betType }');
+      this.str(`${p}.text`, c.text);
+      if (c.placement !== undefined && c.placement !== 'above' && c.placement !== 'below')
+        this.err(`${p}.placement`, 'must be "above" or "below"');
+    });
   }
   betList(path: string, v: unknown, allowAll = true) {
     if (v === 'all' && allowAll) return;
@@ -352,6 +377,7 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'callouts',
   'challenge',
 ];
 const STEP_KEYS = [
@@ -370,6 +396,7 @@ const STEP_KEYS = [
   'showEV',
   'play',
   'ask',
+  'callouts',
 ];
 
 /** Strict scene validation: canonical ids, integer cents, dice 1-6, shapes, and engine-backed bet checks. */
@@ -411,6 +438,7 @@ export function validateScene(
   if (s.allowedBets !== undefined) c.betList('allowedBets', s.allowedBets);
   if (s.allowedActions !== undefined) c.actions('allowedActions', s.allowedActions);
   if (s.highlightedBets !== undefined) c.betList('highlightedBets', s.highlightedBets, false);
+  if (s.callouts !== undefined) c.callouts('callouts', s.callouts);
   if (s.showEV !== undefined) c.bool('showEV', s.showEV);
   if (s.evDetail !== undefined && s.evDetail !== 'basic' && s.evDetail !== 'full')
     c.err('evDetail', 'must be basic or full');
@@ -617,6 +645,7 @@ export function validateScene(
         if (st.allowedActions !== undefined) c.actions(`${p}.allowedActions`, st.allowedActions);
         if (st.highlightedBets !== undefined)
           c.betList(`${p}.highlightedBets`, st.highlightedBets, false);
+        if (st.callouts !== undefined) c.callouts(`${p}.callouts`, st.callouts);
         if (st.showEV !== undefined) c.bool(`${p}.showEV`, st.showEV);
         if (st.advance !== undefined && st.advance !== 'auto' && st.advance !== 'button')
           c.err(`${p}.advance`, 'must be auto or button');

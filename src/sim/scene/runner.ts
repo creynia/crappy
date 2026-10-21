@@ -1,5 +1,5 @@
 import { BET_TYPES, sameHop } from '../engine/bets';
-import { createGame, equity } from '../engine/game';
+import { applyAction, createGame, equity } from '../engine/game';
 import { findMergeTarget, findParent, maxOddsAmount } from '../engine/validate';
 import type {
   Action,
@@ -16,6 +16,7 @@ import type {
   ActionMatcher,
   BetResult,
   Condition,
+  PlayFrame,
   SceneConfig,
   SceneInput,
   SceneRuntime,
@@ -98,6 +99,35 @@ function startStep(
     game: g,
     runtime: { stepIndex: index, stepStartRoll: g.rollCount, counters: {}, done: false },
   };
+}
+
+/** The state a step starts from when played from the scene start: scene config plus that step's setup. */
+export function stageFor(scene: SceneConfig, index: number): GameState {
+  const { steps: _steps, ...plain } = scene;
+  const base = initScene(plain).game;
+  return startStep(scene, base, index).game;
+}
+
+export type ScriptResult =
+  | {
+      ok: true;
+      game: GameState;
+      frames: { frame: PlayFrame; events: GameEvent[]; state: GameState }[];
+    }
+  | { ok: false; index: number; message: string; game: GameState };
+
+/** Plays a demo script on `game` without any UI: the same states the Simulator will step through. */
+export function runScript(game: GameState, script: readonly PlayFrame[]): ScriptResult {
+  const frames: { frame: PlayFrame; events: GameEvent[]; state: GameState }[] = [];
+  let g = game;
+  for (let i = 0; i < script.length; i++) {
+    const frame = script[i]!;
+    const r = applyAction(g, frame.action);
+    if (!r.ok) return { ok: false, index: i, message: r.error.message, game: g };
+    g = r.state;
+    frames.push({ frame, events: r.events, state: g });
+  }
+  return { ok: true, game: g, frames };
 }
 
 /** Initial state for a scene. `seed` is used when the scene has none (guided scenes default to 1). */

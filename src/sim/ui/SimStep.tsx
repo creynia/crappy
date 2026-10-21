@@ -8,10 +8,20 @@ export interface SimStepProps {
   hintVisible: boolean;
   onNext: () => void;
   onRestart: () => void;
+  /** set on a demo step when it is not playing */
+  onReplay?: (() => void) | undefined;
 }
 
 /** Guided-lesson step panel, or the "Done" panel once the scene is complete. */
-export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: SimStepProps) {
+export function SimStep({
+  scene,
+  step,
+  rt,
+  hintVisible,
+  onNext,
+  onRestart,
+  onReplay,
+}: SimStepProps) {
   const guided = !!scene.steps?.length;
   const lastIdx = (scene.steps?.length ?? 1) - 1;
   const stepAck = step ? 'acknowledged' in step.completeWhen : false;
@@ -29,6 +39,7 @@ export function SimStep({ scene, step, rt, hintVisible, onNext, onRestart }: Sim
           done={false}
           onNext={onNext}
           onRestart={onRestart}
+          {...(onReplay ? { onReplay } : {})}
         />
       ) : null}
       {guided && rt.done ? (

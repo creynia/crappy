@@ -185,3 +185,65 @@ describe('Simulator roll announcements', () => {
     expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
   });
 });
+
+describe('demo steps', () => {
+  const scene: SceneConfig = {
+    id: 'demo',
+    version: 1,
+    bankroll: 50_000,
+    phase: 'point',
+    point: 6,
+    bets: [{ type: 'pass-line', amount: 1000 }],
+    steps: [
+      {
+        id: 'watch',
+        text: 'Watch the dealer',
+        completeWhen: { acknowledged: true },
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'A Come bet' },
+          { action: { type: 'roll', dice: [5, 4] } },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 } },
+          { action: { type: 'roll', dice: [3, 6] } },
+        ],
+      },
+    ],
+  };
+  const confirmed = (events: SimulatorEvent[]) =>
+    events.filter((e) => e.type === 'action-confirmed').length;
+
+  it('at instant speed plays every scripted action as soon as the step starts', async () => {
+    const events: SimulatorEvent[] = [];
+    render(<Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy();
+  });
+
+  it('Replay restores the starting state and plays the same script again', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    const finalText = container.querySelector('.sim-status-money')!.textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    expect(container.querySelector('.sim-status-money')!.textContent).toBe(finalText);
+  });
+
+  it('a tap skips to the end state while a slower demo is playing', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={scene}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBeGreaterThanOrEqual(1));
+    expect(confirmed(events)).toBeLessThan(4); // paused between frames
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(confirmed(events)).toBe(4);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+});

@@ -13,6 +13,8 @@ export interface StepPanelProps {
   done: boolean;
   onNext: () => void;
   onRestart?: () => void;
+  /** demo step: play the scripted actions again */
+  onReplay?: () => void;
 }
 
 /** Tiny inline formatter: **bold** and _italic_ only (scene text is trusted repo content, still escaped). */
@@ -39,6 +41,16 @@ export function StepPanel(p: StepPanelProps) {
     <section class="sim-step" aria-label="Lesson step" data-step={p.step.id}>
       <div class="sim-step-count">
         {p.done ? 'Done' : `Step ${p.index + 1} of ${p.total}`}
+        {p.onReplay ? (
+          <button
+            type="button"
+            class="sim-linkbtn"
+            aria-label="Replay the demo"
+            onClick={p.onReplay}
+          >
+            Replay
+          </button>
+        ) : null}
         {p.onRestart ? (
           <button type="button" class="sim-linkbtn" onClick={p.onRestart}>
             Restart

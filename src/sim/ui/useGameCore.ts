@@ -50,10 +50,13 @@ export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: Game
   };
 
   /** Gate + engine + scene observation. */
-  const doAction = (action: Action): DoActionResult => {
+  const doAction = (action: Action, opts?: { scripted?: boolean }): DoActionResult => {
     const { game: g, rt: r } = coreRef.current;
     const sc = sceneRef.current;
-    const gate = gateAction(sc, r, g, action);
+    // a demo step's own actions are scripted by the lesson, so the step's gate does not apply
+    const gate = opts?.scripted
+      ? ({ ok: true, warnings: [] } as const)
+      : gateAction(sc, r, g, action);
     if (!gate.ok) {
       emit({ type: 'action-rejected', action, error: gate });
       onRejected(gate.message);

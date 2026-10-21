@@ -2,6 +2,7 @@ import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
+import { runScript, stageFor } from './runner';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -89,6 +90,28 @@ class Ctx {
     v.forEach((a, i) => {
       if (!ACTION_TYPES.includes(a as string))
         this.err(`${path}[${i}]`, `unknown action type ${JSON.stringify(a)}`);
+    });
+  }
+  playFrames(path: string, v: unknown) {
+    if (!Array.isArray(v) || v.length === 0 || v.length > 30)
+      return this.err(path, 'must be an array of 1-30 frames');
+    v.forEach((f: unknown, i) => {
+      const p = `${path}[${i}]`;
+      if (!isObj(f)) return this.err(p, 'must be an object');
+      this.keys(p, f, ['action', 'say', 'pauseMs']);
+      if (f.say !== undefined) this.str(`${p}.say`, f.say);
+      if (f.pauseMs !== undefined && !(isInt(f.pauseMs) && f.pauseMs >= 0 && f.pauseMs <= 10_000))
+        this.err(`${p}.pauseMs`, 'must be an integer 0-10000');
+      const a = f.action;
+      if (!isObj(a) || !ACTION_TYPES.includes(a.type as string))
+        return this.err(`${p}.action`, 'must be an action with a known type');
+      if (a.type === 'place-bet') {
+        if (!isBetTypeId(a.betType)) this.err(`${p}.action.betType`, 'unknown bet type');
+        this.cents(`${p}.action.amount`, a.amount, { min: 1 });
+      } else if (a.type === 'roll') {
+        if (a.dice !== undefined && !isDicePair(a.dice))
+          this.err(`${p}.action.dice`, 'must be a pair of dice, each an integer 1-6');
+      } else if (typeof a.betId !== 'string') this.err(`${p}.action.betId`, 'must be a bet id');
     });
   }
   phase(path: string, v: unknown) {
@@ -321,6 +344,7 @@ const STEP_KEYS = [
   'completeWhen',
   'advance',
   'showEV',
+  'play',
 ];
 
 /** Strict scene validation: canonical ids, integer cents, dice 1-6, shapes, and engine-backed bet checks. */
@@ -528,6 +552,7 @@ export function validateScene(
             c.err(`${p}.expect`, 'must be a non-empty array');
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
+        if (st.play !== undefined) c.playFrames(`${p}.play`, st.play);
         if (st.completeWhen === undefined) c.err(`${p}.completeWhen`, 'is required');
         else c.condition(`${p}.completeWhen`, st.completeWhen, autoOn);
         if (st.setup !== undefined) {
@@ -552,7 +577,27 @@ export function validateScene(
       });
     }
   }
-  return c.errors.length
-    ? { ok: false, errors: c.errors }
-    : { ok: true, scene: json as unknown as SceneConfig };
+  if (c.errors.length) return { ok: false, errors: c.errors };
+  const scene = json as unknown as SceneConfig;
+  // Demo scripts are replayed against the engine from the scene start plus the step's own setup,
+  // so an illegal scripted action is reported with its step id.
+  scene.steps?.forEach((st, i) => {
+    if (!st.play) return;
+    let stage;
+    try {
+      stage = stageFor(scene, i);
+    } catch (e) {
+      return c.err(
+        `steps[${i}].play`,
+        `step "${st.id}": cannot stage the step (${(e as Error).message})`,
+      );
+    }
+    const r = runScript(stage, st.play);
+    if (!r.ok)
+      c.err(
+        `steps[${i}].play[${r.index}]`,
+        `step "${st.id}": scripted action is illegal: ${r.message}`,
+      );
+  });
+  return c.errors.length ? { ok: false, errors: c.errors } : { ok: true, scene };
 }

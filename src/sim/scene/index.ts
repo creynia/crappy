@@ -11,6 +11,9 @@ export {
   highlightedFor,
   betTypeAllowed,
   conditionNeedsRoll,
+  stageFor,
+  runScript,
+  type ScriptResult,
 } from './runner';
 export {
   challengeScene,

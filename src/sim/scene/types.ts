@@ -43,6 +43,10 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** hide the step panel's Restart (default shown); a challenge keeps its seed */
+    showRestart?: boolean;
+    /** accessible name of the step panel (default "Lesson step") */
+    stepPanelLabel?: string;
   };
   autoRoll?: {
     enabled: boolean;
@@ -55,6 +59,8 @@ export interface SceneConfig {
     chart?: 'bankroll' | 'edge';
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** open on the sortable all-presets comparison table */
+    table?: boolean;
     /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */
@@ -65,6 +71,17 @@ export interface SceneConfig {
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: { rolls: number; scoring: { minResolved: Cents } };
+}
+
+/** One scripted action of a demo step, played by the runner with an optional caption. */
+export interface PlayFrame {
+  action: Action;
+  /** caption shown as a toast while this action plays */
+  say?: string;
+  /** ms to wait before the next frame (default depends on speed; 0 at instant speed) */
+  pauseMs?: number;
 }
 
 export interface SceneStep {
@@ -89,6 +106,12 @@ export interface SceneStep {
   completeWhen: Condition;
   advance?: 'auto' | 'button';
   showEV?: boolean;
+  /**
+   * Demo: when the step starts, these actions are played one at a time (bets, rolls with forced dice)
+   * with captions, then control is handed back. The learner can Replay or tap to skip to the end.
+   * Scripted actions skip the step's allowed-action gate but are counted toward `completeWhen`.
+   */
+  play?: PlayFrame[];
 }
 
 export interface StepAsk {

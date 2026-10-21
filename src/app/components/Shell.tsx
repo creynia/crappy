@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Link } from './Link';
 
 const TABS = [
@@ -20,11 +20,16 @@ const immersive = (p: string) => p.startsWith('/play');
 
 export function Shell(props: { path: string; children: ComponentChildren }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const handle = useRef<HTMLButtonElement>(null);
   // the menu closes on navigation and on Escape
   useEffect(() => setMenuOpen(false), [props.path]);
   useEffect(() => {
     if (!menuOpen) return;
-    const on = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setMenuOpen(false);
+      handle.current?.focus();
+    };
     document.addEventListener('keydown', on);
     return () => document.removeEventListener('keydown', on);
   }, [menuOpen]);
@@ -32,7 +37,20 @@ export function Shell(props: { path: string; children: ComponentChildren }) {
     <div class={`shell${immersive(props.path) ? ' is-immersive' : ''}`}>
       {immersive(props.path) ? (
         <>
+          {menuOpen ? (
+            <div
+              class="immersive-backdrop"
+              aria-hidden="true"
+              onClick={(e) => {
+                // an outside tap only closes the menu; it does not also hit what is underneath
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen(false);
+              }}
+            />
+          ) : null}
           <button
+            ref={handle}
             type="button"
             class="immersive-menu"
             aria-label="Pages"
@@ -52,6 +70,7 @@ export function Shell(props: { path: string; children: ComponentChildren }) {
                 {t.label}
               </Link>
             ))}
+            <Link to="/challenge">Challenge</Link>
           </nav>
         </>
       ) : null}

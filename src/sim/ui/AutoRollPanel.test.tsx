@@ -203,6 +203,48 @@ describe('AutoRollPanel', () => {
   });
 });
 
+describe('AutoRollPanel strategy table approximate rows', () => {
+  it('marks approximate presets with ≈ in the cells and a footnote', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel config={{ table: true }} />, el);
+    const row = el.querySelector('[data-strategy="martingale-pass"]')!;
+    expect(row.textContent).toContain('≈ starting layout');
+    expect(row.querySelector('td[data-label="Loss per hour"]')!.textContent).toContain('≈');
+    expect(
+      el.querySelector('[data-strategy="pass-max-odds"] td[data-label="Loss per hour"]')!
+        .textContent,
+    ).not.toContain('≈');
+    expect(el.querySelector('[data-testid="strategy-table-approx"]')).not.toBeNull();
+  });
+});
+
+describe('AutoRollPanel strategy table', () => {
+  it('opens on the table, sorts, and Run it selects the strategy', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel config={{ table: true }} />, el);
+    const rows = () =>
+      Array.from(el.querySelectorAll('[data-testid="strategy-table"] tbody tr')).map((r) =>
+        r.getAttribute('data-strategy'),
+      );
+    expect(rows().length).toBeGreaterThan(8);
+    expect(rows()).not.toContain('my-layout');
+    // default: cheapest hour first
+    expect(rows()[0]).toBe('no-bet');
+    const heads = Array.from(el.querySelectorAll<HTMLElement>('.sim-st-sort'));
+    await act(() => {
+      heads.find((b) => b.textContent.startsWith('Loss per hour'))!.click();
+    });
+    expect(rows()[0]).toBe('any-7-every-roll');
+    await act(() => {
+      el.querySelector<HTMLElement>('[data-strategy="iron-cross"] .sim-st-run button')!.click();
+    });
+    expect(el.querySelector('[data-testid="strategy-table"]')).toBeNull();
+    expect((el.querySelector('select[aria-label="Strategy"]') as HTMLSelectElement).value).toBe(
+      'iron-cross',
+    );
+  });
+});
+
 describe('AutoRollPanel starting bankroll', () => {
   const bustRow = (el: HTMLElement) =>
     [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
@@ -373,5 +415,27 @@ describe('AutoRollPanel bankroll controls', () => {
     const spec = { id: 'pass-max-odds' as const, unit: 1000 };
     expect(peekEdgeFunnelSigma(spec, 'standard-vegas')).toBeDefined();
     expect(peekEdgeFunnelSigma(spec, 'odds-100x')).toBeUndefined();
+  });
+});
+
+describe('AutoRollPanel bankroll warning (I057)', () => {
+  const config = (unit: number) => ({
+    strategies: ['pass-max-odds' as const],
+    defaultStrategy: { id: 'pass-max-odds' as const, unit },
+    rollOptions: [100],
+    sessions: [1],
+  });
+
+  it('warns when a $100 max-odds unit is more than a quarter of a $500 bankroll', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(10_000)} />, el);
+    const note = el.querySelector('[data-testid="bankroll-warning"]');
+    expect(note?.textContent).toContain('expect a high bust rate');
+  });
+
+  it('does not warn for a $10 max-odds unit on $500', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(1_000)} />, el);
+    expect(el.querySelector('[data-testid="bankroll-warning"]')).toBeNull();
   });
 });

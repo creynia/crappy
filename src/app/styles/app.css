@@ -601,12 +601,19 @@ textarea {
     padding: 0 env(safe-area-inset-right) 0 calc(28px + env(safe-area-inset-left));
   }
   .shell.is-immersive .topbar,
-  .shell.is-immersive .tabbar {
-    display: none;
+  .shell.is-immersive .tabbar,
+  .shell.is-immersive .play-challenge-link {
+    display: none; /* the challenge link lives in the Pages menu here */
   }
   .shell.is-immersive .page {
     padding: 4px 4px 4px 0;
     max-width: none;
+  }
+  .immersive-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: transparent;
   }
   .immersive-menu {
     display: flex;
@@ -626,6 +633,12 @@ textarea {
     font-size: 1.25rem;
     line-height: 1;
     cursor: pointer;
+  }
+  /* a 28px strip to look at, a 44px target to hit: the extra width is invisible and overlaps the felt edge */
+  .immersive-menu::before {
+    content: '';
+    position: absolute;
+    inset: -4px -16px -4px 0;
   }
   .immersive-nav.is-open {
     display: flex;
@@ -653,4 +666,57 @@ textarea {
   .immersive-nav a[aria-current='page'] {
     background: rgb(255 255 255 / 0.16);
   }
+}
+
+/* ---------- challenge mode (I030) ---------- */
+.play-challenge-link {
+  margin: 0 0 0.75rem;
+}
+.challenge-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.challenge-head h1 {
+  margin: 0;
+  flex: 1 1 auto;
+}
+.challenge-head p {
+  margin: 0;
+}
+.challenge-score-big {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.challenge-bands {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.challenge-kv {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.75rem;
+}
+.challenge-kv dd {
+  margin: 0;
+  text-align: right;
+}
+.challenge-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+button.tile {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }

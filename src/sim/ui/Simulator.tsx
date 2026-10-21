@@ -458,8 +458,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // text nothing taps, never a betting region or the lesson step card.
   const toastsEl = (
     <Toasts
-      // while the odds nudge is up, roll toasts wait out of sight (kept, not dismissed); other messages show
-      toasts={oddsHintRoom ? toasts.filter((t) => !t.roll) : toasts}
+      // while the odds nudge is up, only the newest message shows beside it (the rest are kept)
+      toasts={oddsHintRoom ? toasts.slice(-1) : toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
       hint={oddsHintEl}

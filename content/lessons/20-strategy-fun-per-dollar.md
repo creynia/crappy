@@ -13,7 +13,7 @@ Here are some popular ways to play a $10-ish table, priced honestly (about 100 r
 | Strategy | What it is | Expected cost/hour | Hourly swing | Fun per $ (swing ÷ cost) |
 |---|---|---|---|---|
 | **Pass + max odds** | $10 Pass, 3-4-5× odds | $4.19 | ±$265 | **63** |
-| **3-point Molly** | $10 Pass + up to two $10 Come bets, all with max odds | ~$10.10 | ±$470 | **46** |
+| **3-point Molly** | $10 Pass + up to two $10 Come bets, all with max odds | $10.11 | ±$470 | **46** |
 | **Place 6 & 8** | $6 each, after the point | $3.91 | ±$50 | 13 |
 | Flat Pass | $10 Pass, no odds | $4.19 | ±$55 | 13 |
 | $1 Hard 6 & Hard 8 | kept up after the point | $3.91 | ±$20 | 5 |
@@ -24,7 +24,7 @@ Here are some popular ways to play a $10-ish table, priced honestly (about 100 r
 What this shows:
 
 * **Odds are the cheapest thrill in the casino.** Pass + odds and the 3-point Molly give the biggest swings per dollar of cost, because odds add excitement at 0% edge.
-* **The 3-point Molly** is the classic "lots of numbers working" plan that stays mathematically clean. It costs about 2.4× the single Pass bet, because there are more flat bets in action, and it carries about 0.40% per dollar bet, odds included, close to Pass + odds. It's slightly higher because come odds are off, and returned, on come-out 7s.
+* **The 3-point Molly** is the classic "lots of numbers working" plan that stays mathematically clean. It costs about 2.4× the single Pass bet, because there are more flat bets in action, and it carries about 0.40% per dollar bet, odds included, close to Pass + odds. It's slightly higher because come odds are off on the come-out, so they are returned and are not action there.
 * **Iron Cross** wins on every roll except 7 (83% of rolls!). That feels great, but it costs about **6.5×** as much per hour as Pass + odds. The steady trickle of small wins is the price you're paying.
 * **Small hardway bets** are cheap in dollars per hour ($1 units), but they're 9% bets. Enjoy them as a garnish, not a meal.
 * **Props every roll** are the most expensive fun on the table.
@@ -125,6 +125,27 @@ steps:
     text: "Play 30 rolls. When a bet wins or loses, add another Come bet to stay at three numbers."
     allowedActions: [roll, place-bet]
     completeWhen: { rolls: 30 }
+```
+
+Want to price your own table? This sortable version covers every preset, and its "Run it" buttons set up an auto-roll.
+
+```scene
+id: l20-table
+version: 1
+title: Every strategy, side by side
+rules: standard-vegas
+bankroll: 200000
+phase: come-out
+autoRoll:
+  enabled: true
+  table: true
+  defaultStrategy: { id: pass-max-odds, unit: 500 }
+  rollOptions: [100]
+  sessions: [1, 20]
+steps:
+  - id: look
+    text: "Open **Auto-roll** and tap **Compare all**. Sort by **Loss per hour**, then by **On the table**, and tap **Run it** on any row to try it. The table is priced at a $5 unit."
+    completeWhen: { acknowledged: true }
 ```
 
 ## Your perfect-strategy cheat sheet

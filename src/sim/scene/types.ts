@@ -59,6 +59,8 @@ export interface SceneConfig {
     chart?: 'bankroll' | 'edge';
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** open on the sortable all-presets comparison table */
+    table?: boolean;
     /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */

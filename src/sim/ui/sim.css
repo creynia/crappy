@@ -1114,6 +1114,8 @@
   color: inherit;
   font: inherit;
   font-size: 0.85rem;
+}
+
 /* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
 .sim-calls {
   pointer-events: none;

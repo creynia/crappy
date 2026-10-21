@@ -366,13 +366,6 @@
   top: 0;
   bottom: auto;
 }
-/* it may reach the top of the felt: the toast text lets taps through, only its dismiss box takes them */
-.sim-status-wrap > .sim-toasts .sim-toast {
-  pointer-events: none;
-}
-.sim-status-wrap > .sim-toasts .sim-toast-x {
-  pointer-events: auto;
-}
 .sim-land .sim-toasts {
   left: 0;
   right: 0;

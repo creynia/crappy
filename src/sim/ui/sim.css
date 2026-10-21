@@ -1099,7 +1099,7 @@
   border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   pointer-events: auto;
 }
 .sim-odds-hint p {

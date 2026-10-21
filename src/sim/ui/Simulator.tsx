@@ -126,10 +126,13 @@ export function Simulator(props: SimulatorInternalProps) {
   const [hintVisible, setHintVisible] = useState(false);
   const landscape = useLandscape(scene);
 
-  const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
-    const id = `t${++toastN.current}`;
-    setToasts((t) => [...t.slice(-1), { id, text, tone }]);
-  }, []);
+  const pushToast = useCallback(
+    (text: string, tone: ToastItem['tone'] = 'info', roll?: boolean) => {
+      const id = `t${++toastN.current}`;
+      setToasts((t) => [...t.slice(-1), { id, text, tone, ...(roll ? { roll } : {}) }]);
+    },
+    [],
+  );
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
   // A roll's announcement is made by an effect after the render (see below), so that the odds nudge
   // can join it in the same live update.
@@ -455,8 +458,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // text nothing taps, never a betting region or the lesson step card.
   const toastsEl = (
     <Toasts
-      // while the odds nudge is up the roll toasts wait out of sight (kept, not dismissed)
-      toasts={oddsHintRoom ? [] : toasts}
+      // while the odds nudge is up, roll toasts wait out of sight (kept, not dismissed); other messages show
+      toasts={oddsHintRoom ? toasts.filter((t) => !t.roll) : toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
       hint={oddsHintEl}

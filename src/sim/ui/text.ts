@@ -1,5 +1,5 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, bonusTargets, isBonusType } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
@@ -54,6 +54,10 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   horn: 'Horn',
   'c-e': 'C and E',
   world: 'World',
+  fire: 'Fire Bet',
+  all: 'All',
+  tall: 'Tall',
+  small: 'Small',
 };
 
 export function betLabel(type: BetTypeId): string {
@@ -245,7 +249,11 @@ export function buildEvFacts(
   if (wn > 0n) {
     const p = fracToNumber({ n: wn, d: wd }) * 100;
     const pct = wd <= 36n ? String(Math.round(p)) : p.toFixed(1).replace(/\.0$/, '');
-    chance = `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
+    // bonus side bets ride a whole hand and have unwieldy exact fractions: "about 1 in 38 hands"
+    chance =
+      def.category === 'bonus'
+        ? `about 1 in ${Math.round(100 / p).toLocaleString('en-US')} hands (${pct}%)`
+        : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
   try {
@@ -313,15 +321,20 @@ export function describeRoll(events: readonly GameEvent[]): string {
   const losses: string[] = [];
   const pushes: string[] = [];
   const returned: string[] = [];
+  const progressed: string[] = [];
   for (const e of events) {
-    if (e.type === 'bet-won')
+    if (e.type === 'bet-progressed')
+      progressed.push(
+        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
+      );
+    else if (e.type === 'bet-won')
       wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
     else if (e.type === 'bet-lost')
       losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
     else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
     else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
   }
-  for (const group of [wins, losses, pushes, returned]) {
+  for (const group of [wins, losses, pushes, returned, progressed]) {
     if (group.length) parts.push(group.join(', ') + '.');
   }
   if (roll) {
@@ -358,6 +371,14 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   if (bets.length) {
     const desc = bets.map((b) => {
       const working = opts.offIds?.has(b.id) ? 'off' : 'working';
+      if (isBonusType(b.type)) {
+        const have = b.progress ?? [];
+        const total = bonusTargets(b.type).length;
+        const collected = have.length
+          ? `Collected ${have.join(', ')} (${have.length} of ${total})`
+          : `Nothing collected yet (0 of ${total})`;
+        return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${collected}`;
+      }
       return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
     });
     parts.push(`Your bet: ${desc.join('; ')}.`);
@@ -370,4 +391,54 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
 
 export function diceAriaLabel(d: readonly [number, number]): string {
   return `Rolled ${d[0]} and ${d[1]}, total ${d[0] + d[1]}`;
+}
+
+export interface WorkingCopyInput {
+  /** the bet is working now */
+  on: boolean;
+  /** cents per roll: positive = what turning it ON costs, negative = what turning it OFF saves */
+  perRollCents: number;
+  phase: 'come-out' | 'point';
+  /** the player switched this bet off (bet.working === 'off'), not the table convention */
+  playerOff: boolean;
+  type: BetTypeId;
+  /** a buy bet whose vig is already paid, so its marginal cost is about nothing */
+  vigSunk: boolean;
+}
+
+/** Copy under the Working toggle; undefined when there is no honest reason to show. */
+export function workingCopy(c: WorkingCopyInput): string | undefined {
+  const def = BET_TYPES[c.type];
+  if (def.category === 'lay' || def.category === 'big') return undefined;
+  const oddsCopy =
+    "Odds have no house edge, so ON costs nothing on average. If they're ON, a come-out 7 loses them along with the come bet; OFF, they'd be returned.";
+  const isOdds = c.type === 'come-odds' || c.type === 'dont-come-odds';
+  if (isOdds) return oddsCopy;
+  if (c.perRollCents === 0) return undefined;
+  if (c.vigSunk) {
+    return c.on
+      ? 'The vig is already paid, so keeping it working costs nothing more.'
+      : 'The vig is already paid, so turning it ON costs nothing more.';
+  }
+  const roll = c.phase === 'point' ? 'roll' : 'come-out roll';
+  const amt = fmtMoney(Math.abs(c.perRollCents), { exact: true });
+  if (c.on) {
+    const lead = c.phase === 'come-out' ? 'Working on the come-out.' : 'Working.';
+    return `${lead} Turning it OFF saves about ${amt} per ${roll}.`;
+  }
+  const why = c.playerOff
+    ? 'You turned this bet off.'
+    : c.phase === 'come-out'
+      ? 'Off on the come-out by table convention.'
+      : 'Off.';
+  const cost = `${why} Turning it ON costs about ${amt} per ${roll}`;
+  if (def.category === 'place' || def.category === 'buy') {
+    return `${cost} and risks the 7, which comes up 6 of 36 ways.`;
+  }
+  if (def.category === 'hardway') {
+    const n = Number(c.type.replace('hard-', ''));
+    const easy = n === 6 || n === 8 ? 4 : 2;
+    return `${cost}. Hard ${n} loses on ${6 + easy} of 36 rolls (6 sevens and ${easy} easy ways).`;
+  }
+  return `${cost}.`;
 }

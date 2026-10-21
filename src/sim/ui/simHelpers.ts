@@ -41,7 +41,7 @@ export function minAmountFor(type: BetTypeId, g: GameState): Cents {
   let min =
     def.category === 'odds'
       ? 100
-      : def.category === 'prop' || def.category === 'hardway'
+      : def.category === 'prop' || def.category === 'hardway' || def.category === 'bonus'
         ? g.rules.propMin
         : g.rules.tableMin;
   const unit = 100 * def.unitMultiple;

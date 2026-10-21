@@ -36,6 +36,10 @@ export function Home() {
         <p class="card">No lessons yet.</p>
       )}
       <div class="grid">
+        <Link to="/practice" class="card tile tile-wide">
+          <strong>Practice</strong>
+          <span class="muted">Quick drills, 10 questions a round</span>
+        </Link>
         <Link to="/learn" class="card tile">
           <strong>Learn</strong>
           <span class="muted">All lessons, by chapter</span>

@@ -666,3 +666,38 @@ test('the odds nudge is inside the viewport and above the tabs, portrait and lan
     await context.close();
   }
 });
+
+test('in landscape the odds nudge does not cover the felt or the controls', async ({ browser }) => {
+  const overlaps = (
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+  ) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  for (const vp of [
+    { width: 844, height: 390 },
+    { width: 667, height: 375 },
+  ]) {
+    const context = await browser.newContext({ viewport: vp });
+    const page = await context.newPage();
+    await page.goto('/#/play?speed=instant&dice=3-3');
+    await page.locator('[data-region="pass"]').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    const hint = page.getByTestId('odds-hint');
+    await expect(hint).toBeVisible();
+    const hb = await hint.boundingBox();
+    expect(hb, `hint box at ${vp.width}x${vp.height}`).not.toBeNull();
+    const targets = [
+      page.locator('[data-region="pass"]').first(),
+      page.locator('[data-region="dont-pass"]').first(),
+      page.getByRole('button', { name: /^Roll/ }),
+      page.getByRole('button', { name: /^Auto-roll$/ }),
+    ];
+    for (const t of targets) {
+      if ((await t.count()) === 0) continue;
+      const tb = await t.boundingBox();
+      if (!tb) continue;
+      expect(overlaps(hb!, tb), `hint overlaps a target at ${vp.width}x${vp.height}`).toBe(false);
+    }
+    await context.close();
+  }
+});

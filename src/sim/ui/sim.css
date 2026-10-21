@@ -367,6 +367,16 @@
   top: 0;
   bottom: auto;
   gap: 2px;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-land .sim-toast > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .sim-land .sim-toast {
   font-size: 0.75rem;
@@ -1165,4 +1175,49 @@
 .sim-luck-ticks span {
   position: absolute;
   transform: translateX(-50%);
+}
+
+/* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
+.sim-calls {
+  pointer-events: none;
+}
+.sim-stack-target {
+  fill: transparent;
+}
+.sim-call rect {
+  fill: #fff;
+  stroke: #1d2b22;
+  stroke-width: 2;
+}
+.sim-call text {
+  fill: #1d2b22;
+  font-weight: 700;
+}
+.sim-call.is-selected rect {
+  fill: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-call.is-right rect {
+  fill: var(--sim-win, #2f9e44);
+  stroke: #fff;
+}
+.sim-call.is-wrong rect {
+  fill: var(--sim-loss, #c92a2a);
+  stroke: #fff;
+}
+.sim-call.is-right text,
+.sim-call.is-wrong text {
+  fill: #fff;
+}
+
+/* landscape: the hint lives in the controls rail, so it never covers the felt */
+.sim-rail .sim-odds-hint {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: auto;
+  box-shadow: none;
+  pointer-events: auto;
+  margin: 6px 0;
 }

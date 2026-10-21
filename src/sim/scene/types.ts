@@ -45,6 +45,10 @@ export interface SceneConfig {
     compact?: boolean;
     /** show the one-time "odds are available, 0% edge" nudge after a point is set */
     hints?: boolean;
+    /** hide the step panel's Restart (default shown); a challenge keeps its seed */
+    showRestart?: boolean;
+    /** accessible name of the step panel (default "Lesson step") */
+    stepPanelLabel?: string;
   };
   autoRoll?: {
     enabled: boolean;
@@ -67,6 +71,8 @@ export interface SceneConfig {
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: { rolls: number; scoring: { minResolved: Cents } };
 }
 
 export interface SceneStep {

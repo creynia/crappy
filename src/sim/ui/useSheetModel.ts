@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, isToggleable } from '../engine/bets';
 import type { Action, BetTypeId, Cents, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
@@ -10,6 +10,7 @@ import type { QuickAction, TypeOption } from './BetSheet';
 import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
 import type { RegionDef, RegionId } from './layouts/types';
 import type { ResolvedSimSettings } from './settings';
+import { workingProp } from './workingProp';
 import {
   defaultAmount,
   defaultBetForRegion,
@@ -159,6 +160,7 @@ export function buildSheetModel(
           parentId: bet.id,
         }
       : null;
+  const working = bet && isToggleable(bet.type) ? workingProp(game, bet, rollsPerHour) : undefined;
   return {
     bet,
     action,
@@ -171,6 +173,7 @@ export function buildSheetModel(
     removePreview,
     contract,
     addOdds,
+    working,
   };
 }
 
@@ -183,6 +186,8 @@ interface SheetDeps {
   setCore: (c: Core) => void;
   emit: (e: SimulatorEvent) => void;
   pushToast: (text: string, tone?: 'info') => void;
+  /** live announcement for messages that are not roll results */
+  announce: (text: string) => void;
   doAction: (a: Action) => DoActionResult;
   /** the displayed game (animation-aware) and live scene state, for the model */
   game: GameState;
@@ -221,6 +226,7 @@ export function useSheetModel(d: SheetDeps) {
     const allowedTypes = region.betTypes.filter((t) => betTypeAllowed(sceneRef.current, r, t));
     if (!allowedTypes.length) {
       d.pushToast('That bet is not available in this lesson.', 'info');
+      d.announce('That bet is not available in this lesson.');
       return;
     }
     let type = defaultBetForRegion(region, g);

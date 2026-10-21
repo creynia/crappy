@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SceneStep } from '../scene/types';
 
 export interface StepPanelProps {
@@ -36,6 +36,18 @@ export function renderLite(text: string) {
   return out;
 }
 
+/** Spoken/shown text for an answer, naming the pick so repeated wrong answers read differently. */
+export function askFeedback(ask: NonNullable<SceneStep['ask']>, choice: number): string {
+  const ok = choice === ask.answer;
+  return `You chose "${ask.options[choice] ?? ''}". ${ok ? 'Correct.' : 'Not quite.'} ${ask.explain}${
+    ok ? ' Now roll to check your call.' : ' Try again.'
+  }`;
+}
+
+/**
+ * The question and its options (radio semantics). Feedback is shown here but is not a live region: the
+ * simulator has one announcer, which Simulator.tsx feeds the same text through `announce`.
+ */
 function AskBlock(p: {
   ask: NonNullable<SceneStep['ask']>;
   stepId: string;
@@ -43,26 +55,32 @@ function AskBlock(p: {
   onAnswer?: (choice: number) => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
+  const feedback = useRef<HTMLParagraphElement>(null);
   useEffect(() => setPicked(null), [p.stepId]);
   // a restart clears the runtime counters; forget the old pick with them
   useEffect(() => {
     if (p.asked.count === 0) setPicked(null);
   }, [p.asked.count]);
+  const solved = p.asked.correct;
+  // once solved the options are disabled, so focus would drop to the page: park it on the feedback
+  useEffect(() => {
+    if (solved) feedback.current?.focus();
+  }, [solved]);
   const shown = p.asked.count === 0 ? null : picked;
   const correct = shown !== null && shown === p.ask.answer;
-  const solved = p.asked.correct;
   return (
-    <div class="sim-ask" role="group" aria-labelledby={`ask-q-${p.stepId}`}>
+    <div class="sim-ask">
       <p class="sim-ask-q" id={`ask-q-${p.stepId}`}>
         {renderLite(p.ask.q)}
       </p>
-      <div class="sim-ask-options">
+      <div class="sim-ask-options" role="radiogroup" aria-labelledby={`ask-q-${p.stepId}`}>
         {p.ask.options.map((o, i) => (
           <button
             key={i}
             type="button"
+            role="radio"
+            aria-checked={shown === i}
             class="sim-ask-opt"
-            aria-pressed={shown === i}
             data-state={shown === i ? (correct ? 'correct' : 'wrong') : undefined}
             disabled={solved}
             onClick={() => {
@@ -74,11 +92,12 @@ function AskBlock(p: {
           </button>
         ))}
       </div>
-      <p class="sim-ask-feedback" role="status" aria-live="polite">
+      {/* TODO(I056): the announcer in Simulator.tsx speaks this text; this region stays silent */}
+      <p class="sim-ask-feedback" ref={feedback} tabIndex={-1}>
         {shown === null ? null : (
           <>
             <strong>{correct ? 'Correct.' : 'Not quite.'}</strong> {renderLite(p.ask.explain)}
-            {correct ? null : ' Try again.'}
+            {correct ? ' Now roll to check your call.' : ' Try again.'}
           </>
         )}
       </p>
@@ -99,9 +118,8 @@ export function StepPanel(p: StepPanelProps) {
           </button>
         ) : null}
       </div>
-      <p class="sim-step-text" role="status" aria-live="polite">
-        {renderLite(p.step.text)}
-      </p>
+      {/* not a live region: the simulator has one announcer (roll results); see Simulator.tsx */}
+      <p class="sim-step-text">{renderLite(p.step.text)}</p>
       {p.step.ask ? (
         <AskBlock
           ask={p.step.ask}

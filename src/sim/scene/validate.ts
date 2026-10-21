@@ -1,7 +1,8 @@
-import { isBetTypeId } from '../engine/bets';
+import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS } from '../engine/rules';
 import { listStrategies } from '../strategy/presets';
+import { answeredRequirements } from './conditions';
 import type { SceneConfig } from './types';
 
 type Obj = Record<string, unknown>;
@@ -95,8 +96,18 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
+    this.keys(path, v, [
+      'ref',
+      'type',
+      'amount',
+      'point',
+      'parentRef',
+      'working',
+      'hop',
+      'progress',
+    ]);
     this.bet(`${path}.type`, v.type);
+    this.hop(path, v.type, v.hop, true);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
     if (v.parentRef !== undefined) this.str(`${path}.parentRef`, v.parentRef);
@@ -108,9 +119,21 @@ class Ctx {
         this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
     }
   }
+  /** Hop pair (I035): required on a hop BetInit, optional on a hop matcher, rejected elsewhere. */
+  hop(path: string, type: unknown, hop: unknown, required: boolean) {
+    const types = Array.isArray(type) ? type : type === undefined ? [] : [type];
+    const isHop = types.length > 0 && types.every((t) => t === 'hop');
+    if (hop === undefined) {
+      if (required && isHop) this.err(`${path}.hop`, 'a hop bet needs a dice pair, e.g. [2, 4]');
+      return;
+    }
+    if (!isDicePair(hop)) this.err(`${path}.hop`, 'must be a pair of dice, each an integer 1-6');
+    else if (!isHop) this.err(`${path}.hop`, 'only applies to the "hop" bet type');
+  }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax']);
+    this.keys(path, v, ['type', 'betType', 'amount', 'minAmount', 'maxAmount', 'oddsMax', 'hop']);
+    this.hop(path, v.betType, v.hop, false);
     if (!ACTION_TYPES.includes(v.type as string)) this.err(`${path}.type`, 'unknown action type');
     if (v.betType !== undefined) {
       if (Array.isArray(v.betType))
@@ -504,12 +527,17 @@ export function validateScene(
           else st.expect.forEach((m, j) => c.matcher(`${p}.expect[${j}]`, m));
         }
         if (st.ask !== undefined) c.ask(`${p}.ask`, st.ask);
-        if (
-          st.completeWhen !== undefined &&
-          JSON.stringify(st.completeWhen).includes('"answered"') &&
-          st.ask === undefined
-        )
+        const needsAnswer = answeredRequirements(st.completeWhen).length > 0;
+        if (needsAnswer && st.ask === undefined)
           c.err(`${p}.completeWhen`, 'an answered condition needs the step to have an ask');
+        // the feedback must be seen before the step moves on: wait for Next or for something else too
+        const cw = isObj(st.completeWhen) ? st.completeWhen : {};
+        const alsoWaits = Array.isArray(cw.all) && cw.all.length > 1;
+        if (st.ask !== undefined && st.advance !== 'button' && !alsoWaits)
+          c.err(
+            `${p}.advance`,
+            'a step with an ask needs advance: button, or an all condition with something besides answered',
+          );
         if (st.completeWhen === undefined) c.err(`${p}.completeWhen`, 'is required');
         else c.condition(`${p}.completeWhen`, st.completeWhen, autoOn);
         if (st.setup !== undefined) {

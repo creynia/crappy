@@ -11,6 +11,7 @@ import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
@@ -61,6 +62,8 @@ export function Simulator(props: SimulatorInternalProps) {
   const [chip, setChip] = useState<Cents>(initialChip(chips, ui.defaultChip, boot.chip));
   const [view, setView] = useState<'table' | 'center'>(ui.view ?? 'table');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // The one live announcer: { text, n } so a repeated message is re-announced (the key changes).
+  const [live, setLive] = useState({ text: '', n: 0 });
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
@@ -73,8 +76,9 @@ export function Simulator(props: SimulatorInternalProps) {
     const id = `t${++toastN.current}`;
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
+  const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
-  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast);
+  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast, announce);
   const { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction } = useGameCore({
     boot,
     sceneRef,
@@ -82,6 +86,7 @@ export function Simulator(props: SimulatorInternalProps) {
     onRejected: (message) => {
       setHintVisible(true);
       pushToast(message, 'info');
+      announce(message);
     },
     onRolled: anim.run,
   });
@@ -112,6 +117,7 @@ export function Simulator(props: SimulatorInternalProps) {
     setCore,
     emit,
     pushToast,
+    announce,
     doAction,
     game,
     scene,
@@ -230,6 +236,7 @@ export function Simulator(props: SimulatorInternalProps) {
         if (!step || !ask) return;
         const correct = choice === ask.answer;
         emit({ type: 'step-answered', stepId: step.id, index: rt.stepIndex, choice, correct });
+        announce(askFeedback(ask, choice));
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
@@ -295,6 +302,9 @@ export function Simulator(props: SimulatorInternalProps) {
         )}
       </div>
 
+      <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
+        <span key={live.n}>{live.text}</span>
+      </div>
       <Toasts
         toasts={toasts}
         onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}

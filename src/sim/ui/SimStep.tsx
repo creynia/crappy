@@ -44,7 +44,8 @@ export function SimStep({
       ) : null}
       {guided && rt.done ? (
         <section class="sim-step sim-step-done" aria-label="Lesson step">
-          <p class="sim-step-text" role="status">
+          {/* not a live region: the simulator has one announcer; see Simulator.tsx */}
+          <p class="sim-step-text">
             <strong>Done.</strong> Nice work. Keep playing here, or restart the practice.
           </p>
           <button type="button" class="sim-linkbtn" onClick={onRestart}>

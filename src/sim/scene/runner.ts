@@ -1,4 +1,4 @@
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, sameHop } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { findMergeTarget, findParent, maxOddsAmount } from '../engine/validate';
 import type {
@@ -12,6 +12,7 @@ import type {
   Validation,
 } from '../engine/types';
 import type { BetInit } from '../engine/game';
+import { answeredRequirements } from './conditions';
 import type {
   ActionMatcher,
   Condition,
@@ -132,7 +133,7 @@ function totalAfter(
   const def = BET_TYPES[action.betType];
   const parent =
     def.category === 'odds' ? findParent(game, action.betType, action.parentId) : undefined;
-  const target = findMergeTarget(game, action.betType, parent);
+  const target = findMergeTarget(game, action.betType, parent, action.hop);
   if (post) return target?.amount ?? action.amount;
   return (target?.amount ?? 0) + action.amount;
 }
@@ -142,14 +143,18 @@ function matches(m: ActionMatcher, action: Action, game: GameState, post: boolea
   if (action.type === 'roll') return true;
   let betType: BetTypeId | undefined;
   let amount: Cents | undefined;
+  let hop: Bet['hop'];
   if (action.type === 'place-bet') {
     betType = action.betType;
     amount = action.amount;
+    hop = action.hop;
   } else if ('betId' in action) {
     const b = game.bets.find((x) => x.id === action.betId);
     betType = b?.type;
+    hop = b?.hop;
     if (action.type === 'set-amount') amount = action.amount;
   }
+  if (m.hop !== undefined && (betType !== 'hop' || !sameHop(m.hop, hop))) return false;
   if (m.betType !== undefined) {
     const list = Array.isArray(m.betType) ? m.betType : [m.betType];
     if (!betType || !list.includes(betType)) return false;
@@ -251,7 +256,7 @@ export function highlightedFor(scene: SceneConfig, step?: SceneStep): BetTypeId[
 
 /** Has the step's question been answered enough to unlock the roll (correctly, when the step needs that)? */
 function askAnswered(step: SceneStep, rt: SceneRuntime): boolean {
-  return JSON.stringify(step.completeWhen).includes('"answered":"correct"')
+  return answeredRequirements(step.completeWhen).includes('correct')
     ? (rt.counters.ansOk ?? 0) > 0
     : (rt.counters.ans ?? 0) > 0;
 }

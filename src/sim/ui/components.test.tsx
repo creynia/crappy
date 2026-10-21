@@ -306,7 +306,9 @@ describe('RollButton, StatusBar, history, toasts', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
+    const toasts = document.querySelector('.sim-toasts')!;
+    expect(toasts.getAttribute('aria-hidden')).toBeNull();
+    expect(toasts.getAttribute('aria-live')).toBeNull();
     fireEvent.click(screen.getByLabelText('Dismiss'));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });
@@ -571,7 +573,9 @@ describe('StepPanel ask', () => {
     );
     const opts = container.querySelectorAll<HTMLButtonElement>('button.sim-ask-opt');
     expect(opts).toHaveLength(2);
-    expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBe('polite');
+    // not a live region: the simulator's one announcer speaks it
+    expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBeNull();
+    expect(container.querySelectorAll('[role="radio"]')).toHaveLength(2);
     fireEvent.click(opts[0]!);
     expect(picks).toEqual([0]);
     rerender(

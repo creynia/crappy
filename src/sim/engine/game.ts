@@ -1,4 +1,4 @@
-import { BET_TYPES, bonusTargets, upfrontVig, type BonusBetTypeId } from './bets';
+import { BET_TYPES, bonusTargets, normalizeHop, upfrontVig, type BonusBetTypeId } from './bets';
 import { resolveRules } from './rules';
 import { rollDice, seedRng } from './rng';
 import { resolveRoll } from './resolve';
@@ -32,6 +32,8 @@ export interface BetInit {
   point?: PointNumber;
   parentRef?: string;
   working?: WorkingMode;
+  /** EXTENSION (I035): the dice pair of a 'hop' bet (either order); required for hop, rejected otherwise. */
+  hop?: Dice;
   /** bonus bets only: numbers already collected (scenes that start mid-hand) */
   progress?: number[];
 }
@@ -60,6 +62,7 @@ function addBet(
   point: PointNumber | null,
   parentId: string | null,
   working: WorkingMode,
+  hop?: Dice,
   progress?: readonly number[],
 ): { state: GameState; bet: Bet } {
   const bet: Bet = {
@@ -71,6 +74,7 @@ function addBet(
     working,
     placedOnRoll: state.rollCount,
     vigPaid: upfrontVig(type, amount, state.rules),
+    ...(hop ? { hop: normalizeHop(hop) } : {}),
     ...(progress ? { progress } : {}),
   };
   return {
@@ -135,6 +139,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       betType: init.type,
       amount: init.amount,
       parentId,
+      ...(init.hop !== undefined ? { hop: init.hop } : {}),
     });
     if (!v.ok) throw new Error(`createGame: bet ${init.type} ${init.amount}: ${v.message}`);
     let betPoint: PointNumber | null = null;
@@ -164,6 +169,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       state,
       init.type,
       pid ? state.bets.find((b) => b.id === pid) : undefined,
+      init.hop,
     );
     if (merge && betPoint === null)
       throw new Error(`createGame: duplicate ${init.type}; set the combined amount instead`);
@@ -174,6 +180,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       betPoint,
       pid,
       init.working ?? 'auto',
+      init.hop,
       progress,
     );
     state = r.state;
@@ -218,14 +225,22 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       const def = BET_TYPES[action.betType];
       const parent =
         def.category === 'odds' ? findParent(state, action.betType, action.parentId) : undefined;
-      const existing = findMergeTarget(state, action.betType, parent);
+      const existing = findMergeTarget(state, action.betType, parent, action.hop);
       if (existing) {
         const r = setAmount(state, existing, existing.amount + action.amount);
         return { ok: true, state: r.state, events: r.events, warnings };
       }
       let point: PointNumber | null = null;
       if (parent) point = oddsPoint(state, parent);
-      const r = addBet(state, action.betType, action.amount, point, parent?.id ?? null, 'auto');
+      const r = addBet(
+        state,
+        action.betType,
+        action.amount,
+        point,
+        parent?.id ?? null,
+        'auto',
+        action.hop,
+      );
       return { ok: true, state: r.state, events: [{ type: 'bet-placed', bet: r.bet }], warnings };
     }
     case 'set-amount': {

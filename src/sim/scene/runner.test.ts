@@ -174,19 +174,41 @@ describe('step ask (in-sim question)', () => {
     expect(rollLock(sc, runtime, game)).toBeNull();
   });
   it('validates ask shape, answer range and answered-without-ask', () => {
-    const mkScene = (a: unknown, cw: unknown = { answered: true }) => ({
+    const mkScene = (a: unknown, cw: unknown = { answered: true }, advance?: 'button') => ({
       id: 'v',
       version: 1,
-      steps: [{ id: 's', text: 't', ...(a === undefined ? {} : { ask: a }), completeWhen: cw }],
+      steps: [
+        {
+          id: 's',
+          text: 't',
+          ...(a === undefined ? {} : { ask: a }),
+          ...(advance ? { advance } : {}),
+          completeWhen: cw,
+        },
+      ],
     });
-    expect(validateScene(mkScene(ask)).ok).toBe(true);
-    expect(validateScene(mkScene({ ...ask, answer: 3 })).ok).toBe(false);
-    expect(validateScene(mkScene({ ...ask, answer: -1 })).ok).toBe(false);
-    expect(validateScene(mkScene({ ...ask, options: ['only'] })).ok).toBe(false);
-    expect(validateScene(mkScene({ ...ask, mode: 'never' })).ok).toBe(false);
-    expect(validateScene(mkScene({ ...ask, extra: 1 })).ok).toBe(false);
+    // the feedback must be seen: a bare answered condition needs advance: button
+    expect(validateScene(mkScene(ask)).ok).toBe(false);
+    expect(validateScene(mkScene(ask, { answered: true }, 'button')).ok).toBe(true);
+    expect(validateScene(mkScene(ask, { all: [{ answered: true }, { rolls: 1 }] })).ok).toBe(true);
+    expect(validateScene(mkScene(ask, { all: [{ answered: true }] })).ok).toBe(false);
+    expect(validateScene(mkScene({ ...ask, answer: 3 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(validateScene(mkScene({ ...ask, answer: -1 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(
+      validateScene(mkScene({ ...ask, options: ['only'] }, { answered: true }, 'button')).ok,
+    ).toBe(false);
+    expect(validateScene(mkScene({ ...ask, mode: 'never' }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
+    expect(validateScene(mkScene({ ...ask, extra: 1 }, { answered: true }, 'button')).ok).toBe(
+      false,
+    );
     expect(validateScene(mkScene(undefined)).ok).toBe(false);
-    expect(validateScene(mkScene(ask, { answered: 'wrong' })).ok).toBe(false);
-    expect(validateScene(mkScene(ask, { answered: 'correct' })).ok).toBe(true);
+    expect(validateScene(mkScene(ask, { answered: 'wrong' }, 'button')).ok).toBe(false);
+    expect(validateScene(mkScene(ask, { answered: 'correct' }, 'button')).ok).toBe(true);
   });
 });

@@ -1,13 +1,14 @@
 import { useRef, useState } from 'preact/hooks';
 import type { Bet, Cents, Dice as DicePair, GameEvent, GameState } from '../engine/types';
 import { buildAnimationQueue, playTimeline, type Player, type Speed } from './animation';
-import { describeRoll, rollTone } from './text';
+import { describeRoll, rollAnnouncement, rollTone } from './text';
 import type { ToastItem } from './Toasts';
 
 /** Plays a roll's timeline: the shown (pre/post) state, tumbling dice, and lost/won chip overlays. */
 export function useAnimationPlayer(
   getSpeed: () => Speed,
   pushToast: (text: string, tone?: ToastItem['tone']) => void,
+  announce: (text: string) => void,
 ) {
   const [shown, setShown] = useState<GameState | null>(null);
   const [rolling, setRolling] = useState<{ dice: DicePair; durationMs: number } | null>(null);
@@ -33,6 +34,8 @@ export function useAnimationPlayer(
       setBusy(false);
       player.current = null;
       pushToast(text, tone);
+      // the one live message per roll (the toast above is visual only)
+      announce(rollAnnouncement(events, post));
     };
     if (!tl.steps.length || !roll) {
       finish();

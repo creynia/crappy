@@ -17,7 +17,7 @@ All figures in this document were checked by exact rational computation (Python 
 | Engine | Pure, immutable, framework-free TS in `src/sim/engine/`. No DOM, no `Math.random`, no `Date`. |
 | Math | Exact rationals (`bigint`-based `Fraction`) in `src/sim/math/`. EV comes from the same payout functions the engine uses, so preview and play always agree. |
 | Default rules | **Standard Vegas**: 3-4-5x odds, Field pays 2x on 2 **and 2x on 12**, buy/lay vig 5% **collected only on a win**, don't-side lay odds up to **6x the flat bet**. Presets: `field-3x-12`, `odds-10x`, `odds-100x`. |
-| Bets in v1 | The list in §1.3, including `world`, plus the bonus side bets `fire`, `all`, `tall`, `small` (added by I037, see decisions.md). **No** hop bets. |
+| Bets in v1 | The list in §1.3, including `world`, plus **hop bets** (`hop`, added in I035: one-roll bet on an exact pair, easy 15:1, hard 30:1) and the bonus side bets `fire`, `all`, `tall`, `small` (added by I037, see decisions.md). |
 | Odds | Odds are **separate bet instances** (`pass-odds`, etc.) linked to their flat bet by `parentId`. |
 | RNG | `xoshiro128**` seeded through `splitmix32`, with rejection-sampled d6. Its state is stored in `GameState`, so play is replayable. |
 | Rendering | **SVG** layouts with a data-driven region map: one portrait layout, one landscape layout, and a separate **Center (props)** panel. Controls are HTML around the SVG. |
@@ -856,7 +856,8 @@ export type Condition =
   | { bankrollAtLeast: Cents } | { bankrollAtMost: Cents }
   | { previewed: BetTypeId }                           // user opened the sheet for this bet
   | { autoRollCompleted: { minRolls?: number } }
-  | { acknowledged: true };                            // user tapped "Next"
+  | { acknowledged: true }                             // user tapped "Next"
+  | { answered: true | 'correct' };                    // the step's `ask` was answered (any answer / the right one)
 ```
 
 Runner (`scene/runner.ts`, pure):
@@ -867,9 +868,11 @@ export function gateAction(scene: SceneConfig, rt: SceneRuntime, game: GameState
 export function observe(scene: SceneConfig, rt: SceneRuntime, game: GameState, input: SceneInput): { runtime: SceneRuntime; game: GameState; completedStep?: string; sceneCompleted?: boolean };
 export type SceneInput =
   | { kind: 'action'; action: Action; events: GameEvent[] }
-  | { kind: 'previewed'; betType: BetTypeId } | { kind: 'acknowledged' } | { kind: 'auto-roll-completed'; rolls: number };
+  | { kind: 'previewed'; betType: BetTypeId } | { kind: 'acknowledged' } | { kind: 'answered'; correct: boolean } | { kind: 'auto-roll-completed'; rolls: number };
 export function validateScene(json: unknown): { ok: true; scene: SceneConfig } | { ok: false; errors: string[] };
 ```
+In-sim questions: a `SceneStep` may carry `ask: { q, options, answer, explain, mode?: 'before-roll' | 'any' }` (`StepAsk`). The panel shows the options as a radio group; each pick feeds `{ kind: 'answered', correct }`, emits `{ type: 'step-answered', stepId, index, choice, correct }` (the app stores it with `markQuiz("<scene id>:<step id>")`) and is spoken through the simulator's single announcer. A wrong answer shows `explain` and allows a retry. With `mode: 'before-roll'` (the default) Roll stays locked ("Answer the question first.") until the step is answered, or answered correctly when its `completeWhen` asks for `{ answered: 'correct' }`. A step with an `ask` must use `advance: 'button'` or an `all` condition with something besides `answered` (typically a roll), so the feedback is seen before the step moves on; `answered` without an `ask` is rejected by `validateScene`.
+
 Rules: when a step starts, apply `setup`, replace `forcedDice` if given, and reset counters. Restrictions are resolved step → scene → defaults. `gateAction` returns `not-allowed-by-scene` with the step hint as the message. With `onForcedExhausted: 'block'` and an empty queue, Roll is disabled ("The lesson is over: try the sandbox!").
 
 ### 4.2 Embedding API

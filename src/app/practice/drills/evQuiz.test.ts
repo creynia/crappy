@@ -89,6 +89,9 @@ describe('EV quiz: answers are the math engine', () => {
       expect(choices(it).map((c) => c.id)).toContain(it.correct);
     }
   });
+  it('cheaper: the prompt is about cents per roll, not per dollar bet', () => {
+    expect(gen(1, 'cheaper').prompt).toContain('in cents (not per dollar bet)');
+  });
   it('cheaper: the right bet has the lower loss per roll', () => {
     for (let s = 0; s < 80; s++) {
       const it = gen(s, 'cheaper');

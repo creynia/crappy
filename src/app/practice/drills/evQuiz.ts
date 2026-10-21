@@ -217,10 +217,12 @@ function cheaperItem(rng: DrillRng): EvQuizItem {
     lossPerRoll({ type: b.type, amount: b.amount, point: null }, ON_POINT(rules));
   let a = rng.pick(EDGE_BETS);
   let b = rng.pick(EDGE_BETS);
-  for (let i = 0; i < 20 && (a.type === b.type || toNumber(cost(a)) === toNumber(cost(b))); i++) {
+  const same = () => a.type === b.type || toNumber(cost(a)) === toNumber(cost(b));
+  for (let i = 0; i < 200 && same(); i++) {
     a = rng.pick(EDGE_BETS);
     b = rng.pick(EDGE_BETS);
   }
+  if (same()) throw new Error('evQuiz: no two bets with different costs found');
   const ca = toNumber(cost(a));
   const cb = toNumber(cost(b));
   const cheap = ca < cb ? a : b;
@@ -228,7 +230,8 @@ function cheaperItem(rng: DrillRng): EvQuizItem {
   const choices: Choice[] = [a, b].map((x) => ({ id: x.type, label: name(x) }));
   return {
     key: `cheaper|${[a.type, b.type].sort().join('|')}`,
-    prompt: 'Which bet has the lower expected loss per roll while it is working?',
+    prompt:
+      'Which bet has the lower expected loss per roll, in cents (not per dollar bet)? A line bet counts every roll until it is decided; other bets count the rolls they are working.',
     answer: { kind: 'choice', choices },
     template: 'cheaper',
     meta: { a: a.type, aAmount: a.amount, b: b.type, bAmount: b.amount },

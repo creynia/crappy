@@ -443,6 +443,31 @@ describe('BetSheet', () => {
     expect(document.querySelector('[data-line="combined"]')).toBeNull();
   });
 
+  it('contract bets show their current value instead of an expected-loss line', () => {
+    const hold = (type: 'pass-line' | 'dont-pass', point: 4 | 6) => {
+      cleanup();
+      const g = createGame({
+        point,
+        bankroll: 100000,
+        bets: [{ ref: 'b', type, amount: 1000 }],
+      });
+      const b = g.bets.find((x) => x.type === type)!;
+      const pv = previewAction(g, { type: 'set-amount', betId: b.id, amount: 1000 });
+      sheet({
+        mode: 'manage',
+        contract: { reason: 'It stays up until it wins or loses.' },
+        preview: pv,
+        facts: buildEvFacts(pv, g),
+      });
+      return document.querySelector('[data-line="hold-value"]')!.textContent;
+    };
+    expect(hold('pass-line', 4)).toContain('Pass line on 4: worth -$3.33 right now (wins 1 in 3)');
+    expect(hold('pass-line', 6)).toContain('worth -$0.91 right now');
+    expect(hold('dont-pass', 4)).toContain("Don't pass on 4: worth +$3.33 right now");
+    expect(document.querySelector('[data-line="loss"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Expected loss on this');
+  });
+
   it('hard 4 is not marked one-roll and pays 7 to 1', () => {
     sheet({ ...real('hard-4', 500), confirmSucker: false });
     expect(lines('hour').querySelector('strong')).toBeNull();

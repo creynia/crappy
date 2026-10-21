@@ -1,7 +1,7 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { BET_TYPES, bonusTargets, isBonusType } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge } from '../math';
+import { betEdge, betEV, pointWinProb, toNumber } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
@@ -117,6 +117,8 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** Pass/Come (or Don't/Don't Come) bet already on a point: its current value (cents) and chance to win. */
+  holdValue?: { cents: number; winChance: string; point: number; label: string } | null;
 }
 
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
@@ -274,7 +276,40 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    holdValue: holdValueOf(bet, type, state),
   };
+}
+
+const HOLD_LABEL: Partial<Record<BetTypeId, string>> = {
+  'pass-line': 'Pass line',
+  'dont-pass': "Don't pass",
+  come: 'Come',
+  'dont-come': "Don't come",
+};
+
+/** A flat line/come bet already on a point: its current expected value (contract bets). */
+function holdValueOf(
+  bet: Bet | undefined,
+  type: BetTypeId,
+  state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+): EvFacts['holdValue'] {
+  const label = HOLD_LABEL[type];
+  if (!bet || !label || bet.amount <= 0 || state.phase !== 'point') return null;
+  const point = bet.point ?? state.point;
+  if (point !== 4 && point !== 5 && point !== 6 && point !== 8 && point !== 9 && point !== 10)
+    return null;
+  const ctx = { phase: 'point' as const, point, rules: state.rules };
+  const cents = toNumber(betEV({ type, amount: bet.amount, point }, ctx));
+  const w = pointWinProb(point);
+  return { cents, winChance: `${w.n} in ${w.d}`, point, label };
+}
+
+/** Plain sentence for a contract bet's current value. */
+export function holdValueText(h: NonNullable<EvFacts['holdValue']>): string {
+  const worth = `worth ${fmtMoney(h.cents, { sign: true })} right now`;
+  if (h.label === 'Pass line' || h.label === 'Come')
+    return `${h.label} on ${h.point}: ${worth} (wins ${h.winChance}). It can't come down, so the best move is to add odds (0% edge).`;
+  return `${h.label} on ${h.point}: ${worth}. Taking it down gives this up.`;
 }
 
 // ---------- roll descriptions ----------

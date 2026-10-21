@@ -25,10 +25,6 @@ win, lose or stay (dealer-style). Builds table fluency.
 A small planner: pick bankroll, unit, strategy and session length, and see
 expected loss, risk of ruin and a suggested stop-loss before you play.
 
-### Contract-bet sheet wording
-For a Pass/Come bet already on a point, the sheet shows "Expected loss: $0.00".
-Show the bet's current (positive) value instead, or hide the loss line.
-
 ### Auto-roll "Watch" mode
 Replay a short auto-roll run on the table itself, roll by roll.
 
@@ -39,3 +35,4 @@ stacked card layout.
 ## Done
 
 - Combined edge with two Come bets (PR #18): `combinedEdge` uses the managed bet (`betId` / `parentId`) for every lookup, so set-amount and odds on the second Come bet no longer fall back to the first.
+- Contract-bet sheet wording: a Pass/Come bet already on a point shows its current value (for example "Pass line on 4: worth -$3.33 right now") instead of "Expected loss $0.00" (I002).

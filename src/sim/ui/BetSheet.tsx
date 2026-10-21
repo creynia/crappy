@@ -1,7 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Action, BetTypeId, Cents } from '../engine/types';
 import type { ActionPreview } from '../math/types';
-import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
+import {
+  fmtMoney,
+  fmtPct,
+  fracToNumber,
+  holdValueText,
+  normalizeTier,
+  TIER_LABEL,
+  type EvFacts,
+} from './text';
 import { DiceGrid } from './DiceGrid';
 import './sim.css';
 
@@ -248,7 +256,15 @@ export function BetSheet(p: BetSheetProps) {
                   : 'Sucker bet: this gives up expected value.'}
               </p>
             ) : null}
-            {facts ? <EvLines facts={facts} /> : <p class="sim-detail">{preview.detail}</p>}
+            {contract && facts?.holdValue ? (
+              <p class="sim-hold-value" data-line="hold-value">
+                {holdValueText(facts.holdValue)}
+              </p>
+            ) : facts && !contract ? (
+              <EvLines facts={facts} />
+            ) : (
+              <p class="sim-detail">{preview.detail}</p>
+            )}
             {preview.alternative ? (
               <div class="sim-alt">
                 <p>{preview.alternative.message}</p>

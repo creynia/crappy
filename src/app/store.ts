@@ -2,11 +2,16 @@ import {
   createStorage,
   decodeImport,
   defaultPersisted,
+  emptyDrillProgress,
   encodeExport,
-  load,
+  loadWithStatus,
+  REVIEW_GAPS,
+  REVIEW_LIMIT,
   save,
+  type DrillProgress,
   type LessonProgress,
-  type PersistedV1,
+  type Persisted,
+  type PracticeItemRef,
   type Settings,
   type StorageLike,
 } from './storage';
@@ -17,18 +22,22 @@ export type LessonStatus = 'new' | 'progress' | 'done';
 const emptyLesson = (): LessonProgress => ({ quizzes: {}, scenes: {} });
 
 export class Store {
-  private data: PersistedV1;
+  private data: Persisted;
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** saved data is from a newer app version: keep changes in memory only (see loadWithStatus) */
+  readonly readOnly: boolean;
 
   constructor(
     private storage: StorageLike = createStorage(),
     private debounceMs = 300,
   ) {
-    this.data = load(storage);
+    const r = loadWithStatus(storage);
+    this.data = r.data;
+    this.readOnly = r.readOnly;
   }
 
-  get snapshot(): PersistedV1 {
+  get snapshot(): Persisted {
     return this.data;
   }
   get settings(): Settings {
@@ -42,7 +51,7 @@ export class Store {
     };
   };
 
-  private commit(next: PersistedV1) {
+  private commit(next: Persisted) {
     this.data = next; // new object identity on every change
     this.listeners.forEach((l) => l());
     if (this.timer) clearTimeout(this.timer);
@@ -53,7 +62,7 @@ export class Store {
   flush() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    save(this.storage, this.data);
+    if (!this.readOnly) save(this.storage, this.data);
   }
 
   private patchLesson(id: string, fn: (p: LessonProgress) => LessonProgress) {
@@ -132,6 +141,74 @@ export class Store {
     });
   }
 
+  // ---- practice drills (src/app/practice) ----
+
+  /** Saved progress for a drill, if it was ever played. */
+  drill(id: string): DrillProgress | undefined {
+    return Object.hasOwn(this.data.practice, id) ? this.data.practice[id] : undefined;
+  }
+
+  private patchDrill(id: string, fn: (p: DrillProgress) => DrillProgress) {
+    const cur = this.drill(id) ?? emptyDrillProgress();
+    this.commit({ ...this.data, practice: { ...this.data.practice, [id]: fn(cur) } });
+  }
+
+  /**
+   * One answered drill item: updates the running streak (`scored: false` for in-round re-asks,
+   * which leave it alone) and the spaced-review list:
+   * - `addReview`: missed on the first try; due next round (gap 1), replacing any earlier entry.
+   * - `passReview`: a review item answered right; it moves to the next gap in REVIEW_GAPS
+   *   (due 2, then 4 rounds later) and leaves the list after passing at the last gap.
+   * The list keeps the REVIEW_LIMIT most recent misses; older ones drop off on purpose (a
+   * learner who misses that much is better served by the fresh misses).
+   */
+  recordPracticeAnswer(
+    drillId: string,
+    ok: boolean,
+    opts: { addReview?: PracticeItemRef; passReview?: PracticeItemRef; scored?: boolean } = {},
+  ) {
+    const same = (a: PracticeItemRef) => (b: PracticeItemRef) =>
+      a.seed === b.seed && a.level === b.level;
+    this.patchDrill(drillId, (p) => {
+      const streak = opts.scored === false ? p.streak : ok ? p.streak + 1 : 0;
+      let review = p.review;
+      if (opts.passReview) {
+        const hit = same(opts.passReview);
+        review = review.flatMap((r) => {
+          if (!hit(r)) return [r];
+          const next = REVIEW_GAPS.find((g) => g > r.gap);
+          return next ? [{ ...r, gap: next, due: p.rounds + next }] : [];
+        });
+      }
+      if (opts.addReview) {
+        const { seed, level } = opts.addReview;
+        review = [
+          ...review.filter((r) => !same(opts.addReview!)(r)),
+          { seed, level, due: p.rounds + 1, gap: 1 },
+        ].slice(-REVIEW_LIMIT);
+      }
+      return { ...p, streak, bestStreak: Math.max(p.bestStreak, streak), review };
+    });
+  }
+
+  /** A finished round: counts it and keeps the best score. */
+  recordPracticeRound(drillId: string, score: number, level: number, now = Date.now()) {
+    this.patchDrill(drillId, (p) => ({
+      ...p,
+      rounds: p.rounds + 1,
+      best: Math.max(p.best, score),
+      last: score,
+      level,
+      lastPlayedAt: now,
+    }));
+  }
+
+  /** Remember the level picked for a drill. */
+  setPracticeLevel(drillId: string, level: number) {
+    if (this.drill(drillId)?.level === level) return;
+    this.patchDrill(drillId, (p) => ({ ...p, level }));
+  }
+
   updateSettings(patch: Partial<Settings>) {
     this.commit({ ...this.data, settings: { ...this.data.settings, ...patch } });
   }
@@ -147,7 +224,7 @@ export class Store {
     return true;
   }
 
-  /** Clear lesson progress (keeps settings unless `settings` is true). */
+  /** Clear lesson and practice progress (keeps settings unless `settings` is true). */
   reset(settings = false) {
     const fresh = defaultPersisted();
     this.commit(settings ? fresh : { ...fresh, settings: this.data.settings });

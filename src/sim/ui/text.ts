@@ -1,7 +1,15 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
-import { BET_TYPES } from '../engine/bets';
+import {
+  BET_TYPES,
+  HOP_PAYS,
+  bonusTargets,
+  hopLabel,
+  isBonusType,
+  isHardHop,
+} from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge, betStdDev } from '../math';
+import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
@@ -54,6 +62,11 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   horn: 'Horn',
   'c-e': 'C and E',
   world: 'World',
+  hop: 'Hop',
+  fire: 'Fire Bet',
+  all: 'All',
+  tall: 'Tall',
+  small: 'Small',
 };
 
 export function betLabel(type: BetTypeId): string {
@@ -247,11 +260,18 @@ export function buildEvFacts(
   if (wn > 0n) {
     const p = fracToNumber({ n: wn, d: wd }) * 100;
     const pct = wd <= 36n ? String(Math.round(p)) : p.toFixed(1).replace(/\.0$/, '');
-    chance = `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
+    // bonus side bets ride a whole hand and have unwieldy exact fractions: "about 1 in 38 hands"
+    chance =
+      def.category === 'bonus'
+        ? `about 1 in ${Math.round(100 / p).toLocaleString('en-US')} hands (${pct}%)`
+        : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
+  const hop = bet?.hop ?? (a.type === 'place-bet' ? a.hop : undefined);
   try {
-    pays = def.describePayout(state.rules, bet?.point ?? state.point);
+    pays = hop
+      ? `${isHardHop(hop) ? HOP_PAYS.hard : HOP_PAYS.easy} to 1`
+      : def.describePayout(state.rules, bet?.point ?? state.point);
   } catch {
     pays = '';
   }
@@ -309,6 +329,59 @@ const NICKNAME: Record<number, string> = {
   12: 'boxcars',
 };
 
+/** Bet results of a roll as sentences: "Pass line wins $5.", "Field loses $1.", ... */
+function betResultGroups(events: readonly GameEvent[]): string[] {
+  const wins: string[] = [];
+  const losses: string[] = [];
+  const pushes: string[] = [];
+  const returned: string[] = [];
+  const progressed: string[] = [];
+  for (const e of events) {
+    if (e.type === 'bet-progressed')
+      progressed.push(
+        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
+      );
+    else if (e.type === 'bet-won')
+      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
+    else if (e.type === 'bet-lost')
+      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
+    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
+    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
+  }
+  return [wins, losses, pushes, returned, progressed]
+    .filter((g) => g.length)
+    .map((g) => g.join(', ') + '.');
+}
+
+/**
+ * The one live announcement per roll: dice, total, bet results with amounts, bankroll after the roll,
+ * and the point state. Built from the roll's events and the state after it.
+ */
+export function rollAnnouncement(events: readonly GameEvent[], post: GameState): string {
+  const roll = events.find(
+    (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
+  );
+  if (!roll) return describeRoll(events);
+  const [a, b] = roll.roll.dice;
+  const r = roll.roll;
+  let total = String(r.total);
+  if (r.hard && r.total >= 4 && r.total <= 10 && r.total % 2 === 0) total += ', the hard way';
+  else if (NICKNAME[r.total]) total += `, ${NICKNAME[r.total]}`;
+  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events)];
+  sentences.push(`Bankroll ${fmtMoney(equity(post))}.`);
+  const ended = events.find((e) => e.type === 'point-made' || e.type === 'seven-out');
+  if (post.point === null)
+    sentences.push(
+      ended?.type === 'point-made'
+        ? 'Point made. Point is off.'
+        : ended?.type === 'seven-out'
+          ? 'Seven out. Point is off.'
+          : 'Point is off.',
+    );
+  else sentences.push(`Point is ${post.point}.`);
+  return sentences.join(' ');
+}
+
 export function describeRoll(events: readonly GameEvent[]): string {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
@@ -340,21 +413,7 @@ export function describeRoll(events: readonly GameEvent[]): string {
         break;
     }
   }
-  const wins: string[] = [];
-  const losses: string[] = [];
-  const pushes: string[] = [];
-  const returned: string[] = [];
-  for (const e of events) {
-    if (e.type === 'bet-won')
-      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
-    else if (e.type === 'bet-lost')
-      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
-    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
-    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
-  }
-  for (const group of [wins, losses, pushes, returned]) {
-    if (group.length) parts.push(group.join(', ') + '.');
-  }
+  parts.push(...betResultGroups(events));
   if (roll) {
     const net = roll.roll.net;
     parts.push(net === 0 ? 'Net $0.' : `Net ${fmtMoney(net, { sign: true })}.`);
@@ -389,7 +448,15 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   if (bets.length) {
     const desc = bets.map((b) => {
       const working = opts.offIds?.has(b.id) ? 'off' : 'working';
-      return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
+      if (isBonusType(b.type)) {
+        const have = b.progress ?? [];
+        const total = bonusTargets(b.type).length;
+        const collected = have.length
+          ? `Collected ${have.join(', ')} (${have.length} of ${total})`
+          : `Nothing collected yet (0 of ${total})`;
+        return `${betLabel(b.type)} ${fmtMoney(b.amount)}, ${collected}`;
+      }
+      return `${b.hop ? hopLabel(b.hop) : betLabel(b.type)} ${fmtMoney(b.amount)}, ${working}`;
     });
     parts.push(`Your bet: ${desc.join('; ')}.`);
   } else {
@@ -401,4 +468,54 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
 
 export function diceAriaLabel(d: readonly [number, number]): string {
   return `Rolled ${d[0]} and ${d[1]}, total ${d[0] + d[1]}`;
+}
+
+export interface WorkingCopyInput {
+  /** the bet is working now */
+  on: boolean;
+  /** cents per roll: positive = what turning it ON costs, negative = what turning it OFF saves */
+  perRollCents: number;
+  phase: 'come-out' | 'point';
+  /** the player switched this bet off (bet.working === 'off'), not the table convention */
+  playerOff: boolean;
+  type: BetTypeId;
+  /** a buy bet whose vig is already paid, so its marginal cost is about nothing */
+  vigSunk: boolean;
+}
+
+/** Copy under the Working toggle; undefined when there is no honest reason to show. */
+export function workingCopy(c: WorkingCopyInput): string | undefined {
+  const def = BET_TYPES[c.type];
+  if (def.category === 'lay' || def.category === 'big') return undefined;
+  const oddsCopy =
+    "Odds have no house edge, so ON costs nothing on average. If they're ON, a come-out 7 loses them along with the come bet; OFF, they'd be returned.";
+  const isOdds = c.type === 'come-odds' || c.type === 'dont-come-odds';
+  if (isOdds) return oddsCopy;
+  if (c.perRollCents === 0) return undefined;
+  if (c.vigSunk) {
+    return c.on
+      ? 'The vig is already paid, so keeping it working costs nothing more.'
+      : 'The vig is already paid, so turning it ON costs nothing more.';
+  }
+  const roll = c.phase === 'point' ? 'roll' : 'come-out roll';
+  const amt = fmtMoney(Math.abs(c.perRollCents), { exact: true });
+  if (c.on) {
+    const lead = c.phase === 'come-out' ? 'Working on the come-out.' : 'Working.';
+    return `${lead} Turning it OFF saves about ${amt} per ${roll}.`;
+  }
+  const why = c.playerOff
+    ? 'You turned this bet off.'
+    : c.phase === 'come-out'
+      ? 'Off on the come-out by table convention.'
+      : 'Off.';
+  const cost = `${why} Turning it ON costs about ${amt} per ${roll}`;
+  if (def.category === 'place' || def.category === 'buy') {
+    return `${cost} and risks the 7, which comes up 6 of 36 ways.`;
+  }
+  if (def.category === 'hardway') {
+    const n = Number(c.type.replace('hard-', ''));
+    const easy = n === 6 || n === 8 ? 4 : 2;
+    return `${cost}. Hard ${n} loses on ${6 + easy} of 36 rolls (6 sevens and ${easy} easy ways).`;
+  }
+  return `${cost}.`;
 }

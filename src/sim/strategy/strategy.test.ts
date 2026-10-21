@@ -7,6 +7,7 @@ import {
   listStrategies,
   simulateCompare,
   simulateMany,
+  simulateSweep,
   simulateManyCompare,
   simulateSession,
   strategyMetrics,
@@ -280,5 +281,249 @@ describe('edge on action is per decision', () => {
     expect(e({ id: 'pass-max-odds', unit: 1000 })).toBeCloseTo(0.374, 2);
     expect(e({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 })).toBeCloseTo(1.414, 2);
     expect(e({ id: 'dont-pass-max-lay', unit: 1000 })).toBeCloseTo(0.273, 2);
+  });
+});
+
+describe('more presets (I012)', () => {
+  const rules = resolveRules('standard-vegas');
+  const m = (id: StrategyId, unit = 500) => strategyMetrics({ id, unit }, rules);
+
+  it('buy 4/10 at $20 loses 2 x $20 x 1/60 per resolution', () => {
+    // each $20 buy: vig $1 paid on the 1/3 of resolutions it wins = $20/60 per resolution
+    const perRoll = m('buy-4-10').expectedLossPerRoll;
+    // each number resolves on 3/36 (hit) + 6/36 (seven) = 9/36 of point-phase rolls
+    expect(perRoll).toBeCloseTo(2 * 20 * (1 / 60) * (9 / 36), 3);
+    expect(m('buy-4-10').edgeOnAction).toBeCloseTo(1 / 60, 3);
+  });
+  it('lay 4/10: $40 laid, loss per resolution is $40 x 1/60 on the amount laid', () => {
+    // lay $40 wins $20 on 7 before the number (2/3): vig $1; loss per resolution = 2/3 x $1
+    expect(m('lay-4-10').edgeOnAction).toBeCloseTo(1 / 60, 6);
+    // each number resolves on 6/36 (seven) + 3/36 (hit) = 9/36 of point-phase rolls
+    expect(m('lay-4-10').expectedLossPerRoll).toBeCloseTo(2 * (2 / 3) * (9 / 36), 6);
+  });
+  it('hedging the pass line with Any Craps raises the edge on action', () => {
+    const hedge = m('pass-hedge-any-craps');
+    const flat = strategyMetrics({ id: 'pass-max-odds', unit: 500, oddsMultiple: 0 }, rules);
+    expect(hedge.edgeOnAction).toBeGreaterThan(flat.edgeOnAction);
+    // per decision: $5 pass loses 5 x 7/495, $1 any craps loses 1/9: 2/11 of $1 on $6 of action
+    expect(hedge.edgeOnAction).toBeCloseTo(1 / 33, 6);
+    // a decision lasts 557/165 rolls; the come-out any craps is costed once per decision
+    expect(hedge.expectedLossPerRoll).toBeCloseTo(30 / 557, 6);
+  });
+
+  describe('behavior', () => {
+    const driver = (id: StrategyId, init: Parameters<typeof createGame>[0], extra = {}) => {
+      let s = createGame(init);
+      const sp = spec(id, extra);
+      const step = (): string[] => {
+        const before = s.bets.map((b) => b.id);
+        for (const a of getStrategy(id).decide(s, sp)) {
+          const r = applyAction(s, a);
+          if (!r.ok) throw new Error(r.error.message);
+          s = r.state;
+        }
+        return s.bets.filter((b) => !before.includes(b.id)).map((b) => b.type);
+      };
+      const roll = (d: readonly [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]) => {
+        const r = applyAction(s, { type: 'roll', dice: [d[0], d[1]] });
+        if (!r.ok) throw new Error('roll');
+        s = r.state;
+      };
+      return {
+        get s() {
+          return s;
+        },
+        step,
+        roll,
+      };
+    };
+
+    it("don't-come-molly: DP plus at most two DCs, each with 6x lay, never a third", () => {
+      const d = driver('dont-come-molly', { bankroll: 100_000, seed: 1 });
+      expect(d.step()).toEqual(['dont-pass']);
+      d.roll([3, 3]); // point 6
+      expect(d.step().sort()).toEqual(['dont-come', 'dont-pass-odds']);
+      d.roll([2, 2]); // DC travels to 4
+      d.step();
+      d.roll([5, 4]); // second DC travels to 9
+      d.step();
+      d.roll([1, 2]); // 3: a don't come bet in the box would win; none is up, nothing to resolve
+      d.step();
+      const t = (x: string) => d.s.bets.filter((b) => b.type === x);
+      expect(t('dont-come')).toHaveLength(2);
+      expect(t('dont-come-odds')).toHaveLength(2);
+      expect(t('dont-pass-odds')[0]!.amount).toBe(500 * 6);
+      for (const o of t('dont-come-odds')) expect(o.amount).toBe(500 * 6);
+      expect(d.s.bets.filter((b) => b.type === 'dont-come' && b.point === null)).toHaveLength(0);
+    });
+
+    it('buy 4/10 and lay 4/10: placed only after a point, $20/$40, re-placed, vig on a win', () => {
+      for (const [id, amt, win] of [
+        ['buy-4-10', 2000, [2, 2]],
+        ['lay-4-10', 4000, [3, 4]],
+      ] as const) {
+        const d = driver(id, { bankroll: 100_000, seed: 1 });
+        expect(d.step()).toEqual([]); // come-out: nothing
+        const p = driver(id, { bankroll: 100_000, seed: 1, phase: 'point', point: 6 });
+        const kind = id.slice(0, 3);
+        expect(p.step().sort()).toEqual([`${kind}-10`, `${kind}-4`]);
+        expect(p.s.bets.map((b) => b.amount)).toEqual([amt, amt]);
+        p.roll(win);
+        // a $1 vig per winning bet: the buy wins on its own number, both lays win on a 7
+        expect(p.s.stats.totalVig).toBe(id === 'buy-4-10' ? 100 : 200);
+        p.roll(win[0] === 3 ? [2, 2] : [3, 4]); // seven-out clears buys; a 4 wins the lay against it
+        p.step();
+        if (id === 'buy-4-10') {
+          expect(p.s.bets).toHaveLength(0);
+          const q = driver(id, { bankroll: 100_000, seed: 1, phase: 'point', point: 5 });
+          expect(q.step()).toHaveLength(2); // placed again on the next point
+        }
+      }
+    });
+
+    it('pass-hedge-any-craps: any craps only on come-out rolls', () => {
+      const d = driver('pass-hedge-any-craps', { bankroll: 100_000, seed: 1 });
+      expect(d.step().sort()).toEqual(['any-craps', 'pass-line']);
+      d.roll([3, 3]);
+      expect(d.step()).toEqual([]);
+      d.roll([2, 1]);
+      expect(d.step()).toEqual([]);
+      expect(d.s.bets.some((b) => b.type === 'any-craps')).toBe(false);
+      d.roll([3, 3]); // point made: back to the come-out
+      expect(d.step()).toEqual(['any-craps']);
+    });
+  });
+  it('progressions are flagged approximate', () => {
+    expect(m('inside-regress').approximate).toBe(true);
+    expect(m('place-6-8-press').approximate).toBe(true);
+    expect(m('buy-4-10').approximate).toBeUndefined();
+  });
+  it('inside-regress places $22 then keeps $12 on 6/8 after a hit', () => {
+    const seq = (dice: Array<[1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]>) => {
+      let s = createGame({ bankroll: 100_000, seed: 1, phase: 'point', point: 4 });
+      const sp = spec('inside-regress');
+      const run = () => {
+        for (const a of getStrategy('inside-regress').decide(s, sp)) {
+          const r = applyAction(s, a);
+          if (!r.ok) throw new Error(r.error.message);
+          s = r.state;
+        }
+      };
+      run();
+      const first = s.bets.reduce((a, b) => a + b.amount, 0);
+      for (const d of dice) {
+        const r = applyAction(s, { type: 'roll', dice: [d[0], d[1]] });
+        if (!r.ok) throw new Error('roll');
+        s = r.state;
+        run();
+      }
+      return { first, bets: s.bets.map((b) => [b.type, b.amount]) };
+    };
+    const r = seq([[1, 2]]); // 3 does nothing
+    expect(r.first).toBe(2200);
+    expect(r.bets).toHaveLength(4);
+    const hit = seq([[4, 4]]); // 8 hits
+    expect(hit.bets.sort()).toEqual([
+      ['place-6', 600],
+      ['place-8', 600],
+    ]);
+  });
+  it('place-6-8-press presses by one unit per hit up to 5x', () => {
+    let s = createGame({ bankroll: 1_000_000, seed: 1, phase: 'point', point: 4 });
+    const sp = spec('place-6-8-press');
+    const step = () => {
+      for (const a of getStrategy('place-6-8-press').decide(s, sp)) {
+        const r = applyAction(s, a);
+        if (!r.ok) throw new Error(r.error.message);
+        s = r.state;
+      }
+    };
+    step();
+    const amt = () => s.bets.find((b) => b.type === 'place-6')!.amount;
+    expect(amt()).toBe(600);
+    for (let i = 0; i < 8; i++) {
+      const r = applyAction(s, { type: 'roll', dice: [3, 3] });
+      if (!r.ok) throw new Error('roll');
+      s = r.state;
+      step();
+    }
+    expect(amt()).toBe(3000);
+  });
+});
+
+describe('simulateMany stops', () => {
+  const base = {
+    strategy: spec('pass-max-odds', { oddsMultiple: 2, unit: 1000 }),
+    rolls: 100,
+    seed: 7,
+    bankroll: 50_000,
+  };
+  const perRoll = (r: { meanExpectedLoss: number; meanRollsPlayed: number }) =>
+    r.meanExpectedLoss / r.meanRollsPlayed;
+
+  it('stops off: no stop endings and finals match a run without the stop keys', async () => {
+    const a = await simulateMany(base, 20, { sliceMs: 0 });
+    const b = await simulateMany({ ...base, stopWin: undefined, stopLoss: undefined }, 20, {
+      sliceMs: 0,
+    });
+    expect(a.stopWinRate).toBe(0);
+    expect(a.stopLossRate).toBe(0);
+    expect(Array.from(a.finals)).toEqual(Array.from(b.finals));
+    expect(a.meanRollsPlayed).toBeLessThanOrEqual(100);
+  });
+
+  it('a stop cuts the rolls played but leaves the expected loss per roll about the same', async () => {
+    const plain = await simulateMany(base, 200, { sliceMs: 0 });
+    const stopped = await simulateMany({ ...base, stopWin: 5000 }, 200, { sliceMs: 0 });
+    expect(stopped.stopWinRate).toBeGreaterThan(0);
+    expect(stopped.meanRollsPlayed).toBeLessThan(plain.meanRollsPlayed);
+    expect(Math.abs(perRoll(stopped) - perRoll(plain)) / perRoll(plain)).toBeLessThan(0.1);
+  });
+});
+
+describe('simulateSweep', () => {
+  const cfg = {
+    strategy: 'pass-max-odds' as const,
+    unit: 1000,
+    oddsMultiples: [0, 1, 2, 'max', 10, 100] as (number | 'max')[],
+    rolls: 100,
+    seed: 1,
+    bankroll: 10_000_000,
+  };
+  it('edge falls with odds, expected loss is constant, variance rises', async () => {
+    const rows = await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    const edges = rows.map((r) => +(r.edgeOnAction * 100).toFixed(3));
+    expect(edges).toEqual([1.414, 0.848, 0.606, 0.374, 0.184, 0.021]);
+    for (const r of rows)
+      expect(Math.abs(r.expectedLossCents - rows[0]!.expectedLossCents)).toBeLessThan(1);
+    for (let i = 1; i < rows.length; i++)
+      expect(rows[i]!.sdFinal).toBeGreaterThan(rows[i - 1]!.sdFinal);
+  });
+  it('odds add no expected loss per roll (analytic, independent of the sweep)', () => {
+    const rules = resolveRules('odds-100x');
+    const flat = strategyMetrics({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 }, rules);
+    for (const m of [1, 2, 10, 100]) {
+      const x = strategyMetrics({ id: 'pass-max-odds', unit: 1000, oddsMultiple: m }, rules);
+      expect(x.expectedLossPerRoll).toBeCloseTo(flat.expectedLossPerRoll, 6);
+    }
+  });
+  it('fixed-seed regression pin (seed 1): more sessions finish ahead with odds than flat only', async () => {
+    // Not a general law: P(ahead) is not monotonic in odds for every seed; this pins seed 1 only.
+    const rows = await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    for (const r of rows.slice(1)) expect(r.probAhead).toBeGreaterThan(rows[0]!.probAhead);
+  });
+  it('the dont-pass sweep raises the lay cap too, so 10x really lays 10x', async () => {
+    const rows = await simulateSweep(
+      { ...cfg, strategy: 'dont-pass-max-lay', oddsMultiples: [6, 10] },
+      20,
+      { schedule: (fn) => fn() },
+    );
+    expect(rows[1]!.edgeOnAction).toBeLessThan(rows[0]!.edgeOnAction);
+    expect(rows[1]!.sdFinal).toBeGreaterThan(rows[0]!.sdFinal);
+  });
+  it('benchmark: 6 x 100 sessions x 100 rolls finishes (loose bound)', async () => {
+    const t = performance.now();
+    await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    expect(performance.now() - t).toBeLessThan(20_000);
   });
 });

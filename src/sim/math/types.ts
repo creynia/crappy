@@ -7,13 +7,18 @@ export interface Outcome {
   outOf: number;
   probability: Fraction;
   net: Fraction; // cents, incl. vig
+  /** The point this outcome went through first (line and come bets). */
+  via?: PointNumber;
 }
 export interface BetCtx {
   phase: Phase;
   point: PointNumber | null;
   rules: TableRules;
 }
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point'>;
+/** `hop` is the dice pair of a hop bet (I035); `working` is the player's ON/OFF setting, omitted means 'auto'. */
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'hop' | 'progress'> & {
+  working?: Bet['working'];
+};
 
 export interface EdgeInfo {
   perResolved: Fraction; // -EV / amount, pushes count as decisions
@@ -25,8 +30,40 @@ export interface EdgeInfo {
 /** By edge per bet resolved: free <=0, good <=2%, fair <=5%, poor <9%, avoid >=9% (only `avoid` needs a second tap). */
 export type EdgeTier = 'free' | 'good' | 'fair' | 'poor' | 'avoid';
 
+/** A final outcome in the tree; probability is absolute (from the come-out). */
+export interface TreeLeaf {
+  label: string;
+  probability: Fraction;
+  net: Fraction;
+  /** 'win' | 'lose' | 'push', for ordering and totals */
+  kind: 'win' | 'lose' | 'push';
+  /** Chance given that the point was set: P(N before 7) or P(7 before N). Point leaves only. */
+  given?: Fraction;
+}
+/** Two-level tree for line-like bets: come-out leaves plus one branch per point. */
+export interface OutcomeTree {
+  /** Resolved straight from the come-out roll (natural / craps). */
+  comeOut: TreeLeaf[];
+  /** `probability` = P(this point is set) = ways/36; `ways` is the 36ths numerator, `pMake` P(N before 7). */
+  points: {
+    point: PointNumber;
+    probability: Fraction;
+    ways: number;
+    pMake: Fraction;
+    leaves: TreeLeaf[];
+  }[];
+  /** Total chance of winning, losing and pushing, from the come-out. */
+  totals: { win: Fraction; lose: Fraction; push: Fraction };
+}
+
 export interface Explanation {
   rows: Outcome[];
+  /** Present only when the bet can set a point (pass / don't pass / come / don't come). */
+  tree?: OutcomeTree;
+  /** next-roll effect on the bet per dice combination (36, ALL_DICE order) */
+  grid?: import('./outcomes').RollEffect[];
+  /** shown with the grid when the bet is off / does nothing this roll */
+  gridNote?: string;
   evFormula: string;
   note?: string;
 }

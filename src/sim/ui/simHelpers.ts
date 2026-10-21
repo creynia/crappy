@@ -1,6 +1,6 @@
 import { BET_TYPES } from '../engine/bets';
 import { maxOddsAmount, suggestAmount } from '../engine/validate';
-import type { Action, Bet, BetTypeId, Cents, GameState, PointNumber } from '../engine/types';
+import type { Action, Bet, BetTypeId, Cents, Dice, GameState, PointNumber } from '../engine/types';
 import type { RegionDef, RegionId } from './layouts/types';
 
 /** The number a box region stands for, or null. */
@@ -41,7 +41,7 @@ export function minAmountFor(type: BetTypeId, g: GameState): Cents {
   let min =
     def.category === 'odds'
       ? 100
-      : def.category === 'prop' || def.category === 'hardway'
+      : def.category === 'prop' || def.category === 'hardway' || def.category === 'bonus'
         ? g.rules.propMin
         : g.rules.tableMin;
   const unit = 100 * def.unitMultiple;
@@ -68,11 +68,15 @@ export function defaultAmount(type: BetTypeId, region: RegionId, g: GameState, c
   return suggestAmount(type, base, g);
 }
 
+/** The pair a fresh hop sheet starts on: 2-4, the example lesson 13 uses. */
+export const DEFAULT_HOP: Dice = [2, 4];
+
 export function placeAction(
   type: BetTypeId,
   amount: Cents,
   region: RegionId,
   g: GameState,
+  hop?: Dice,
 ): Extract<Action, { type: 'place-bet' }> {
   const parent = BET_TYPES[type].category === 'odds' ? parentFor(type, region, g) : undefined;
   return {
@@ -82,5 +86,11 @@ export function placeAction(
     ...(parent && (type === 'come-odds' || type === 'dont-come-odds')
       ? { parentId: parent.id }
       : {}),
+    ...(type === 'hop' ? { hop: hop ?? DEFAULT_HOP } : {}),
   };
+}
+
+/** SheetState fields for a bet type: a hop sheet carries its pair (default DEFAULT_HOP), others nothing. */
+export function hopSheetFields(type: BetTypeId, hop: Dice | undefined): { hop?: Dice } {
+  return type === 'hop' ? { hop: hop ?? DEFAULT_HOP } : {};
 }

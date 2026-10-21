@@ -1,4 +1,4 @@
-import { BET_TYPES, upfrontVig } from './bets';
+import { BET_TYPES, bonusTargets, normalizeHop, upfrontVig, type BonusBetTypeId } from './bets';
 import { resolveRules } from './rules';
 import { rollDice, seedRng } from './rng';
 import { resolveRoll } from './resolve';
@@ -32,6 +32,10 @@ export interface BetInit {
   point?: PointNumber;
   parentRef?: string;
   working?: WorkingMode;
+  /** EXTENSION (I035): the dice pair of a 'hop' bet (either order); required for hop, rejected otherwise. */
+  hop?: Dice;
+  /** bonus bets only: numbers already collected (scenes that start mid-hand) */
+  progress?: number[];
 }
 
 export interface CreateGameOptions {
@@ -49,6 +53,8 @@ export interface ApplyOptions {
   expectedLossFn?: (s: GameState) => number;
   /** Expected loss (cents) per bet type for the roll about to happen. */
   expectedLossByTypeFn?: (s: GameState) => Partial<Record<BetTypeId, number>>;
+  /** Variance (cents^2) of what the roll about to happen adds to the session result, given the pre-roll state; summed into stats.variance. */
+  varianceFn?: (s: GameState) => number;
 }
 
 function addBet(
@@ -58,6 +64,8 @@ function addBet(
   point: PointNumber | null,
   parentId: string | null,
   working: WorkingMode,
+  hop?: Dice,
+  progress?: readonly number[],
 ): { state: GameState; bet: Bet } {
   const bet: Bet = {
     id: `b${state.nextBetId}`,
@@ -68,6 +76,8 @@ function addBet(
     working,
     placedOnRoll: state.rollCount,
     vigPaid: upfrontVig(type, amount, state.rules),
+    ...(hop ? { hop: normalizeHop(hop) } : {}),
+    ...(progress ? { progress } : {}),
   };
   return {
     bet,
@@ -103,7 +113,15 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     seed,
     forcedDice: [...(opts.forcedDice ?? [])],
     nextBetId: 1,
-    stats: { totalWagered: 0, totalWon: 0, totalLost: 0, totalVig: 0, expectedLoss: 0, byType: {} },
+    stats: {
+      totalWagered: 0,
+      totalWon: 0,
+      totalLost: 0,
+      totalVig: 0,
+      expectedLoss: 0,
+      variance: 0,
+      byType: {},
+    },
   };
   const refs = new Map<string, string>();
   for (const init of opts.bets ?? []) {
@@ -111,7 +129,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     if (!def) throw new Error(`createGame: unknown bet type ${String(init.type)}`);
     // Validate against a phase in which the bet type is legal, so scenes can start mid-hand.
     const viewPhase: Phase =
-      init.type === 'pass-line' || init.type === 'dont-pass'
+      init.type === 'pass-line' || init.type === 'dont-pass' || def.category === 'bonus'
         ? 'come-out'
         : init.type === 'come' || init.type === 'dont-come'
           ? 'point'
@@ -131,6 +149,7 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
       betType: init.type,
       amount: init.amount,
       parentId,
+      ...(init.hop !== undefined ? { hop: init.hop } : {}),
     });
     if (!v.ok) throw new Error(`createGame: bet ${init.type} ${init.amount}: ${v.message}`);
     let betPoint: PointNumber | null = null;
@@ -147,14 +166,33 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     } else if (init.point !== undefined) {
       throw new Error(`createGame: ${init.type} cannot have a point`);
     }
+    let progress: number[] | undefined;
+    if (init.progress !== undefined) {
+      if (def.category !== 'bonus')
+        throw new Error(`createGame: ${init.type} cannot have progress`);
+      const targets = bonusTargets(init.type as BonusBetTypeId);
+      progress = [...new Set(init.progress)].sort((a, b) => a - b);
+      if (progress.some((n) => !targets.includes(n)) || progress.length >= targets.length)
+        throw new Error(`createGame: invalid progress for ${init.type}`);
+    }
     const merge = findMergeTarget(
       state,
       init.type,
       pid ? state.bets.find((b) => b.id === pid) : undefined,
+      init.hop,
     );
     if (merge && betPoint === null)
       throw new Error(`createGame: duplicate ${init.type}; set the combined amount instead`);
-    const r = addBet(state, init.type, init.amount, betPoint, pid, init.working ?? 'auto');
+    const r = addBet(
+      state,
+      init.type,
+      init.amount,
+      betPoint,
+      pid,
+      init.working ?? 'auto',
+      init.hop,
+      progress,
+    );
     state = r.state;
     if (init.ref) refs.set(init.ref, r.bet.id);
   }
@@ -197,14 +235,22 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       const def = BET_TYPES[action.betType];
       const parent =
         def.category === 'odds' ? findParent(state, action.betType, action.parentId) : undefined;
-      const existing = findMergeTarget(state, action.betType, parent);
+      const existing = findMergeTarget(state, action.betType, parent, action.hop);
       if (existing) {
         const r = setAmount(state, existing, existing.amount + action.amount);
         return { ok: true, state: r.state, events: r.events, warnings };
       }
       let point: PointNumber | null = null;
       if (parent) point = oddsPoint(state, parent);
-      const r = addBet(state, action.betType, action.amount, point, parent?.id ?? null, 'auto');
+      const r = addBet(
+        state,
+        action.betType,
+        action.amount,
+        point,
+        parent?.id ?? null,
+        'auto',
+        action.hop,
+      );
       return { ok: true, state: r.state, events: [{ type: 'bet-placed', bet: r.bet }], warnings };
     }
     case 'set-amount': {
@@ -261,6 +307,10 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       const byTypeLoss = opts?.expectedLossByTypeFn ? opts.expectedLossByTypeFn(state) : null;
       const r = resolveRoll(s, dice, forced);
       let out = r.state;
+      if (opts?.varianceFn) {
+        const v = opts.varianceFn(state);
+        if (v !== 0) out = { ...out, stats: { ...out.stats, variance: out.stats.variance + v } };
+      }
       if (loss || byTypeLoss) {
         const byType = { ...out.stats.byType };
         if (byTypeLoss) {

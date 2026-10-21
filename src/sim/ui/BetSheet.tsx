@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
-import type { Action, BetTypeId, Cents } from '../engine/types';
+import type { Action, BetTypeId, Cents, Dice } from '../engine/types';
+import { HopPicker } from './HopPicker';
 import type { ActionPreview } from '../math/types';
 import {
   fmtMoney,
@@ -10,6 +11,8 @@ import {
   TIER_LABEL,
   type EvFacts,
 } from './text';
+import { DiceGrid } from './DiceGrid';
+import { OddsTree } from './OddsTree';
 import './sim.css';
 
 export type SheetPreview = ActionPreview;
@@ -43,7 +46,7 @@ export interface BetSheetProps {
   /** selected chip value: one step of the +/- stepper */
   step: Cents;
   quickActions?: readonly QuickAction[];
-  working?: { value: boolean; canToggle: boolean };
+  working?: { value: boolean; canToggle: boolean; copy?: string };
   /** sandbox setting "Confirm sucker bets" (default true): avoid-tier needs a second tap */
   confirmSucker?: boolean;
   onTypeChange: (t: BetTypeId) => void;
@@ -57,6 +60,8 @@ export interface BetSheetProps {
   contract?: { reason: string; onAddOdds?: () => void };
   onConfirm: () => void;
   onCancel: () => void;
+  /** Hop bets (I035): the chosen pair and its picker (shown for a new hop only). */
+  hop?: { value: Dice; onChange: (d: Dice) => void };
 }
 
 const FOCUSABLE =
@@ -88,7 +93,7 @@ export function BetSheet(p: BetSheetProps) {
   const removeNeedsSecondTap =
     !!p.removePreview && normalizeTier(p.removePreview.tier) === 'avoid' && confirmSucker;
   const [removeArmed, setRemoveArmed] = useState(false);
-  const sig = `${p.selectedType}|${amount}|${preview.action.type}`;
+  const sig = `${p.selectedType}|${amount}|${preview.action.type}|${p.hop?.value.join('-') ?? ''}`;
 
   useEffect(() => {
     setArmed(false);
@@ -181,6 +186,10 @@ export function BetSheet(p: BetSheetProps) {
           </div>
         ) : null}
 
+        {p.hop && mode === 'new' ? (
+          <HopPicker value={p.hop.value} onChange={p.hop.onChange} />
+        ) : null}
+
         <div class="sim-stepper">
           <button
             type="button"
@@ -217,10 +226,16 @@ export function BetSheet(p: BetSheetProps) {
               type="checkbox"
               checked={p.working.value}
               disabled={!p.working.canToggle}
+              aria-describedby={p.working.copy ? 'working-copy' : undefined}
               onChange={(e) => p.onToggleWorking?.(e.currentTarget.checked)}
             />
             Working: {p.working.value ? 'ON' : 'OFF'}
           </label>
+        ) : null}
+        {p.working?.copy ? (
+          <p id="working-copy" class="sim-working-copy">
+            {p.working.copy}
+          </p>
         ) : null}
 
         {!valid ? (
@@ -277,26 +292,33 @@ export function BetSheet(p: BetSheetProps) {
             </button>
             {whyOpen ? (
               <div class="sim-why">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Outcome</th>
-                      <th scope="col">Chance</th>
-                      <th scope="col">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.explanation.rows.map((r, i) => (
-                      <tr key={i}>
-                        <td>{r.label}</td>
-                        <td>
-                          {ways(r.ways, r.outOf)} ({fmtPct(fracToNumber(r.probability), 1)})
-                        </td>
-                        <td>{fmtMoney(fracToNumber(r.net), { sign: true, exact: true })}</td>
+                {preview.explanation.tree ? (
+                  <OddsTree tree={preview.explanation.tree} />
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Outcome</th>
+                        <th scope="col">Chance</th>
+                        <th scope="col">Result</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {preview.explanation.rows.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.label}</td>
+                          <td>
+                            {ways(r.ways, r.outOf)} ({fmtPct(fracToNumber(r.probability), 1)})
+                          </td>
+                          <td>{fmtMoney(fracToNumber(r.net), { sign: true, exact: true })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {preview.explanation.grid ? (
+                  <DiceGrid grid={preview.explanation.grid} note={preview.explanation.gridNote} />
+                ) : null}
                 <p class="sim-formula">{preview.explanation.evFormula}</p>
                 {preview.explanation.note ? (
                   <p class="sim-note">{preview.explanation.note}</p>

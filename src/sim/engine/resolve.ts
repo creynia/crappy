@@ -131,6 +131,15 @@ export function resolveRoll(
           point: res.point,
         });
         break;
+      case 'advance':
+        kept.push({ ...bet, progress: res.progress });
+        events.push({
+          type: 'bet-progressed',
+          betId: bet.id,
+          betType: bet.type,
+          progress: res.progress,
+        });
+        break;
       case 'return':
         bankroll += bet.amount;
         events.push({
@@ -208,6 +217,7 @@ export function resolveRoll(
     totalLost,
     totalVig,
     expectedLoss: state.stats.expectedLoss,
+    variance: state.stats.variance,
     byType,
   };
 

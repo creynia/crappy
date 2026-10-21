@@ -125,3 +125,63 @@ describe('auto-roll compare scene', () => {
     await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true));
   });
 });
+
+describe('auto-roll sweep scene', () => {
+  const scene: SceneConfig = {
+    id: 'sw',
+    version: 1,
+    bankroll: 100000,
+    allowedBets: [],
+    autoRoll: {
+      enabled: true,
+      sweep: { strategy: 'pass-max-odds', oddsMultiples: [0, 2] },
+    },
+    steps: [{ id: 'run', text: 'Run it.', completeWhen: { autoRollCompleted: { minRolls: 100 } } }],
+  };
+  it('shows the sweep panel and completes the step when it finishes', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="sweep-panel"]')).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByTestId('sweep-run'));
+    await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true), {
+      timeout: 15_000,
+    });
+    expect(container.querySelectorAll('[data-testid="sweep-row"]')).toHaveLength(2);
+  });
+});
+
+describe('Simulator roll announcements', () => {
+  const scene: SceneConfig = {
+    id: 'r',
+    version: 1,
+    bankroll: 50000,
+    forcedDice: [
+      [5, 6],
+      [5, 6],
+    ],
+  };
+  const live = (c: Element) =>
+    c.querySelector('[data-testid="roll-announcer"]')!.textContent.trim();
+
+  it('announces the roll in one sentence, again for an identical roll, from one live region', async () => {
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={() => {}} />,
+    );
+    expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() =>
+      expect(live(container)).toBe('Rolled 5 and 6, 11, yo. Bankroll $500. Point is off.'),
+    );
+    const first = container.querySelector('[data-testid="roll-announcer"] span');
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="roll-announcer"] span')).not.toBe(first),
+    );
+    expect(live(container)).toBe('Rolled 5 and 6, 11, yo. Bankroll $500. Point is off.');
+    expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
+  });
+});

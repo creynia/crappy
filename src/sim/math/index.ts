@@ -12,7 +12,18 @@ export {
   expectedLossByTypePerRoll,
   lossPerRoll,
 } from './ev';
+export { makeVarianceFn, luckOf, luckFrom, luckText, type Luck, type LuckVerdict } from './luck';
 export { previewAction, suggestAlternative } from './preview';
 export { explainBet } from './explain';
 export { edgeTier } from './tiers';
 export { money as formatCents, pct as formatEdge } from './format';
+export { rollEffectGrid, countEffects, worksNow, type RollEffect } from './outcomes';
+export {
+  firePointsDistribution,
+  fireExpectedRolls,
+  fireEV,
+  atsWinProb,
+  atsExpectedRolls,
+  atsEV,
+  bonusDistribution,
+} from './bonus';

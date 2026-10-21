@@ -53,6 +53,14 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
+    stopWin?: Cents;
+    /** default "stop when behind by" amount, in cents */
+    stopLoss?: Cents;
+    /** starting bankroll for the auto-roll runs, in cents; default is the scene bankroll */
+    bankroll?: Cents;
+    /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
+    sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
 }
@@ -86,19 +94,28 @@ export interface ActionMatcher {
   minAmount?: Cents;
   maxAmount?: Cents;
   oddsMax?: boolean;
+  /** EXTENSION (I035): only a hop bet on this pair matches (either order). */
+  hop?: Dice;
 }
+
+/** Outcome of a resolved bet, for `betResolved` (sugar over the bet-won / bet-lost / bet-pushed events). */
+export type BetResult = 'won' | 'lost' | 'pushed';
 
 export type Condition =
   | { all: Condition[] }
   | { any: Condition[] }
+  | { not: Condition }
   | { action: ActionMatcher; count?: number }
   | { event: GameEvent['type']; betType?: BetTypeId; count?: number }
   | { rolls: number }
   | { phase: Phase }
   | { point: PointNumber | null }
-  | { betOnTable: { type: BetTypeId; minAmount?: Cents } }
+  | { betOnTable: { type: BetTypeId; minAmount?: Cents; point?: PointNumber } }
+  | { betResolved: { type: BetTypeId; result?: BetResult } }
   | { bankrollAtLeast: Cents }
   | { bankrollAtMost: Cents }
+  | { equityAtLeast: Cents }
+  | { equityAtMost: Cents }
   | { previewed: BetTypeId }
   | { autoRollCompleted: { minRolls?: number; oddsMultiple?: number | 'default' } }
   | { acknowledged: true };

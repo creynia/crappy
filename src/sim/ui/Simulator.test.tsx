@@ -492,3 +492,81 @@ describe('share link RNG position across Reset and reload (I071 review)', () => 
     location.hash = '';
   });
 });
+
+describe('watch mode accessibility', () => {
+  const startWatch = async (initialSettings: Record<string, unknown>) => {
+    const r = render(<Simulator initialSettings={initialSettings} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(r.container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() => screen.getByRole('button', { name: 'Watch on the table' }));
+    return r;
+  };
+
+  it('announces a replay once, at the end, not once per roll', async () => {
+    const { container } = await startWatch(instant);
+    const announcer = container.querySelector('[data-testid="roll-announcer"]')!;
+    // count real text changes (a re-render can rewrite the same text without announcing anything)
+    const seen: string[] = [announcer.textContent ?? ''];
+    const mo = new MutationObserver(() => {
+      const t = announcer.textContent ?? '';
+      if (t !== seen[seen.length - 1]) seen.push(t);
+    });
+    mo.observe(announcer, { childList: true, subtree: true, characterData: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() => screen.getByTestId('watch-controls'));
+    fireEvent.click(screen.getByRole('button', { name: '16x' }));
+    await waitFor(
+      () => expect(screen.getByTestId('watch-controls').textContent).toContain('Finished'),
+      {
+        timeout: 15_000,
+      },
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    mo.disconnect();
+    expect(seen).toHaveLength(2); // '' then the one end-of-replay line
+    expect(announcer.textContent).toContain('Replay finished');
+  });
+
+  it('Escape exits watch mode', async () => {
+    const { container } = await startWatch(instant);
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() => screen.getByTestId('watch-controls'));
+    fireEvent.keyDown(container.querySelector('[data-testid="simulator"]')!, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId('watch-controls')).toBeNull());
+  });
+
+  it('reduced motion makes watch-mode rolls instant at any speed (no animation in flight)', async () => {
+    const real = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    const setReduced = (on: boolean) =>
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: (q: string) => ({
+          matches: on && q.includes('reduce'),
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        }),
+      });
+    try {
+      for (const reduced of [false, true]) {
+        setReduced(reduced);
+        const { unmount } = await startWatch({ speed: 'normal' });
+        fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+        await waitFor(() => screen.getByTestId('watch-controls'));
+        fireEvent.click(screen.getByRole('button', { name: '4x' }));
+        fireEvent.click(screen.getByTestId('watch-toggle')); // pause
+        const step = screen.getByTestId('watch-step') as HTMLButtonElement;
+        await waitFor(() => expect(step.disabled).toBe(false));
+        fireEvent.click(step);
+        // an animation in flight keeps Step disabled; instant rolls do not
+        expect(step.disabled).toBe(!reduced ? true : false);
+        unmount();
+        document.body.innerHTML = '';
+      }
+    } finally {
+      if (real) Object.defineProperty(window, 'matchMedia', real);
+      else delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+});

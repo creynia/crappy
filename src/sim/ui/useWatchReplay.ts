@@ -5,6 +5,7 @@ import { replayRoll, replayStart, replayTo, simulateSession } from '../strategy'
 import type { SessionConfig, SessionLogEntry } from '../strategy';
 import { prefersReducedMotion, type Speed } from './animation';
 import type { Core } from './simCore';
+import { fmtMoney } from './text';
 
 export type WatchSpeed = 1 | 4 | 16;
 
@@ -29,6 +30,8 @@ interface Options {
     run: (pre: GameState, post: GameState, events: GameEvent[]) => void;
     clear: () => void;
   };
+  /** the simulator's single live announcer, used once when a replay finishes */
+  announce: (text: string) => void;
   /** animation speed the replay overrides while it is active (null = the player's own setting) */
   speedRef: { current: Speed | null };
   /** the player's own animation speed, used for 1x */
@@ -98,6 +101,8 @@ export function useWatchReplay(o: Options) {
     o.setCore({ game: post, rt: o.coreRef.current.rt });
     o.anim.run(pre, post, events);
     update({ index: w.index + 1, playing: w.playing && w.index + 1 < w.log.length });
+    if (w.index + 1 === w.log.length)
+      o.announce(`Replay finished. Final bankroll ${fmtMoney(equity(post))}.`);
   };
 
   const scrub = (k: number) => {

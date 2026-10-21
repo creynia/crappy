@@ -123,7 +123,10 @@ export function Simulator(props: SimulatorInternalProps) {
   const anim = useAnimationPlayer(
     () => watchSpeed.current ?? settingsRef.current.speed,
     pushToast,
-    announce,
+    // a replay would flood the live region (one message per roll): it announces only its end
+    (text) => {
+      if (watchSpeed.current === null) announce(text);
+    },
     (pre, post, events) => {
       // a replayed run is not the player's own history: keep it out of the roll log
       if (watchSpeed.current !== null) return;
@@ -150,6 +153,7 @@ export function Simulator(props: SimulatorInternalProps) {
     startEquity,
     anim,
     speedRef: watchSpeed,
+    announce,
     baseSpeed: () => settingsRef.current.speed,
   });
   const watching = watcher.watch !== null;
@@ -450,7 +454,10 @@ export function Simulator(props: SimulatorInternalProps) {
         }
       }}
       onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
+        if (e.key === 'Escape' && watching) {
+          e.preventDefault();
+          watcher.exit();
+        } else if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
           e.preventDefault();
           demo.skip();
         } else if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {

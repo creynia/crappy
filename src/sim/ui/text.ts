@@ -390,8 +390,10 @@ export function workingCopy(c: WorkingCopyInput): string | undefined {
   const def = BET_TYPES[c.type];
   if (def.category === 'lay' || def.category === 'big') return undefined;
   const oddsCopy =
-    'Odds have no house edge, so ON costs nothing on average. A come-out 7 would lose the odds while the come bet wins.';
-  if (c.type === 'come-odds' || c.perRollCents === 0) return oddsCopy;
+    "Odds have no house edge, so ON costs nothing on average. If they're ON, a come-out 7 loses them along with the come bet; OFF, they'd be returned.";
+  const isOdds = c.type === 'come-odds' || c.type === 'dont-come-odds';
+  if (isOdds) return oddsCopy;
+  if (c.perRollCents === 0) return undefined;
   if (c.vigSunk) {
     return c.on
       ? 'The vig is already paid, so keeping it working costs nothing more.'

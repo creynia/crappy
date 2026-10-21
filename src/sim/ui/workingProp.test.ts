@@ -59,7 +59,9 @@ describe('workingProp copy', () => {
     });
     const p = workingProp(g, betOf(g, 'come-odds'), 100);
     expect(p.copy).toContain('Odds have no house edge, so ON costs nothing on average.');
+    expect(p.copy).toContain('a come-out 7 loses them along with the come bet');
     expect(p.copy).not.toContain('$0.00');
+    expect(p.copy).not.toContain('come bet wins');
   });
 
   it('a lay bet gets no reason, since it wins on the 7', () => {

@@ -28,6 +28,9 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { useWatchReplay } from './useWatchReplay';
+import { WatchControls } from './WatchControls';
+import type { Speed } from './animation';
 import './sim.css';
 import './simulator.css';
 
@@ -77,7 +80,12 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
-  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast, announce);
+  const watchSpeed = useRef<Speed | null>(null);
+  const anim = useAnimationPlayer(
+    () => watchSpeed.current ?? settingsRef.current.speed,
+    pushToast,
+    announce,
+  );
   const { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction } = useGameCore({
     boot,
     sceneRef,
@@ -90,6 +98,16 @@ export function Simulator(props: SimulatorInternalProps) {
     onRolled: anim.run,
   });
 
+  const watcher = useWatchReplay({
+    coreRef,
+    setCore,
+    startEquity,
+    anim,
+    speedRef: watchSpeed,
+    baseSpeed: () => settingsRef.current.speed,
+  });
+  const watching = watcher.watch !== null;
+
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
   const step = currentStep(scene, rt);
@@ -101,7 +119,7 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
   useSandboxPersist(
-    sandbox && !guided ? props.persistKey : undefined,
+    sandbox && !guided && !watching ? props.persistKey : undefined,
     scene,
     settings,
     liveGame,
@@ -140,7 +158,7 @@ export function Simulator(props: SimulatorInternalProps) {
   }, [scene, rt]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
-  const lock = rollLock(scene, rt, liveGame);
+  const lock = watching ? 'Watching a replay: exit to play.' : rollLock(scene, rt, liveGame);
 
   const roll = () => {
     if (anim.busy || sheet || lock) return;
@@ -251,7 +269,7 @@ export function Simulator(props: SimulatorInternalProps) {
       data-testid="simulator"
       data-mode={mode}
       onClickCapture={(e) => {
-        if (anim.playing()) {
+        if (anim.playing() && !(e.target as Element | null)?.closest?.('.sim-watch')) {
           e.preventDefault();
           e.stopPropagation();
           anim.skip();
@@ -265,9 +283,20 @@ export function Simulator(props: SimulatorInternalProps) {
       }}
     >
       {landscape ? null : stepEl}
+      {watcher.watch ? (
+        <WatchControls
+          watch={watcher.watch}
+          busy={anim.busy}
+          onToggle={watcher.toggle}
+          onStep={watcher.step}
+          onScrub={watcher.scrub}
+          onSpeed={watcher.setSpeed}
+          onExit={watcher.exit}
+        />
+      ) : null}
 
       <div class="sim-main">
-        <div class="sim-felt">
+        <div class="sim-felt" {...(watching ? { inert: true } : {})}>
           {!landscape ? status(false) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (
@@ -326,6 +355,11 @@ export function Simulator(props: SimulatorInternalProps) {
           rollsPerHour={settings.rollsPerHour}
           emit={emit}
           feedInput={feedInput}
+          onWatch={(cfg) => {
+            sh.setSheet(null);
+            setAutoOpen(false);
+            watcher.start(cfg);
+          }}
         />
       ) : null}
 

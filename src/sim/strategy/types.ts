@@ -54,7 +54,15 @@ export interface Strategy {
   decide(state: GameState, spec: StrategySpec): Action[];
 }
 
+/** One recorded roll: the actions the strategy took before it, and the dice that came up. */
+export interface SessionLogEntry {
+  actions: Action[];
+  dice: readonly [number, number];
+}
+
 export interface SessionConfig {
+  /** Record every roll's actions and dice in `SessionResult.log` (for watch/replay). Off by default. */
+  record?: boolean;
   strategy: StrategySpec;
   rolls: number;
   seed: number;
@@ -71,6 +79,8 @@ export interface SessionConfig {
   stopLoss?: Cents;
 }
 export interface SessionResult {
+  /** One entry per roll played, only when `SessionConfig.record` was set. */
+  log?: SessionLogEntry[];
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss

@@ -113,6 +113,24 @@ test.describe('sandbox', () => {
     await guard.check('auto-roll-done');
   });
 
+  test('watch mode replays an auto-roll run on the table', async ({ page }) => {
+    await page.goto('/#/play?speed=fast');
+    await page.getByRole('button', { name: 'Auto-roll', exact: true }).click();
+    const panel = page.locator('.sim-auto');
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await panel.getByRole('button', { name: 'Watch on the table' }).click();
+    const watch = page.getByTestId('watch-controls');
+    await expect(watch).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Roll/ })).toBeDisabled();
+    if (process.env.SHOT)
+      await page.screenshot({ path: `${process.env.SHOT}-${test.info().project.name}.png` });
+    await watch.getByRole('button', { name: '16x' }).click();
+    await expect(watch).toContainText('Finished', { timeout: 20_000 });
+    await watch.getByRole('button', { name: 'Exit' }).click();
+    await expect(watch).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Roll/ })).toBeEnabled();
+  });
+
   test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

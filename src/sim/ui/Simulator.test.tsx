@@ -185,3 +185,50 @@ describe('Simulator roll announcements', () => {
     expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
   });
 });
+
+describe('watch mode', () => {
+  it('replays a recorded run on the table, ends at the run result, and exit restores the table', async () => {
+    const { container } = render(<Simulator initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="auto-roll-summary"]')).not.toBeNull(),
+    );
+    const rowFinal = [...container.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')]
+      .find((r) => r.textContent?.startsWith('Final bankroll'))!
+      .querySelector('td')!.textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    const controls = () => container.querySelector('[data-testid="watch-controls"]');
+    await waitFor(() => expect(controls()).not.toBeNull());
+    // the table is locked while watching
+    expect(container.querySelector('.sim-lock')!.textContent).toContain('replay');
+    fireEvent.click(screen.getByRole('button', { name: '16x' }));
+    await waitFor(() => expect(controls()!.textContent).toContain('Finished'), { timeout: 15_000 });
+    expect(controls()!.textContent).toContain('roll 100 of 100');
+    // the status bar bankroll equals the run's final bankroll (cents-exact money string)
+    expect(controls()!.textContent.replace(/,/g, '')).toContain(
+      rowFinal.replace(/[,.]00$/, '').replace(/,/g, ''),
+    );
+    fireEvent.click(screen.getByTestId('watch-exit'));
+    await waitFor(() => expect(controls()).toBeNull());
+    expect(container.querySelector('.sim-lock')).toBeNull();
+  });
+
+  it('scrubbing jumps to a roll and pauses', async () => {
+    const { container } = render(<Simulator initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
+    await waitFor(() => expect(container.querySelector('.sim-autoroll')).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-roll 100/ }));
+    await waitFor(() => screen.getByRole('button', { name: 'Watch on the table' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
+    await waitFor(() => screen.getByLabelText('Scrub the replay'));
+    fireEvent.input(screen.getByLabelText('Scrub the replay'), { target: { value: '40' } });
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')!.textContent).toContain(
+        'roll 40 of 100',
+      ),
+    );
+    expect(screen.getByTestId('watch-toggle').textContent).toBe('Play');
+  });
+});

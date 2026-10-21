@@ -446,3 +446,36 @@
 .sim-sweep-table td {
   padding: 4px 3px;
 }
+
+/* watch mode: replay controls above the table */
+.sim-watch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--sim-border);
+  border-radius: 10px;
+  background: var(--sim-surface-2);
+}
+.sim-watch-status {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.sim-watch-scrub input {
+  width: 100%;
+  min-height: 32px;
+}
+.sim-watch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.sim-watch-speeds {
+  display: inline-flex;
+  gap: 4px;
+}
+.sim-watch [aria-pressed='true'] {
+  background: var(--sim-accent, #0b6b3a);
+  color: #fff;
+}

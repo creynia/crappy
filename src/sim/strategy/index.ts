@@ -5,6 +5,7 @@ import type { StrategyMetrics, StrategySpec } from './types';
 
 export * from './types';
 export { oddsMultiplePerDecision };
+export { replayRoll, replayStart, replayTo } from './replay';
 export { getStrategy, listStrategies } from './presets';
 export {
   simulateSession,

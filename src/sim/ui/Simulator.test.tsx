@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
-import { afterEach, describe, expect, it } from 'vitest';
-import { Simulator } from '../index';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
 import { askFeedback } from './StepPanel';
 import { buildEvFacts } from './text';
@@ -127,6 +127,26 @@ describe('auto-roll compare scene', () => {
   });
 });
 
+describe('challenge scene panel (I030)', () => {
+  it('has no Restart while the challenge runs and is labelled Challenge', () => {
+    render(<Simulator scene={challengeScene({ seed: 1, rolls: 3 })} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Challenge' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+  });
+  it('a lesson scene still offers Restart under the default label', () => {
+    const lesson: SceneConfig = {
+      id: 'l',
+      version: 1,
+      steps: [{ id: 's', text: 'Roll once.', completeWhen: { rolls: 1 } }],
+    };
+    render(<Simulator scene={lesson} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Lesson step' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeTruthy();
+  });
+});
+
 describe('auto-roll sweep scene', () => {
   const scene: SceneConfig = {
     id: 'sw',
@@ -187,6 +207,156 @@ describe('Simulator roll announcements', () => {
   });
 });
 
+describe('demo steps', () => {
+  const scene: SceneConfig = {
+    id: 'demo',
+    version: 1,
+    bankroll: 50_000,
+    phase: 'point',
+    point: 6,
+    bets: [{ type: 'pass-line', amount: 1000 }],
+    steps: [
+      {
+        id: 'watch',
+        text: 'Watch the dealer',
+        completeWhen: { acknowledged: true },
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'A Come bet' },
+          { action: { type: 'roll', dice: [5, 4] } },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 } },
+          { action: { type: 'roll', dice: [3, 6] } },
+        ],
+      },
+    ],
+  };
+  const confirmed = (events: SimulatorEvent[]) =>
+    events.filter((e) => e.type === 'action-confirmed').length;
+
+  it('at instant speed plays every scripted action as soon as the step starts', async () => {
+    const events: SimulatorEvent[] = [];
+    render(<Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy();
+  });
+
+  it('Replay restores the starting state and plays the same script again', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    const finalText = container.querySelector('.sim-status-money')!.textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    expect(container.querySelector('.sim-status-money')!.textContent).toBe(finalText);
+  });
+
+  const narrated: SceneConfig = {
+    ...scene,
+    steps: [
+      {
+        ...scene.steps![0]!,
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'First line' },
+          { action: { type: 'roll', dice: [5, 4] }, say: 'Second line' },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'Third line' },
+          { action: { type: 'roll', dice: [3, 6] }, say: 'Fourth line' },
+        ],
+      },
+    ],
+  };
+
+  it('shows every caption in the step panel and announces the narration once, even at instant speed', async () => {
+    const { container } = render(<Simulator scene={narrated} initialSettings={instant} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy(),
+    );
+    const list = screen.getByRole('list', { name: 'What happens in the demo' });
+    expect(Array.from(list.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+      'First line',
+      'Second line',
+      'Third line',
+      'Fourth line',
+    ]);
+    const live = container.querySelector('[data-testid="roll-announcer"]')!.textContent;
+    expect(live).toContain('First line');
+    expect(live).toContain('Fourth line');
+  });
+
+  it('scripted rolls stay out of the roll log, and a replay does not duplicate anything', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator scene={narrated} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
+    expect(screen.getByText(/No rolls yet/)).toBeTruthy();
+  });
+
+  it('a tap while the last roll is still animating skips that animation and ends the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            { ...scene.steps![0]!, play: [{ action: { type: 'roll', dice: [5, 4] }, pauseMs: 0 }] },
+          ],
+        }}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(1)); // every frame is out; the roll animates
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).toBeNull();
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+
+  it('a refused scripted action stops the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            {
+              ...scene.steps![0]!,
+              play: [
+                { action: { type: 'place-bet', betType: 'pass-line', amount: 1000 } }, // not legal on a point
+                { action: { type: 'roll', dice: [5, 4] } },
+              ],
+            },
+          ],
+        }}
+        initialSettings={instant}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(events.some((e) => e.type === 'action-rejected')).toBe(true));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(0);
+  });
+
+  it('a tap skips to the end state while a slower demo is playing', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={scene}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBeGreaterThanOrEqual(1));
+    expect(confirmed(events)).toBeLessThan(4); // paused between frames
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(confirmed(events)).toBe(4);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+});
+
 describe('ask step announcer', () => {
   const scene: SceneConfig = {
     id: 'ask',
@@ -218,5 +388,60 @@ describe('ask step announcer', () => {
     expect(events.filter((e) => e.type === 'step-answered')).toHaveLength(2);
     // focus moved on to the unlocked Roll button
     await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
+  });
+});
+
+describe('share link RNG position across Reset and reload (I071 review)', () => {
+  const shared: string[] = [];
+  beforeEach(() => {
+    shared.length = 0;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t: string) => Promise.resolve(void shared.push(t)) },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    localStorage.clear();
+  });
+  const share = async () => {
+    // the Menu tab toggles: open the menu only when it is closed
+    if (!screen.queryByRole('button', { name: 'Share table' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share table' }));
+    await waitFor(() => expect(shared.length).toBeGreaterThan(0));
+    return shared[shared.length - 1]!;
+  };
+  const skipOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('skip');
+  const seedOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('seed');
+
+  it('Reset bankroll starts a fresh seed with nothing drawn: no stale skip', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    render(<Simulator mode="sandbox" initialSettings={instant} />);
+    const first = await share();
+    expect(seedOf(first)).toBe('7');
+    expect(skipOf(first)).toBe('5');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset bankroll' }));
+    const after = await share();
+    expect(seedOf(after)).not.toBe('7');
+    expect(skipOf(after)).toBeNull();
+    location.hash = '';
+  });
+
+  it('a reload restores the saved sandbox with its draw count', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    const key = 'crappy:test-sandbox';
+    const first = render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(screen.getByTestId('roll-announcer').textContent).not.toBe(''));
+    expect(skipOf(await share())).toBe('6');
+    first.unmount();
+    // the next visit has no link params: the saved table comes back, one roll in
+    location.hash = '#/play';
+    await waitFor(() => expect(localStorage.length).toBeGreaterThan(0));
+    render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    expect(skipOf(await share())).toBe('6');
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(skipOf(shared[shared.length - 1]!)).toBe('6'));
+    expect(skipOf(await share())).toBe('7');
+    location.hash = '';
   });
 });

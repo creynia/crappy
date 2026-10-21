@@ -98,6 +98,14 @@ export interface PersistedV2 {
   settings: Settings;
   /** keyed by drill id */
   practice: Record<string, DrillProgress>;
+  /** Challenge mode (I030): best score so far and sessions finished; absent until one is played */
+  challenge?: ChallengeRecord;
+}
+
+/** Challenge mode (I030): best score so far (lower is better) and how many sessions were finished. */
+export interface ChallengeRecord {
+  played: number;
+  best?: { score: number; band: string; at: number; seed: number };
 }
 
 /** The current persisted shape (kept as an alias so older imports keep working). */
@@ -236,12 +244,29 @@ export function sanitize(input: unknown): Persisted | null {
       lessons[id] = p;
     }
   }
-  return {
+  const out: PersistedV2 = {
     version: 2,
     lessons,
     settings: sanitizeSettings(raw.settings),
     practice: sanitizePractice(raw.practice),
   };
+  const ch = sanitizeChallenge(raw.challenge);
+  if (ch) out.challenge = ch;
+  return out;
+}
+
+function sanitizeChallenge(raw: unknown): ChallengeRecord | null {
+  if (!isObj(raw)) return null;
+  const played = Math.max(0, Math.floor(num(raw.played) ?? 0));
+  const rec: ChallengeRecord = { played };
+  if (isObj(raw.best)) {
+    const score = num(raw.best.score);
+    const at = num(raw.best.at);
+    const seed = num(raw.best.seed);
+    if (score !== undefined && score >= 0 && typeof raw.best.band === 'string')
+      rec.best = { score, band: raw.best.band, at: at ?? 0, seed: seed ?? 0 };
+  }
+  return rec;
 }
 
 function sanitizePractice(raw: unknown): Record<string, DrillProgress> {

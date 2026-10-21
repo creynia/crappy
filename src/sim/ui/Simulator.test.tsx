@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
 import { askFeedback } from './StepPanel';
@@ -435,6 +435,150 @@ describe('ask step announcer', () => {
     expect(events.filter((e) => e.type === 'step-answered')).toHaveLength(2);
     // focus moved on to the unlocked Roll button
     await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
+  });
+});
+
+describe('sandbox panel sheet (I064)', () => {
+  const openSandbox = () => render(<Simulator mode="sandbox" initialSettings={instant} />);
+
+  it('shows one panel at a time in a dialog with tabs', () => {
+    const { container } = openSandbox();
+    expect(container.querySelector('[data-testid="panel-sheet"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('.sim-session-panel')).not.toBeNull();
+    expect(dialog.querySelector('.sim-menu')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Menu' }));
+    expect(screen.getByRole('dialog').querySelector('.sim-menu')).not.toBeNull();
+    expect(screen.getByRole('dialog').querySelector('.sim-session-panel')).toBeNull();
+    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    // the tab row reflects the single open panel
+    expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Session' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+  });
+
+  it('Escape closes the sheet and hands focus back to the tab that opened it', () => {
+    openSandbox();
+    const tab = screen.getByRole('button', { name: 'Session' });
+    tab.focus();
+    fireEvent.click(tab);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(tab);
+  });
+
+  it('Tab from the revealed heading stays inside the sheet, and Escape works after tabbing out', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const dialog = screen.getByRole('dialog');
+    const heading = dialog.querySelector<HTMLElement>('.sim-session-panel h3')!;
+    heading.tabIndex = -1;
+    heading.focus();
+    expect(document.activeElement).toBe(heading);
+    fireEvent.keyDown(heading, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.getAttribute('role')).not.toBe('dialog');
+    // focus that escaped (e.g. a mouse click on the table) is pulled back on the next Tab
+    const roll = screen.getByRole('button', { name: /^Roll/ });
+    roll.focus();
+    fireEvent.keyDown(roll, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    roll.focus();
+    fireEvent.keyDown(roll, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('tabs use roving tabindex and arrow keys', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const session = screen.getByRole('tab', { name: 'Session' });
+    const log = screen.getByRole('tab', { name: 'Log' });
+    expect(session.getAttribute('tabindex')).toBe('0');
+    expect(log.getAttribute('tabindex')).toBe('-1');
+    expect(session.getAttribute('aria-controls')).toBe(
+      screen.getByRole('tabpanel').getAttribute('id'),
+    );
+    fireEvent.keyDown(session, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'Log' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('dialog').querySelector('.sim-roll-log')).not.toBeNull();
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Table panels');
+  });
+
+  it('arrow keys keep focus on the tab strip: switching a panel does not move focus', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const session = screen.getByRole('tab', { name: 'Session' });
+    session.focus();
+    fireEvent.keyDown(session, { key: 'ArrowRight' });
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(document.activeElement?.textContent).toBe('Log');
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(document.activeElement?.textContent).toBe('Menu');
+    expect(screen.getByRole('dialog').querySelector('.sim-menu')).not.toBeNull();
+  });
+
+  it('a bet sheet opened over the panel owns Escape and Tab', () => {
+    const { container } = openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    fireEvent.click(container.querySelector('[data-region="pass"]')!);
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(2);
+    const bet = dialogs.find((d) => d.textContent?.includes('house edge'))!;
+    const confirm = screen.getByRole('button', { name: 'Confirm' });
+    confirm.focus();
+    fireEvent.keyDown(confirm, { key: 'Tab' });
+    expect(bet.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(confirm, { key: 'Escape' });
+    // the bet sheet closed; the panel sheet is still open
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog').querySelector('.sim-session-panel')).not.toBeNull();
+  });
+
+  it('a short drag on the handle is not a tap: the sheet stays', () => {
+    // happy-dom reports landscape by default; the handle only exists on the portrait sheet
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (q: string) =>
+        ({
+          matches: false,
+          media: q,
+          addEventListener() {},
+          removeEventListener() {},
+        }) as unknown as MediaQueryList,
+    );
+    try {
+      openSandbox();
+    } finally {
+      mm.mockRestore();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const handle = screen.getByRole('button', { name: /Close panel \(drag/ });
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientY: 120, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientY: 120, pointerId: 1 });
+    fireEvent.click(handle);
+    expect(screen.queryByRole('dialog')).not.toBeNull();
+    fireEvent.click(handle); // a plain tap closes
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('traps Tab inside the sheet and keeps the dice reachable', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const last = focusable[focusable.length - 1]!;
+    last.focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+    expect(screen.getByRole('button', { name: 'Throw the dice' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
 

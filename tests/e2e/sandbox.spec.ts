@@ -481,7 +481,7 @@ test.describe('sandbox flows', () => {
 
   test('panel sheet: tabs switch panels, Escape restores focus, the handle drags it away', async ({
     page,
-  }, testInfo) => {
+  }) => {
     await page.goto(url('seed=1'));
     const sessionTab = page.getByRole('button', { name: 'Session', exact: true });
     await sessionTab.click();
@@ -499,9 +499,16 @@ test.describe('sandbox flows', () => {
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(sessionTab).toBeFocused(); // back to the control that opened the sheet
-    if (testInfo.project.name === 'phone-landscape') return; // side panel: no drag handle
     await sessionTab.click();
+    await expect(sheet).toBeVisible();
     const handle = sheet.getByRole('button', { name: /Close panel \(drag/ });
+    if ((await handle.count()) === 0) {
+      // landscape viewports (phone-landscape, desktop): a side panel with no drag handle
+      await expect(page.locator('.sim-sheet-panel .sim-panel-sheet')).toBeVisible();
+      await sheet.getByRole('button', { name: 'Close panel' }).click();
+      await expect(sheet).toHaveCount(0);
+      return;
+    }
     const box = (await handle.boundingBox())!;
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;

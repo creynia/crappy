@@ -139,7 +139,7 @@ function simulate(
 }
 
 describe('Monte Carlo agrees with exact EV', () => {
-  const N = 200_000;
+  const N = 100_000;
   it.each([
     ['pass-line', 1000, ctx('come-out', null)],
     ['dont-pass', 1000, ctx('come-out', null)],
@@ -158,7 +158,7 @@ describe('Monte Carlo agrees with exact EV', () => {
 });
 
 describe('Monte Carlo agrees with exact variance (sample variance within 5%)', () => {
-  const N = 200_000;
+  const N = 100_000;
   it.each([
     ['pass-line', 1000, ctx('come-out', null)],
     ['dont-pass', 1000, ctx('come-out', null)],

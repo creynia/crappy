@@ -15,15 +15,27 @@ export function betEV(bet: BetLike, ctx: BetCtx): Fraction {
   return d.rows.reduce((acc, r) => add(acc, mul(r.probability, r.net)), ZERO);
 }
 
+/** EV and variance of rows {p, net}: Var = sum(p * net^2) - EV^2. */
+function moments(rows: readonly { p: Fraction; net: Fraction }[]): {
+  ev: Fraction;
+  variance: Fraction;
+} {
+  let ev = ZERO;
+  let m2 = ZERO;
+  for (const r of rows) {
+    ev = add(ev, mul(r.p, r.net));
+    m2 = add(m2, mul(r.p, mul(r.net, r.net)));
+  }
+  return { ev, variance: sub(m2, mul(ev, ev)) };
+}
+
 /**
  * Variance of the bet's net result, cents^2 (conditioned on the bet resolving, exactly like betEV).
  * Var = sum(p * net^2) - EV^2 over the same distribution rows.
  */
 export function betVariance(bet: BetLike, ctx: BetCtx): Fraction {
   const d = distributionFor(bet, ctx);
-  const ev = d.rows.reduce((acc, r) => add(acc, mul(r.probability, r.net)), ZERO);
-  const m2 = d.rows.reduce((acc, r) => add(acc, mul(r.probability, mul(r.net, r.net))), ZERO);
-  return sub(m2, mul(ev, ev));
+  return moments(d.rows.map((r) => ({ p: r.probability, net: r.net }))).variance;
 }
 
 /** Standard deviation of the bet's net result, cents (sqrt of betVariance). */
@@ -32,23 +44,24 @@ export function betStdDev(bet: BetLike, ctx: BetCtx): number {
 }
 
 /**
- * Variance per ROLL, cents^2, for a one-roll bet: every roll either resolves the bet
- * (probability ways/36) or leaves it alone (net 0). Unlike betVariance this includes the
- * non-resolving rolls, so it is the variance of what one roll does to the bet.
- * Throws for bets that span several rolls (line / come / odds-with-travel rows).
+ * Variance per ROLL, cents^2: every roll either resolves the bet (probability ways/36) or
+ * leaves it alone (net 0). Unlike betVariance this includes the non-resolving rolls, so it is
+ * the variance of what one roll does to the bet.
+ * Defined whenever the bet's current state resolves (or not) on a single roll: one-roll bets and
+ * standing bets (place, buy/lay, hardways, odds, line/come on a point). Throws when the rows chain
+ * over several rolls (line/come bets before a point is set).
  */
 export function perRollVariance(bet: BetLike, ctx: BetCtx): Fraction {
   const d = distributionFor(bet, ctx);
-  if (!d.rows.every((r) => r.ways !== undefined)) {
-    throw new Error(`perRollVariance is only defined for one-roll bets (${bet.type})`);
-  }
-  const perRoll = (w: number) => frac(w, 36);
-  const ev = d.rows.reduce((acc, r) => add(acc, mul(perRoll(r.ways ?? 0), r.net)), ZERO);
-  const m2 = d.rows.reduce(
-    (acc, r) => add(acc, mul(perRoll(r.ways ?? 0), mul(r.net, r.net))),
-    ZERO,
-  );
-  return sub(m2, mul(ev, ev));
+  const rows = d.rows.map((r) => {
+    if (r.ways === undefined) {
+      throw new Error(
+        `perRollVariance needs a single-roll bet, but ${bet.type} spans several rolls`,
+      );
+    }
+    return { p: frac(r.ways, 36), net: r.net };
+  });
+  return moments(rows).variance;
 }
 
 /** Edge of any bet in its situation (bet.point is honoured for odds / travelled come bets). */

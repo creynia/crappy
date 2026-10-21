@@ -196,6 +196,14 @@ describe('exact variance (cents^2; $1 = 10000)', () => {
     same(perRollVariance({ type: 'any-7', amount: 100, point: null }, c), frac(312500, 9));
   });
 
+  it('perRollVariance on pass-line with point 6, $1: 246875/81 cents^2', () => {
+    // per roll: win 5/36 (+100c), lose 6/36 (-100c), else 0 -> E = -100/36, Var = 11/36*10^4 - (100/36)^2
+    same(
+      perRollVariance({ type: 'pass-line', amount: 100, point: 6 }, onPoint(6)),
+      frac(246875, 81),
+    );
+  });
+
   it('perRollVariance counts the non-resolving rolls as zero: place-6 $6 = 16595/1296 dollars^2', () => {
     same(
       perRollVariance({ type: 'place-6', amount: 600, point: null }, onPoint(6)),
@@ -203,7 +211,7 @@ describe('exact variance (cents^2; $1 = 10000)', () => {
     );
   });
 
-  it('perRollVariance rejects multi-roll bets', () => {
+  it('rejects come-out line bets', () => {
     expect(() =>
       perRollVariance(
         { type: 'pass-line', amount: 100, point: null },
@@ -213,6 +221,6 @@ describe('exact variance (cents^2; $1 = 10000)', () => {
           rules: DEFAULT_RULES,
         },
       ),
-    ).toThrow(/one-roll/);
+    ).toThrow(/several rolls/);
   });
 });

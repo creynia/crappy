@@ -375,3 +375,25 @@ describe('AutoRollPanel bankroll controls', () => {
     expect(peekEdgeFunnelSigma(spec, 'odds-100x')).toBeUndefined();
   });
 });
+
+describe('AutoRollPanel bankroll warning (I057)', () => {
+  const config = (unit: number) => ({
+    strategies: ['pass-max-odds' as const],
+    defaultStrategy: { id: 'pass-max-odds' as const, unit },
+    rollOptions: [100],
+    sessions: [1],
+  });
+
+  it('warns when a $100 max-odds unit is more than a quarter of a $500 bankroll', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(10_000)} />, el);
+    const note = el.querySelector('[data-testid="bankroll-warning"]');
+    expect(note?.textContent).toContain('expect a high bust rate');
+  });
+
+  it('does not warn for a $10 max-odds unit on $500', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config(1_000)} />, el);
+    expect(el.querySelector('[data-testid="bankroll-warning"]')).toBeNull();
+  });
+});

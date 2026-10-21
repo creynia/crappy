@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bustRateAt,
+  planStopLossRate,
   planExpectedLoss,
   planRisk,
   planRolls,
@@ -58,9 +59,21 @@ describe('session plan', () => {
     expect(await bustRateAt(input, Math.max(1000, s.bankroll! - s.step), sync)).toBeGreaterThan(
       0.05,
     );
-    // fresh seeds: still about 5% (Monte Carlo tolerance)
-    const fresh = await bustRateAt(input, s.bankroll!, { ...sync, seed: 9000, sessions: 400 });
-    expect(fresh).toBeLessThan(0.05 + 0.05);
+    // seeds the search never saw: the claim "under 5%" holds for the real thing, not just the sample
+    // (1500 sessions: standard error 0.6%, so 6.5% would be 2.5 sigma over; twice the target fails)
+    const fresh = await bustRateAt(input, s.bankroll!, {
+      schedule: sync.schedule,
+      seed: 7_000_000,
+      sessions: 1500,
+    });
+    expect(fresh).toBeLessThan(0.065);
+  }, 60_000);
+
+  it('a stop-loss is reached by fewer sessions the lower it is set... and never by more than go broke', async () => {
+    const hi = await planStopLossRate(input, 5_000, sync);
+    const lo = await planStopLossRate(input, 25_000, sync);
+    expect(hi).toBeGreaterThanOrEqual(lo);
+    expect(hi).toBeLessThanOrEqual(1);
   }, 60_000);
 
   it('says so when no bankroll up to the cap is enough', async () => {

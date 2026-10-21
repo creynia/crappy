@@ -25,7 +25,8 @@ test.describe('session plan', () => {
         timeout: 80_000,
       });
       await expect(plan.getByTestId('plan-risk')).toContainText('simulated sessions');
-      await expect(plan.getByTestId('plan-stop')).toContainText('Suggested stop-loss');
+      // at $100 the stop would be the whole bankroll, so none is suggested
+      await expect(plan.getByTestId('plan-stop')).toHaveCount(0);
       const overflow = await page
         .locator('html')
         .evaluate(

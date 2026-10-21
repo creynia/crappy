@@ -5,6 +5,7 @@ import {
   listStrategies,
   planExpectedLoss,
   planRisk,
+  planStopLossRate,
   suggestBankroll,
   suggestStopLoss,
 } from '../strategy';
@@ -46,6 +47,7 @@ export function PlanPanel(props: PlanPanelProps) {
   const [hours, setHours] = useState(4);
   const [risk, setRisk] = useState<PlanRisk | null>(null);
   const [suggestion, setSuggestion] = useState<BankrollSuggestion | null>(null);
+  const [stopRate, setStopRate] = useState<number | null>(null);
   const [progress, setProgress] = useState<number | null>(0);
 
   const effUnit = unitOptions.includes(unit) ? unit : unitOptions[0]!;
@@ -56,7 +58,10 @@ export function PlanPanel(props: PlanPanelProps) {
     rollsPerHour,
     rules: props.rules ?? 'standard-vegas',
   };
-  const instant = planExpectedLoss(input);
+  const instant = useMemo(
+    () => planExpectedLoss(input),
+    [strategyId, effUnit, hours, rollsPerHour, props.rules],
+  );
   const name = strategies.find((s) => s.id === strategyId)?.name ?? strategyId;
 
   // Instant numbers above; the simulated ones follow. Any change aborts the run in flight.
@@ -64,6 +69,7 @@ export function PlanPanel(props: PlanPanelProps) {
     const ac = new AbortController();
     setRisk(null);
     setSuggestion(null);
+    setStopRate(null);
     setProgress(0);
     const h = setTimeout(() => {
       const opts = {
@@ -75,6 +81,9 @@ export function PlanPanel(props: PlanPanelProps) {
           const r = await planRisk(input, { ...opts, onProgress: (p) => setProgress(p * 0.5) });
           setRisk(r);
           setProgress(0.5);
+          const stop = suggestStopLoss(r, instant.expectedLoss, bankroll);
+          // a stop-loss at the whole bankroll is just "going broke": nothing to measure
+          if (stop < bankroll) setStopRate(await planStopLossRate(input, stop, opts));
           if (r.bustRate > 0.05) {
             const s = await suggestBankroll(input, opts);
             setSuggestion(s);
@@ -103,7 +112,14 @@ export function PlanPanel(props: PlanPanelProps) {
     </button>
   );
   const longName = `${fmtMoney(effUnit)} ${name.toLowerCase()}`;
+  const finished = progress === null;
   const stop = risk ? suggestStopLoss(risk, instant.expectedLoss, bankroll) : null;
+  const stopText =
+    stopRate === null
+      ? ''
+      : stopRate < 0.005
+        ? 'Very few sessions like this would reach it.'
+        : `About 1 in ${Math.max(1, Math.round(1 / stopRate))} sessions like this reach it before the end.`;
 
   return (
     <section class="sim-plan" aria-label="Session plan" data-testid="plan-panel">
@@ -136,11 +152,12 @@ export function PlanPanel(props: PlanPanelProps) {
         )}
       </div>
 
-      <div class="sim-plan-out" aria-live="polite" data-testid="plan-output">
+      <div class="sim-plan-out" data-testid="plan-output">
         <p data-testid="plan-expected">
-          The price of this session: about <strong>{fmtMoney(instant.expectedLoss)}</strong> in
-          expected loss over {instant.rolls.toLocaleString('en-US')} rolls ({hours} h at{' '}
-          {rollsPerHour} rolls an hour). Think of it as what the entertainment costs.
+          If you play the full session, the price is about{' '}
+          <strong>{fmtMoney(instant.expectedLoss)}</strong> in expected loss over{' '}
+          {instant.rolls.toLocaleString('en-US')} rolls ({hours} h at {rollsPerHour} rolls an hour).
+          Think of it as what the entertainment costs.
         </p>
         {risk ? (
           <>
@@ -157,10 +174,9 @@ export function PlanPanel(props: PlanPanelProps) {
                 one (1 in 10) ends {fmtMoney(risk.p90, { sign: true })}
               </li>
             </ul>
-            {stop !== null && (
+            {stop !== null && stop < bankroll && stopRate !== null && (
               <p data-testid="plan-stop">
-                Suggested stop-loss: <strong>{fmtMoney(stop)}</strong>. Walking away at that point
-                would end about the worst 1 in 10 sessions early.
+                Suggested stop-loss: <strong>{fmtMoney(stop)}</strong>. {stopText}
               </p>
             )}
             {risk.bustRate <= 0.05 ? (
@@ -190,6 +206,14 @@ export function PlanPanel(props: PlanPanelProps) {
             {progress !== null && <progress value={progress} max={1} aria-label="Plan progress" />}
           </p>
         )}
+        {finished && risk ? (
+          <p class="sim-sr" role="status" data-testid="plan-live">
+            Plan ready. {pct(risk.bustRate)} of simulated {hours}-hour sessions go broke.
+            {suggestion?.bankroll != null
+              ? ` ${fmtMoney(suggestion.bankroll)} gets that under 5%.`
+              : ''}
+          </p>
+        ) : null}
         <p class="sim-ar-desc">
           Simulated with the same dice for every bankroll, so the numbers are repeatable. This is an
           estimate, not a promise.

@@ -134,7 +134,7 @@ export function bustRateAt(
 export interface BankrollSuggestion {
   /** a bankroll found with bust probability at or under the target, within `step` of the smallest such; null when none up to the cap */
   bankroll: Cents | null;
-  /** bust probability at that bankroll (first `searchSessions` of the plan's seeds) */
+  /** bust probability at that bankroll, measured on a fresh, independent set of seeds */
   bustRate: number;
   target: number;
   /** the largest bankroll tried, when none worked */
@@ -152,7 +152,11 @@ export interface BankrollSuggestion {
  */
 export async function suggestBankroll(
   input: PlanInput,
-  opts: PlanOptions & { capMultiple?: number; searchSessions?: number } = {},
+  opts: PlanOptions & {
+    capMultiple?: number;
+    searchSessions?: number;
+    verifySessions?: number;
+  } = {},
 ): Promise<BankrollSuggestion> {
   const target = opts.targetBust ?? 0.05;
   const unit = input.strategy.unit;
@@ -164,7 +168,7 @@ export async function suggestBankroll(
     if (v === undefined) {
       v = await bustRateAt(input, b, {
         ...opts,
-        sessions: opts.searchSessions ?? Math.min(opts.sessions ?? PLAN_SESSIONS, 250),
+        sessions: opts.searchSessions ?? Math.min(opts.sessions ?? PLAN_SESSIONS, 150),
         stopAbove: target,
       });
       cache.set(b, v);
@@ -185,7 +189,25 @@ export async function suggestBankroll(
     if ((await at(mid)) > target) lo = mid;
     else hi = mid;
   }
-  return { bankroll: hi, bustRate: cache.get(hi)!, target, cap, step };
+  // The search picks the first candidate that looks safe on its own seeds, which flatters it. Check the
+  // winner on a larger, independent set of seeds and step up until it holds with a margin (4.5% when the
+  // target is 5%), so "gets that under 5%" is true of the real thing, not just of the sample.
+  const verifySessions = opts.verifySessions ?? 1000;
+  const margin = target * 0.9;
+  let verified = hi;
+  let vRate = 1;
+  for (let i = 0; i < 12; i++) {
+    vRate = await bustRateAt(input, verified, {
+      ...opts,
+      sessions: verifySessions,
+      seed: (opts.seed ?? PLAN_SEED) + 1_000_000,
+      stopAbove: margin,
+    });
+    if (vRate <= margin || verified >= cap) break;
+    verified = Math.min(cap, verified + step);
+  }
+  if (vRate > margin) return { bankroll: null, bustRate: vRate, target, cap: verified, step };
+  return { bankroll: verified, bustRate: vRate, target, cap, step };
 }
 
 /**
@@ -200,4 +222,32 @@ export function suggestStopLoss(
   const raw = Math.max(-risk.p10, expectedLoss, 0);
   const rounded = Math.ceil(raw / 500) * 500;
   return Math.min(Math.max(rounded, 500), bankroll);
+}
+
+/**
+ * Share of the plan's seeded sessions that would hit `stopLoss` (down by that much from the starting
+ * bankroll) before the session ends. Same seeds as `planRisk`.
+ */
+export async function planStopLossRate(
+  input: PlanInput,
+  stopLoss: Cents,
+  opts: PlanOptions = {},
+): Promise<number> {
+  const r = await simulateMany(
+    {
+      strategy: input.strategy,
+      rolls: planRolls(input.hours, input.rollsPerHour),
+      seed: opts.seed ?? PLAN_SEED,
+      bankroll: input.bankroll,
+      stopLoss,
+      ...(input.rules !== undefined ? { rules: input.rules } : {}),
+    },
+    opts.sessions ?? PLAN_SESSIONS,
+    {
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      ...(opts.schedule ? { schedule: opts.schedule } : {}),
+      ...(opts.sliceMs !== undefined ? { sliceMs: opts.sliceMs } : {}),
+    },
+  );
+  return r.stopLossRate;
 }

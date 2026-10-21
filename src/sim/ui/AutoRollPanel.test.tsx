@@ -33,7 +33,7 @@ async function waitUntil<T>(check: () => T | null | undefined | false): Promise<
 }
 
 async function waitFor(el: HTMLElement, selector: string) {
-  for (let i = 0; i < 1000 && !el.querySelector(selector); i++)
+  for (let i = 0; i < 100 && !el.querySelector(selector); i++)
     await act(async () => {
       await new Promise((r) => setTimeout(r, 30));
     });
@@ -166,7 +166,7 @@ describe('AutoRollPanel', () => {
     expect(chart.querySelector('svg desc')!.textContent).toContain('House edge');
     expect(chart.querySelector('[data-role="funnel"]')).not.toBeNull();
     expect(chart.querySelector('[data-role="house-edge"]')).not.toBeNull();
-  }, 60_000);
+  });
 
   it('scene chart: edge opens on the edge chart', async () => {
     const el = document.createElement('div');
@@ -180,7 +180,7 @@ describe('AutoRollPanel', () => {
     await click(el, '[data-testid="auto-roll-run"]');
     await waitFor(el, '[data-testid="edge-chart"]');
     expect(el.querySelector('[data-testid="edge-chart"]')).not.toBeNull();
-  }, 60_000);
+  });
 
   it('martingale-pass draws no funnel (bet size escalates)', async () => {
     const el = document.createElement('div');
@@ -200,7 +200,7 @@ describe('AutoRollPanel', () => {
     await waitFor(el, '[data-testid="edge-chart"]');
     expect(el.querySelector('[data-role="funnel"]')).toBeNull();
     expect(el.textContent).toContain('No funnel');
-  }, 60_000);
+  });
 });
 
 describe('AutoRollPanel starting bankroll', () => {
@@ -373,5 +373,5 @@ describe('AutoRollPanel bankroll controls', () => {
     const spec = { id: 'pass-max-odds' as const, unit: 1000 };
     expect(peekEdgeFunnelSigma(spec, 'standard-vegas')).toBeDefined();
     expect(peekEdgeFunnelSigma(spec, 'odds-100x')).toBeUndefined();
-  }, 60_000);
+  });
 });

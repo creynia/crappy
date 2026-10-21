@@ -32,7 +32,17 @@ describe('PlanPanel', () => {
     expect(el.querySelector('[data-testid="plan-suggest"]')!.textContent).toMatch(
       /gets that under 5%/,
     );
-    expect(el.querySelector('[data-testid="plan-stop"]')!.textContent).toMatch(/stop-loss: \$/);
+    // at $100 the sensible stop would be the whole bankroll, which is just going broke: not offered
+    expect(el.querySelector('[data-testid="plan-stop"]')).toBeNull();
+  }, 120_000);
+
+  it('with room to stop, the stop-loss says how often it is reached', async () => {
+    const el = document.createElement('div');
+    render(<PlanPanel bankroll={100_000} debounceMs={0} />, el);
+    await until(el, '[data-testid="plan-stop"]');
+    expect(el.querySelector('[data-testid="plan-stop"]')!.textContent).toMatch(
+      /Suggested stop-loss: \$[\d,]+\. (About 1 in \d+ sessions|Very few sessions)/,
+    );
   }, 120_000);
 
   it('changing an input restarts: the old result disappears and the expected loss updates', async () => {

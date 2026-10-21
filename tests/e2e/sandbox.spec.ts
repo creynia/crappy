@@ -479,6 +479,40 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
   });
 
+  test('panel sheet: tabs switch panels, Escape restores focus, the handle drags it away', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(url('seed=1'));
+    const sessionTab = page.getByRole('button', { name: 'Session', exact: true });
+    await sessionTab.click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel')).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel h3').first()).toBeFocused();
+    await sheet.getByRole('tab', { name: 'Menu' }).click();
+    await expect(sheet.locator('.sim-menu')).toBeVisible();
+    await expect(sheet.locator('.sim-session-panel')).toHaveCount(0);
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+    // the dice stay reachable from the sheet
+    await sheet.getByRole('button', { name: 'Throw the dice' }).click();
+    await expect(page.getByTestId('roll-announcer')).not.toHaveText('');
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(sessionTab).toBeFocused(); // back to the control that opened the sheet
+    if (testInfo.project.name === 'phone-landscape') return; // side panel: no drag handle
+    await sessionTab.click();
+    const handle = sheet.getByRole('button', { name: /Close panel \(drag/ });
+    const box = (await handle.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 60, { steps: 4 });
+    await page.mouse.move(x, y + 140, { steps: 4 });
+    await page.mouse.up();
+    await expect(sheet).toHaveCount(0);
+  });
+
   test('tapping the table skips the roll animation', async ({ page }) => {
     // Freeze time so only the tap can finish the roll: with the clock paused the animation timers
     // never fire, so "Roll is enabled again" proves the skip, not a fast machine.
@@ -539,10 +573,12 @@ test.describe('sandbox flows', () => {
     await clear('.sim-session-panel h3');
     await expect(session).toBeFocused();
 
-    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
-    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    // the sheet covers the tab row: switch panels with the sheet's own tabs (I064)
+    await page.getByRole('tab', { name: 'Auto-roll' }).click();
     const auto = page.locator('.sim-autoroll');
-    await expect(auto).toBeInViewport({ ratio: 0.5 });
+    // inside the sheet the panel scrolls within its own body; the tall auto-roll section cannot
+    // show half of itself in a 390px-high landscape viewport, but its top is in view and focused
+    await expect(auto).toBeInViewport();
     await expect(auto).toBeFocused();
   });
 });

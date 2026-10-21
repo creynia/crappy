@@ -379,6 +379,115 @@
   cursor: pointer;
 }
 
+/* ---------- panel sheet (Session / Auto-roll / Log / Menu) ---------- */
+.sim-sheet-backdrop.sim-panel-backdrop {
+  z-index: 40;
+  background: transparent;
+  pointer-events: none;
+}
+.sim-panel-backdrop .sim-sheet.sim-panel-sheet {
+  pointer-events: auto;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.3);
+}
+.sim-sheet.sim-panel-sheet {
+  padding: 6px 12px 16px;
+  gap: 8px;
+  border-top-color: var(--sim-border);
+  touch-action: none;
+}
+.sim-sheet-sheet .sim-sheet.sim-panel-sheet {
+  max-height: 82vh;
+}
+.sim-sheet-panel .sim-sheet.sim-panel-sheet {
+  width: min(420px, 52vw);
+  border-left-color: var(--sim-border);
+}
+.sim-panel-sheet.is-dragging {
+  transition: none;
+}
+.sim-panel-sheet .sim-panel-handle {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  height: 28px;
+  padding: 6px 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  cursor: grab;
+  touch-action: none;
+}
+.sim-panel-handle span {
+  display: block;
+  width: 44px;
+  height: 5px;
+  margin: 0 auto;
+  border-radius: 3px;
+  background: var(--sim-border);
+}
+.sim-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sim-panel-head {
+  flex-wrap: wrap;
+}
+.sim-panel-tabs {
+  display: flex;
+  gap: 6px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+.sim-panel-sheet .sim-panel-tab {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--sim-border);
+  border-radius: 999px;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  font: inherit;
+  white-space: nowrap;
+}
+.sim-panel-sheet .sim-panel-tab[aria-selected='true'] {
+  background: var(--sim-text);
+  color: var(--sim-surface);
+  border-color: var(--sim-text);
+}
+.sim-panel-sheet .sim-panel-throw,
+.sim-panel-sheet .sim-panel-close {
+  flex: 0 0 auto;
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid var(--sim-border);
+  border-radius: 10px;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+  font: inherit;
+  padding: 0 12px;
+}
+.sim-panel-throw:disabled {
+  opacity: 0.5;
+}
+.sim-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.sim-panel-body > .sim-menu,
+.sim-panel-body > .sim-session-panel,
+.sim-panel-body > .sim-roll-log,
+.sim-panel-body > .sim-auto {
+  border: 0;
+  padding: 0;
+}
+
 /* ---------- bet sheet ---------- */
 .sim-sheet-backdrop {
   position: fixed;

@@ -220,3 +220,52 @@ describe('ask step announcer', () => {
     await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
   });
 });
+
+describe('sandbox panel sheet (I064)', () => {
+  const openSandbox = () => render(<Simulator mode="sandbox" initialSettings={instant} />);
+
+  it('shows one panel at a time in a dialog with tabs', () => {
+    const { container } = openSandbox();
+    expect(container.querySelector('[data-testid="panel-sheet"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('.sim-session-panel')).not.toBeNull();
+    expect(dialog.querySelector('.sim-menu')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Menu' }));
+    expect(screen.getByRole('dialog').querySelector('.sim-menu')).not.toBeNull();
+    expect(screen.getByRole('dialog').querySelector('.sim-session-panel')).toBeNull();
+    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    // the tab row reflects the single open panel
+    expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Session' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+  });
+
+  it('Escape closes the sheet and hands focus back to the tab that opened it', () => {
+    openSandbox();
+    const tab = screen.getByRole('button', { name: 'Session' });
+    tab.focus();
+    fireEvent.click(tab);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(tab);
+  });
+
+  it('traps Tab inside the sheet and keeps the dice reachable', () => {
+    openSandbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const last = focusable[focusable.length - 1]!;
+    last.focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+    expect(screen.getByRole('button', { name: 'Throw the dice' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

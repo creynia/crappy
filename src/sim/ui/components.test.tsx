@@ -394,7 +394,7 @@ describe('RollButton, StatusBar, history, toasts', () => {
     const toasts = document.querySelector('.sim-toasts')!;
     expect(toasts.getAttribute('aria-hidden')).toBeNull();
     expect(toasts.getAttribute('aria-live')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Dismiss'));
+    fireEvent.click(screen.getByLabelText(/^Dismiss/));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });
   it('Toasts auto-dismiss', () => {

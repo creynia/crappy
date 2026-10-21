@@ -442,6 +442,7 @@ export function Simulator(props: SimulatorInternalProps) {
       toasts={toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
+      hint={oddsHintEl}
     />
   );
   const status = (compact: boolean) => (
@@ -513,13 +514,9 @@ export function Simulator(props: SimulatorInternalProps) {
               {toastsEl}
             </div>
             {controls}
-            {oddsHintEl}
           </div>
         ) : (
-          <>
-            {controls}
-            {oddsHintEl}
-          </>
+          <>{controls}</>
         )}
       </div>
 

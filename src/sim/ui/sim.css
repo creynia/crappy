@@ -969,39 +969,28 @@
 }
 
 .sim-odds-hint {
-  /* docked above the bottom tabs on phones, bottom-left on wider screens; always in the viewport */
-  position: fixed;
-  left: 8px;
-  right: 8px;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  z-index: 9;
+  /* one row inside the toast layer: text (one line, clamped) and two 44px buttons */
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
-  padding: 6px 10px;
+  gap: 6px 8px;
+  padding: 4px 8px;
   border: 1px solid var(--sim-border);
   border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   font-size: 0.85rem;
-  /* taps pass through the text to the tabs and the table; only the buttons take them */
-  pointer-events: none;
+  pointer-events: auto;
 }
 .sim-odds-hint-actions button {
   pointer-events: auto;
 }
-@media (min-width: 768px) {
-  .sim-odds-hint {
-    right: auto;
-    width: min(46vw, 420px);
-    bottom: 12px;
-  }
-}
 .sim-odds-hint p {
   margin: 0;
-  flex: 1 1 200px;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sim-odds-hint-actions {
   display: flex;
@@ -1220,16 +1209,4 @@
 .sim-call.is-right text,
 .sim-call.is-wrong text {
   fill: #fff;
-}
-
-/* landscape: the hint lives in the controls rail, so it never covers the felt */
-.sim-rail .sim-odds-hint {
-  position: static;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  width: auto;
-  box-shadow: none;
-  pointer-events: auto;
-  margin: 6px 0;
 }

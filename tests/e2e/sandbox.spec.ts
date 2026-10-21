@@ -656,13 +656,22 @@ test.describe('sandbox flows', () => {
   });
 });
 
-test('the odds nudge is inside the viewport and above the tabs, portrait and landscape', async ({
+test('the odds nudge never moves or covers Roll, the chips, the betting regions or Menu', async ({
   browser,
 }) => {
+  const box = (b: { x: number; y: number; width: number; height: number } | null) => {
+    expect(b).not.toBeNull();
+    return b!;
+  };
+  const overlaps = (
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+  ) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   for (const vp of [
     { width: 390, height: 844 },
     { width: 360, height: 640 },
     { width: 844, height: 390 },
+    { width: 667, height: 375 },
   ]) {
     // a fresh context per size: the sandbox persists its table between visits
     const context = await browser.newContext({ viewport: vp });
@@ -670,18 +679,43 @@ test('the odds nudge is inside the viewport and above the tabs, portrait and lan
     await page.goto('/#/play?speed=instant&dice=3-3');
     await page.locator('[data-region="pass"]').first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    await page.getByRole('button', { name: /^Roll/ }).click();
+    const roll = page.getByRole('button', { name: /^Roll/ });
+    await roll.click();
     const hint = page.getByTestId('odds-hint');
     await expect(hint).toBeVisible();
-    const box = await hint.boundingBox();
-    expect(box, `hint box at ${vp.width}x${vp.height}`).not.toBeNull();
-    expect(box!.y).toBeGreaterThanOrEqual(0);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
-    const tabs = page.locator('.tabbar');
-    if (await tabs.isVisible()) {
-      const tb = await tabs.boundingBox();
-      expect(box!.y + box!.height).toBeLessThanOrEqual(tb!.y);
+    const hb = box(await hint.boundingBox());
+    const targets = [
+      page.locator('[data-region="pass"]').first(),
+      page.locator('[data-region="dont-pass"]').first(),
+      page.locator('.sim-rack').first(),
+      page.getByRole('button', { name: /^Roll/ }),
+      menu(page),
+    ];
+    for (const t of targets) {
+      if ((await t.count()) === 0) continue;
+      const tb = await t.boundingBox();
+      if (!tb) continue;
+      expect(overlaps(hb, tb), `hint covers a target at ${vp.width}x${vp.height}`).toBe(false);
     }
+    // Roll's own change (the point going on) moves it; the hint must not. Compare with and without it.
+    // page coordinates, so a scroll that Got it triggers does not count as Roll moving
+    const pageBox = () =>
+      roll.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          x: r.x,
+          y: r.y + (globalThis as unknown as { scrollY: number }).scrollY,
+          width: r.width,
+          height: r.height,
+        };
+      });
+    const rollWithHint = await pageBox();
+    await page.getByRole('button', { name: 'Got it' }).click();
+    await expect(hint).toHaveCount(0);
+    const rollWithoutHint = await pageBox();
+    expect(rollWithHint, `the hint moved Roll at ${vp.width}x${vp.height}`).toEqual(
+      rollWithoutHint,
+    );
     await context.close();
   }
 });

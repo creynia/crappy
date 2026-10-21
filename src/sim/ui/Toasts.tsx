@@ -1,3 +1,4 @@
+import type { ComponentChild } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ToastTone } from './text';
 import './sim.css';
@@ -12,6 +13,8 @@ export interface ToastsProps {
   onDismiss: (id: string) => void;
   /** auto-dismiss after this many ms (see toastDurationMs); omit to keep until dismissed */
   autoDismissMs?: number;
+  /** a sticky one-time message (the odds nudge) shown first in the same layer */
+  hint?: ComponentChild;
 }
 
 const SWIPE_PX = 60;
@@ -80,9 +83,10 @@ function ToastView({
   );
 }
 
-export function Toasts({ toasts, onDismiss, autoDismissMs }: ToastsProps) {
+export function Toasts({ toasts, onDismiss, autoDismissMs, hint }: ToastsProps) {
   return (
     <div class="sim-toasts">
+      {hint}
       {toasts.map((t) => (
         <ToastView key={t.id} t={t} onDismiss={onDismiss} ms={autoDismissMs} />
       ))}

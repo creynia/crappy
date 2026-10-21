@@ -75,7 +75,7 @@ function BonusArt({ region, progress }: { region: RegionDef; progress: readonly 
   const rows = Math.ceil(pips.length / perRow);
   const step = (right - left) / perRow;
   const r = Math.min(rows > 1 ? 15 : 16, step * 0.42);
-  const rowY = (row: number) => (rows > 1 ? y + h * (0.62 + row * 0.22) : y + h * 0.78);
+  const rowY = (row: number) => (rows > 1 ? y + h * (0.64 + row * 0.23) : y + h * 0.78);
   return (
     <g>
       <rect
@@ -100,7 +100,7 @@ function BonusArt({ region, progress }: { region: RegionDef; progress: readonly 
       </text>
       <text
         x={left}
-        y={y + h * 0.52}
+        y={y + h * (rows > 1 ? 0.47 : 0.52)}
         class="sim-tiny"
         font-size={h * 0.12}
         text-anchor="start"

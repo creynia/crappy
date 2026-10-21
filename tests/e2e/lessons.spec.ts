@@ -91,8 +91,7 @@ test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ pa
 test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/#/learn/sucker-bets');
-  const scene = await openScene(page, 2);
-  await scene.getByRole('button', { name: 'Center' }).click();
+  const scene = await openScene(page, 2); // opens on the Center panel (ui.view: center)
   await scene.getByRole('radio', { name: '$1 chip' }).click();
   const sheet = page.getByRole('dialog');
   await scene.locator('[data-region="fire"]').click();

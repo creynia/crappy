@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Simulator } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
 import { askFeedback } from './StepPanel';
@@ -258,11 +258,11 @@ describe('win prompt (I039)', () => {
     expect(prompt.querySelector('[data-choice="regress"]')!.textContent).toContain('-$0.03/roll');
     expect(prompt.querySelector('[data-choice="take-down"]')!.textContent).toContain('-$0.06/roll');
     expect(prompt.querySelector('[data-choice="same"]')!.textContent).toContain('no change');
-    const bankBefore = container.textContent!.match(/Bankroll \$([\d,]+)/)![1];
+    const bankBefore = container.textContent.match(/Bankroll \$([\d,]+)/)![1];
     fireEvent.click(pressBtn);
     await waitFor(() => expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull());
     expect(container.textContent).toContain('On table $24');
-    expect(container.textContent!.match(/Bankroll \$([\d,]+)/)![1]).toBe(
+    expect(container.textContent.match(/Bankroll \$([\d,]+)/)![1]).toBe(
       String(Number(bankBefore!.replace(/,/g, '')) - 12),
     );
   });
@@ -293,5 +293,60 @@ describe('win prompt (I039)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Always same bet/ }));
     expect(container.querySelector('[data-testid="win-prompt"]')).toBeNull();
     expect(prompt.isConnected).toBe(false);
+  });
+});
+
+describe('share link RNG position across Reset and reload (I071 review)', () => {
+  const shared: string[] = [];
+  beforeEach(() => {
+    shared.length = 0;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t: string) => Promise.resolve(void shared.push(t)) },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    localStorage.clear();
+  });
+  const share = async () => {
+    // the Menu tab toggles: open the menu only when it is closed
+    if (!screen.queryByRole('button', { name: 'Share table' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share table' }));
+    await waitFor(() => expect(shared.length).toBeGreaterThan(0));
+    return shared[shared.length - 1]!;
+  };
+  const skipOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('skip');
+  const seedOf = (url: string) => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('seed');
+
+  it('Reset bankroll starts a fresh seed with nothing drawn: no stale skip', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    render(<Simulator mode="sandbox" initialSettings={instant} />);
+    const first = await share();
+    expect(seedOf(first)).toBe('7');
+    expect(skipOf(first)).toBe('5');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset bankroll' }));
+    const after = await share();
+    expect(seedOf(after)).not.toBe('7');
+    expect(skipOf(after)).toBeNull();
+    location.hash = '';
+  });
+
+  it('a reload restores the saved sandbox with its draw count', async () => {
+    location.hash = '#/play?seed=7&skip=5';
+    const key = 'crappy:test-sandbox';
+    const first = render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(screen.getByTestId('roll-announcer').textContent).not.toBe(''));
+    expect(skipOf(await share())).toBe('6');
+    first.unmount();
+    // the next visit has no link params: the saved table comes back, one roll in
+    location.hash = '#/play';
+    await waitFor(() => expect(localStorage.length).toBeGreaterThan(0));
+    render(<Simulator mode="sandbox" persistKey={key} initialSettings={instant} />);
+    expect(skipOf(await share())).toBe('6');
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() => expect(skipOf(shared[shared.length - 1]!)).toBe('6'));
+    expect(skipOf(await share())).toBe('7');
+    location.hash = '';
   });
 });

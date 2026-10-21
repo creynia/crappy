@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyAction, createGame } from '../engine';
-import type { Action } from '../engine';
 import {
   fmtDelta,
   loadAskAfterWin,
@@ -75,7 +74,7 @@ describe('win prompt logic', () => {
     expect(winChoices(poor, poor.bets[0]!).map((x) => x.id)).toEqual(['same', 'take-down']);
     // every action offered is legal
     for (const c of winChoices(g, g.bets[0]!))
-      if (c.action) expect(applyAction(g, c.action as Action).ok).toBe(true);
+      if (c.action) expect(applyAction(g, c.action).ok).toBe(true);
   });
 
   it('"Always same bet" is remembered in storage', () => {

@@ -303,6 +303,156 @@ describe('odds nudge', () => {
   });
 });
 
+describe('demo steps', () => {
+  const scene: SceneConfig = {
+    id: 'demo',
+    version: 1,
+    bankroll: 50_000,
+    phase: 'point',
+    point: 6,
+    bets: [{ type: 'pass-line', amount: 1000 }],
+    steps: [
+      {
+        id: 'watch',
+        text: 'Watch the dealer',
+        completeWhen: { acknowledged: true },
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'A Come bet' },
+          { action: { type: 'roll', dice: [5, 4] } },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 } },
+          { action: { type: 'roll', dice: [3, 6] } },
+        ],
+      },
+    ],
+  };
+  const confirmed = (events: SimulatorEvent[]) =>
+    events.filter((e) => e.type === 'action-confirmed').length;
+
+  it('at instant speed plays every scripted action as soon as the step starts', async () => {
+    const events: SimulatorEvent[] = [];
+    render(<Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy();
+  });
+
+  it('Replay restores the starting state and plays the same script again', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    const finalText = container.querySelector('.sim-status-money')!.textContent;
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    expect(container.querySelector('.sim-status-money')!.textContent).toBe(finalText);
+  });
+
+  const narrated: SceneConfig = {
+    ...scene,
+    steps: [
+      {
+        ...scene.steps![0]!,
+        play: [
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'First line' },
+          { action: { type: 'roll', dice: [5, 4] }, say: 'Second line' },
+          { action: { type: 'place-bet', betType: 'come', amount: 1000 }, say: 'Third line' },
+          { action: { type: 'roll', dice: [3, 6] }, say: 'Fourth line' },
+        ],
+      },
+    ],
+  };
+
+  it('shows every caption in the step panel and announces the narration once, even at instant speed', async () => {
+    const { container } = render(<Simulator scene={narrated} initialSettings={instant} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Replay the demo' })).toBeTruthy(),
+    );
+    const list = screen.getByRole('list', { name: 'What happens in the demo' });
+    expect(Array.from(list.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+      'First line',
+      'Second line',
+      'Third line',
+      'Fourth line',
+    ]);
+    const live = container.querySelector('[data-testid="roll-announcer"]')!.textContent;
+    expect(live).toContain('First line');
+    expect(live).toContain('Fourth line');
+  });
+
+  it('scripted rolls stay out of the roll log, and a replay does not duplicate anything', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator scene={narrated} initialSettings={instant} onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(4));
+    fireEvent.click(screen.getByRole('button', { name: 'Replay the demo' }));
+    await waitFor(() => expect(confirmed(events)).toBe(8));
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }));
+    expect(screen.getByText(/No rolls yet/)).toBeTruthy();
+  });
+
+  it('a tap while the last roll is still animating skips that animation and ends the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            { ...scene.steps![0]!, play: [{ action: { type: 'roll', dice: [5, 4] }, pauseMs: 0 }] },
+          ],
+        }}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBe(1)); // every frame is out; the roll animates
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).toBeNull();
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+
+  it('a refused scripted action stops the demo', async () => {
+    const events: SimulatorEvent[] = [];
+    render(
+      <Simulator
+        scene={{
+          ...scene,
+          steps: [
+            {
+              ...scene.steps![0]!,
+              play: [
+                { action: { type: 'place-bet', betType: 'pass-line', amount: 1000 } }, // not legal on a point
+                { action: { type: 'roll', dice: [5, 4] } },
+              ],
+            },
+          ],
+        }}
+        initialSettings={instant}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(events.some((e) => e.type === 'action-rejected')).toBe(true));
+    expect(events.filter((e) => e.type === 'rolled')).toHaveLength(0);
+  });
+
+  it('a tap skips to the end state while a slower demo is playing', async () => {
+    const events: SimulatorEvent[] = [];
+    const { container } = render(
+      <Simulator
+        scene={scene}
+        initialSettings={{ speed: 'normal' }}
+        onEvent={(e) => events.push(e)}
+      />,
+    );
+    await waitFor(() => expect(confirmed(events)).toBeGreaterThanOrEqual(1));
+    expect(confirmed(events)).toBeLessThan(4); // paused between frames
+    fireEvent.click(container.querySelector('[data-testid="simulator"]')!);
+    expect(confirmed(events)).toBe(4);
+    expect(screen.queryByRole('button', { name: 'Replay the demo' })).not.toBeNull();
+  });
+});
+
 describe('ask step announcer', () => {
   const scene: SceneConfig = {
     id: 'ask',

@@ -10,6 +10,10 @@ export interface SimStepProps {
   onNext: () => void;
   onAnswer?: (choice: number) => void;
   onRestart: () => void;
+  /** set on a demo step when it is not playing */
+  onReplay?: (() => void) | undefined;
+  /** the demo's narration so far */
+  captions?: string[] | undefined;
   resolve?: TokenResolver;
 }
 
@@ -22,6 +26,8 @@ export function SimStep({
   onNext,
   onAnswer,
   onRestart,
+  onReplay,
+  captions,
   resolve,
 }: SimStepProps) {
   const guided = !!scene.steps?.length;
@@ -46,6 +52,8 @@ export function SimStep({
           {...(onAnswer ? { onAnswer } : {})}
           asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
           {...(restart ? { onRestart } : {})}
+          {...(onReplay ? { onReplay } : {})}
+          {...(captions ? { captions } : {})}
           label={label}
         />
       ) : null}

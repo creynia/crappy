@@ -1177,6 +1177,18 @@
   transform: translateX(-50%);
 }
 
+.sim-demo-captions {
+  margin: 4px 0;
+  padding-left: 1.3rem;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 2px;
+}
+.sim-step .sim-replay {
+  min-height: 44px;
+  min-width: 44px;
+}
+
 /* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
 .sim-calls {
   pointer-events: none;

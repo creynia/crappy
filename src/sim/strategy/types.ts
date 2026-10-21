@@ -75,6 +75,8 @@ export interface SessionResult {
   pointsMade: number;
   sevenOuts: number;
   longestHand: number;
+  /** Bonus side-bet payouts (I037): one entry per bet type and paytable level, in first-hit order. */
+  bonusHits?: { type: BetTypeId; pays: number; count: number }[];
 }
 export interface ManyResult {
   sessions: number;

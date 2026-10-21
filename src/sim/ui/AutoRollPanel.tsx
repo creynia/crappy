@@ -20,7 +20,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { TotalsHistogram } from './TotalsHistogram';
-import { fmtMoney } from './text';
+import { betLabel, fmtMoney } from './text';
 
 // Strategies whose default odds are the table maximum.
 const MAX_ODDS_BY_DEFAULT = new Set<string>([
@@ -550,6 +550,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ['Busted', rs.map((r) => (r.bustedAtRoll === null ? 'No' : `Roll ${r.bustedAtRoll}`))],
         ['Points made / seven-outs', rs.map((r) => `${r.pointsMade} / ${r.sevenOuts}`)],
         ['Longest hand (rolls)', rs.map((r) => String(r.longestHand))],
+        ...(rs.some((r) => r.bonusHits?.length)
+          ? [
+              [
+                'Bonus bet hits',
+                rs.map((r) =>
+                  r.bonusHits?.length
+                    ? r.bonusHits
+                        .map((h) => `${betLabel(h.type)} ${h.pays}:1 x${h.count}`)
+                        .join(', ')
+                    : 'none',
+                ),
+              ] as [string, string[]],
+            ]
+          : []),
         ['Rolls per $1 of expected loss', perDollar],
         [`Expected cost per ${rollsPerHour} rolls`, perHour],
       ];

@@ -170,7 +170,7 @@ interface SheetState {
 
 const isCenterBet = (b: Bet) => {
   const c = BET_TYPES[b.type].category;
-  return c === 'prop' || c === 'hardway';
+  return c === 'prop' || c === 'hardway' || c === 'bonus';
 };
 
 function matchLandscape(scene: SceneConfig): boolean {
@@ -582,7 +582,9 @@ export function Simulator(props: SimulatorInternalProps) {
     const contract =
       bet && removeVal && !removeVal.ok && removeVal.code === 'contract-bet'
         ? { reason: "You can't take this bet down once the point is set." }
-        : null;
+        : bet && removeVal && !removeVal.ok && removeVal.code === 'not-removable'
+          ? { reason: removeVal.message }
+          : null;
     const oddsFor: Partial<Record<BetTypeId, BetTypeId>> = {
       'pass-line': 'pass-odds',
       'dont-pass': 'dont-pass-odds',

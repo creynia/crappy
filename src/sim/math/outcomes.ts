@@ -1,4 +1,5 @@
-import { BET_TYPES, upfrontVig } from '../engine/bets';
+import { BET_TYPES, isBonusType, upfrontVig } from '../engine/bets';
+import { bonusDistribution } from './bonus';
 import type {
   Bet,
   BetTypeId,
@@ -224,6 +225,7 @@ function rulesKey(rules: TableRules): string {
 }
 
 export function distributionFor(bet: BetLike, ctx: BetCtx): Distribution {
+  if (isBonusType(bet.type)) return bonusDistribution(bet.type, bet.amount, bet.progress);
   const key = `${bet.type}|${bet.amount}|${bet.point}|${ctx.phase}|${ctx.point}|${rulesKey(ctx.rules)}`;
   const hit = cache.get(key);
   if (hit) return hit;

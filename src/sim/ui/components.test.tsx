@@ -166,6 +166,15 @@ describe('Table', () => {
     expect(screen.getByLabelText(/Place 6 \$12, off/)).toBeTruthy();
   });
 
+  it('CenterPanel renders the bonus rail with progress pips', () => {
+    const { container } = render(
+      <CenterPanel bets={[{ ...bet('b1', 'small', 100), progress: [2, 3] }]} />,
+    );
+    expect(container.querySelector('[data-region="fire"]')).not.toBeNull();
+    const small = container.querySelector('[data-region="small"]')!;
+    expect(small.querySelectorAll('.sim-pips .is-hit')).toHaveLength(2);
+    expect(container.querySelector('[data-region="tall"] .sim-pips .is-hit')).toBeNull();
+  });
   it('CenterPanel renders the proposition cells', () => {
     render(<CenterPanel bets={[bet('b1', 'hard-6', 500)]} />);
     expect(document.querySelector('[data-region="any-7"]')).toBeTruthy();

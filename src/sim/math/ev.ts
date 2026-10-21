@@ -1,4 +1,4 @@
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, isBonusType } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import type { BetTypeId, Cents, GameState } from '../engine/types';
 import { distributionFor, isLineLike, isOddsType, toOutcomes } from './outcomes';
@@ -52,6 +52,14 @@ export function lossPerRoll(bet: BetLike, ctx: BetCtx): Fraction {
   if (isOddsType(bet.type) || bet.amount <= 0) return ZERO;
   if (isLineLike(bet.type)) {
     // Amortized over whole line decisions, whether or not a point is set.
+    const e = edgeOfBet(
+      { type: bet.type, amount: bet.amount, point: null },
+      { ...ctx, ...COME_OUT },
+    );
+    return mul(frac(bet.amount), e.perRoll);
+  }
+  if (isBonusType(bet.type)) {
+    // Amortized over the whole hand from its start, whatever the progress so far.
     const e = edgeOfBet(
       { type: bet.type, amount: bet.amount, point: null },
       { ...ctx, ...COME_OUT },

@@ -35,10 +35,10 @@ Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% o
 
 **Watch the word "for".** Some layouts print "30 **for** 1" instead of "30 **to** 1". "For" includes your original bet, so 30 for 1 is really 29 to 1, an even worse deal. This app's tables pay "to".
 
-**Bonus side bets** you'll see in casinos (not in this simulator):
+**Bonus side bets** live on a rail at the bottom of the Center panel. They ride the whole hand: you can only put them up before a new shooter's first roll, and they stay until the hand decides them.
 
-- **Fire Bet**: pays if the shooter makes 4, 5 or 6 *different* points. With the common 24:1 / 249:1 / 999:1 paytable the edge is about **20.8%**.
-- **All / Tall / Small**: pays if every number from 2 to 6 (Small), from 8 to 12 (Tall), or both (All) rolls before a 7. With 34:1 / 34:1 / 175:1 the edge is about **7.5–7.8%**, and much higher with 30:1 / 150:1.
+- **Fire Bet**: pays if the shooter makes 4, 5 or 6 *different* points (the same point twice counts once). With the common 24:1 / 249:1 / 999:1 paytable the edge is **20.76%**. About 1 hand in 100 reaches 4 points.
+- **All / Tall / Small**: pays if every number from 2 to 6 (Small), from 8 to 12 (Tall), or both (All) rolls before a 7, come-out rolls included. With 34:1 / 34:1 / 175:1 the edge is **7.76%** for Small or Tall and **7.46%** for All; it jumps to 18.3% / 20.6% where they pay 30:1 / 150:1. Small and Tall hit 2.64% of the time, All 0.53%.
 
 They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy.
 
@@ -50,7 +50,8 @@ Horn ($4): 2 or 12 → +27 (1/36 each), 3 or 11 → +12 (2/36 each), else −4 (
 C&E ($2): craps → +6 (4/36), 11 → +14 (2/36), else −2 (30/36). EV = (24 + 28 − 60)/36 = −8/36 per $2 = **−11.11%**.
 World ($5): 2/12 → +26, 3/11 → +11, 7 → 0, else (24 ways) −5. EV = (52 + 44 − 120)/36 = −24/36 per $5 = **−13.33%**.
 Hard 8: wins on 4-4 (1 way), loses on 7 (6) or easy 8 (4). EV = (9 − 10)/11 = **−9.09%**. Hard 4: (7 − 8)/9 = **−11.11%**.
-Fire Bet: P(4 points) ≈ 0.880%, P(5) ≈ 0.164%, P(6) ≈ 0.0162% → EV ≈ −20.76%.
+Fire Bet: P(4 points) = 0.880%, P(5) = 0.164%, P(6) = 0.0162% → EV = 24 × 0.00880 + 249 × 0.00164 + 999 × 0.000162 − 0.9894 = **−20.76%**.
+Small: P(2, 3, 4, 5 and 6 all before a 7) = 20049/760760 = 2.635%; EV = 35 × 0.02635 − 1 = **−7.76%**. All: P = 0.5258%; EV = 176 × 0.005258 − 1 = **−7.46%**.
 :::
 
 ```scene
@@ -105,6 +106,38 @@ steps:
     completeWhen: { autoRollCompleted: { minRolls: 1000 } }
   - id: compare
     text: "Expected loss: 1,000 × $1 × 16.67% ≈ $167. How close did you get?"
+    advance: button
+    completeWhen: { acknowledged: true }
+```
+
+```scene
+id: l13-s3
+version: 1
+title: Fire and Small, 1,000 hands
+rules: standard-vegas
+bankroll: 200000
+allowedBets: [fire, small]
+highlightedBets: [fire, small]
+showEV: true
+ui: { view: center }
+autoRoll:
+  enabled: true
+  strategies: [my-layout]
+  rollOptions: [8500]
+  sessions: [1]
+steps:
+  - id: place
+    text: "On the bonus rail, put **$1 on the Fire Bet** and **$1 on Small**. The pips show the points made and the numbers rolled as the hand goes on."
+    allowedActions: [place-bet, set-amount]
+    completeWhen:
+      all:
+        - { betOnTable: { type: fire, minAmount: 100 } }
+        - { betOnTable: { type: small, minAmount: 100 } }
+  - id: auto
+    text: "Open auto-roll: **My layout**, **8,500 rolls** (about 1,000 hands). The bets go back up for every new shooter, so you are buying 1,000 tickets of each."
+    completeWhen: { autoRollCompleted: { minRolls: 8500 } }
+  - id: compare
+    text: "Check **Bonus bet hits** in the results. Over 1,000 hands expect about 9 Fire payouts at 24:1, 2 at 249:1 and a 999:1 once every 6,000 hands; Small hits about 26 times. Expected loss: $1,000 × 20.76% + $1,000 × 7.76% ≈ $285."
     advance: button
     completeWhen: { acknowledged: true }
 ```

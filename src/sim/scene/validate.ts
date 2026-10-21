@@ -20,6 +20,7 @@ const EVENT_TYPES = [
   'bet-pushed',
   'bet-returned',
   'bet-travelled',
+  'bet-progressed',
   'natural',
   'craps',
   'point-established',
@@ -94,7 +95,7 @@ class Ctx {
   }
   betInit(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working']);
+    this.keys(path, v, ['ref', 'type', 'amount', 'point', 'parentRef', 'working', 'progress']);
     this.bet(`${path}.type`, v.type);
     this.cents(`${path}.amount`, v.amount, { min: 1 });
     if (v.ref !== undefined) this.str(`${path}.ref`, v.ref);
@@ -102,6 +103,10 @@ class Ctx {
     if (v.point !== undefined) this.point(`${path}.point`, v.point);
     if (v.working !== undefined && !['auto', 'on', 'off'].includes(v.working as string))
       this.err(`${path}.working`, 'must be auto, on or off');
+    if (v.progress !== undefined) {
+      if (!Array.isArray(v.progress) || !v.progress.every((n) => isInt(n) && n >= 2 && n <= 12))
+        this.err(`${path}.progress`, 'must be an array of dice totals 2-12');
+    }
   }
   matcher(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');

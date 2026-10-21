@@ -54,6 +54,10 @@ const FIXED_LABELS: Partial<Record<BetTypeId, string>> = {
   horn: 'Horn',
   'c-e': 'C and E',
   world: 'World',
+  fire: 'Fire Bet',
+  all: 'All',
+  tall: 'Tall',
+  small: 'Small',
 };
 
 export function betLabel(type: BetTypeId): string {
@@ -238,7 +242,11 @@ export function buildEvFacts(
   if (wn > 0n) {
     const p = fracToNumber({ n: wn, d: wd }) * 100;
     const pct = wd <= 36n ? String(Math.round(p)) : p.toFixed(1).replace(/\.0$/, '');
-    chance = `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
+    // multi-hand bonus bets have unwieldy exact fractions: say "about 1 in 38 hands" instead
+    chance =
+      wd > 1_000_000n
+        ? `about 1 in ${Math.round(100 / p).toLocaleString('en-US')} hands (${pct}%)`
+        : `${wn} in ${wd}${def.oneRoll ? ' rolls' : ''} (${pct}%)`;
   }
   let pays: string;
   try {
@@ -306,15 +314,20 @@ export function describeRoll(events: readonly GameEvent[]): string {
   const losses: string[] = [];
   const pushes: string[] = [];
   const returned: string[] = [];
+  const progressed: string[] = [];
   for (const e of events) {
-    if (e.type === 'bet-won')
+    if (e.type === 'bet-progressed')
+      progressed.push(
+        `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
+      );
+    else if (e.type === 'bet-won')
       wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
     else if (e.type === 'bet-lost')
       losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
     else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
     else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
   }
-  for (const group of [wins, losses, pushes, returned]) {
+  for (const group of [wins, losses, pushes, returned, progressed]) {
     if (group.length) parts.push(group.join(', ') + '.');
   }
   if (roll) {

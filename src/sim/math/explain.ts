@@ -45,6 +45,13 @@ export function explainBet(bet: BetLike, ctx: BetCtx): Explanation {
     }
   }
   if (def.oneRoll) notes.push('One-roll bet: its edge is paid on every roll.');
+  if (def.category === 'bonus') {
+    notes.push(
+      bet.type === 'fire'
+        ? 'Bonus bet on the whole hand: a point made twice counts once; it is decided when the shooter sevens out (or at once on the 6th point).'
+        : 'Bonus bet on the whole hand: every 7 loses it, come-out rolls included; it pays at once on the last number.',
+    );
+  }
   const note = notes.length > 0 ? notes.join(' ') : undefined;
   return note === undefined ? { rows, evFormula } : { rows, evFormula, note };
 }

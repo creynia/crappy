@@ -5,6 +5,8 @@ import { tableExpectedLossPerRoll, toNumber } from '../math';
 import {
   getStrategy,
   listStrategies,
+  edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   simulateCompare,
   simulateMany,
   simulateSweep,
@@ -283,6 +285,52 @@ describe('edge on action is per decision', () => {
     expect(e({ id: 'pass-max-odds', unit: 1000 })).toBeCloseTo(0.374, 2);
     expect(e({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 })).toBeCloseTo(1.414, 2);
     expect(e({ id: 'dont-pass-max-lay', unit: 1000 })).toBeCloseTo(0.273, 2);
+  });
+});
+
+describe('edge convergence (I010)', () => {
+  const rules = resolveRules('standard-vegas');
+  it('wagered is cumulative, aligned with equity, and ends at totalWagered', () => {
+    const r = simulateSession({
+      strategy: spec('pass-max-odds'),
+      rolls: 300,
+      seed: 3,
+      bankroll: 100_000,
+    });
+    expect(r.wagered.length).toBe(r.equity.length);
+    expect(r.wagered[0]).toBe(0);
+    for (let i = 1; i < r.wagered.length; i++)
+      expect(r.wagered[i]!).toBeGreaterThanOrEqual(r.wagered[i - 1]!);
+    expect(r.wagered[r.wagered.length - 1]).toBe(r.totalWagered);
+  });
+  it('a 10,000-roll pass-line session ends inside the 2-sigma funnel (fixed seed)', () => {
+    const sp = spec('pass-max-odds', { unit: 1000 });
+    const n = 10_000;
+    const sigma = edgeFunnelSigma(sp, rules);
+    const edge = strategyMetrics(sp, rules).edgeOnAction;
+    const r = simulateSession({ strategy: sp, rolls: n, seed: 11, bankroll: 1_000_000_000 });
+    const ratio = (r.finalEquity - 1_000_000_000) / r.totalWagered;
+    expect(Math.abs(ratio + edge)).toBeLessThanOrEqual((2 * sigma) / Math.sqrt(n));
+  });
+  it('the funnel estimate is cached per spec and rules', () => {
+    const sp = spec('pass-max-odds', { unit: 500 });
+    expect(peekEdgeFunnelSigma(sp, rules)).toBeUndefined();
+    const a = edgeFunnelSigma(sp, rules);
+    expect(peekEdgeFunnelSigma(sp, rules)).toBe(a);
+    expect(edgeFunnelSigma(sp, rules)).toBe(a);
+  });
+  it('about 95% of sessions end inside the funnel', () => {
+    const sp = spec('place-6-8');
+    const sigma = edgeFunnelSigma(sp, rules);
+    const edge = strategyMetrics(sp, rules).edgeOnAction;
+    let inside = 0;
+    const N = 60;
+    for (let s = 1; s <= N; s++) {
+      const r = simulateSession({ strategy: sp, rolls: 3000, seed: s, bankroll: 1_000_000_000 });
+      const ratio = (r.finalEquity - 1_000_000_000) / r.totalWagered;
+      if (Math.abs(ratio + edge) <= (2 * sigma) / Math.sqrt(3000)) inside++;
+    }
+    expect(inside / N).toBeGreaterThan(0.85);
   });
 });
 

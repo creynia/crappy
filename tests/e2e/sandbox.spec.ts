@@ -53,6 +53,29 @@ test.describe('sandbox', () => {
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
   });
 
+  test('hop bet: pick a hard hop in the 21-pair picker, win 30 to 1', async ({ page }) => {
+    await page.goto(url('seed=1&dice=3-3'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="hop"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.locator('.sim-hop-cell')).toHaveCount(21);
+    await expect(sheet).toContainText('11.11%'); // starts on the 2-4 easy hop
+    await sheet.locator('[data-hop="3-3"]').click();
+    await expect(sheet.locator('[data-hop="3-3"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(sheet).toContainText('13.89%');
+    await expect(sheet.locator('.sim-hop-note')).toContainText('pays 30 to 1 · edge 13.89%');
+    const amount = Number(
+      (await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9.]/g, ''),
+    );
+    await sheet.getByRole('button', { name: 'Place anyway' }).click();
+    await sheet.getByRole('button', { name: /again to place anyway/i }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Edit Hop 3-3 bet/ })).toBeVisible();
+    const before = await bankroll(page);
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    await expect.poll(() => bankroll(page)).toBe(before + amount * 31);
+  });
+
   test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
     page,
   }) => {

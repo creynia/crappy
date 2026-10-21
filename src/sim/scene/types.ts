@@ -92,6 +92,8 @@ export interface ActionMatcher {
   minAmount?: Cents;
   maxAmount?: Cents;
   oddsMax?: boolean;
+  /** EXTENSION (I035): only a hop bet on this pair matches (either order). */
+  hop?: Dice;
 }
 
 /** Outcome of a resolved bet, for `betResolved` (sugar over the bet-won / bet-lost / bet-pushed events). */

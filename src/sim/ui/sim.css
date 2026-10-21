@@ -463,6 +463,29 @@
   border-color: var(--sim-accent);
   font-weight: 700;
 }
+.sim-seg-edge {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.sim-seg-edge[data-tier='free'] {
+  color: var(--ev-free);
+}
+.sim-seg-edge[data-tier='good'] {
+  color: var(--ev-good);
+}
+.sim-seg-edge[data-tier='fair'] {
+  color: var(--ev-fair);
+}
+.sim-seg-edge[data-tier='poor'] {
+  color: var(--ev-poor);
+}
+.sim-seg-edge[data-tier='avoid'] {
+  color: var(--ev-avoid);
+}
+.sim-seg button.is-selected .sim-seg-edge {
+  color: inherit;
+}
 .sim-stepper {
   display: flex;
   align-items: center;

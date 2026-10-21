@@ -24,7 +24,11 @@ export type RegionId =
   | 'horn'
   | 'c-e'
   | 'world'
-  | `hard-${4 | 6 | 8 | 10}`;
+  | `hard-${4 | 6 | 8 | 10}`
+  | 'fire'
+  | 'all'
+  | 'tall'
+  | 'small';
 /**
  * Chip spots inside a region. Number boxes use all of them except `main` is the place spot;
  * `odds` / `dc-odds` sit offset on top of the come-point / don't-come chips, as a dealer would

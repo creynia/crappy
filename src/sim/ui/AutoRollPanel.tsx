@@ -32,11 +32,17 @@ const MAX_ODDS_BY_DEFAULT = new Set<string>([
   'pass-max-odds',
   'dont-pass-max-lay',
   'three-point-molly',
+  'dont-come-molly',
 ]);
 
 // Strategies with no line bet, so an odds setting means nothing for them.
 const NO_ODDS_STRATEGIES = new Set<string>([
   'place-6-8',
+  'buy-4-10',
+  'lay-4-10',
+  'place-6-8-press',
+  'inside-regress',
+  'pass-hedge-any-craps',
   'iron-cross',
   'across',
   'field-every-roll',
@@ -658,7 +664,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const perRoll = lossPerRoll();
     const perDollar = perRoll.map((c) => (c > 0 ? (100 / c).toFixed(1) : 'no cost'));
     const perHour = perRoll.map((c) => money2(c * rollsPerHour));
-    const edge = metrics.map((m) => pct(m.edgeOnAction));
+    const edge = metrics.map((m) =>
+      m.approximate ? `≈ ${pct(m.edgeOnAction)} (starting layout)` : pct(m.edgeOnAction),
+    );
     if (o.kind === 'single') {
       const rs = o.results;
       const rows: Array<[string, string[]]> = [

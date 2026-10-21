@@ -35,7 +35,7 @@ export interface BetSheetProps {
   /** selected chip value: one step of the +/- stepper */
   step: Cents;
   quickActions?: readonly QuickAction[];
-  working?: { value: boolean; canToggle: boolean };
+  working?: { value: boolean; canToggle: boolean; copy?: string };
   /** sandbox setting "Confirm sucker bets" (default true): avoid-tier needs a second tap */
   confirmSucker?: boolean;
   onTypeChange: (t: BetTypeId) => void;
@@ -214,6 +214,7 @@ export function BetSheet(p: BetSheetProps) {
             Working: {p.working.value ? 'ON' : 'OFF'}
           </label>
         ) : null}
+        {p.working?.copy ? <p class="sim-working-copy">{p.working.copy}</p> : null}
 
         {!valid ? (
           <p class="sim-invalid" role="alert">

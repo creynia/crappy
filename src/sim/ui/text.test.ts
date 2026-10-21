@@ -4,7 +4,14 @@ import { portraitLayout } from './layouts';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { Action, GameState } from '../engine/types';
-import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
+import {
+  buildEvFacts,
+  describeRoll,
+  fmtMoney,
+  normalizeTier,
+  regionAriaLabel,
+  workingCopy,
+} from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
   n: 1,
@@ -174,5 +181,19 @@ describe('tiers and ev facts', () => {
   });
   it('returns null for a roll', () => {
     expect(facts({ type: 'roll' })).toBeNull();
+  });
+});
+
+describe('workingCopy', () => {
+  it('explains the come-out OFF convention and the ON cost for a place-6 $12 bet', () => {
+    const copy = workingCopy(false, 5.6); // 5.6 cents per come-out roll
+    expect(copy).toContain('Off on the come-out by table convention');
+    expect(copy).toContain('Turning it ON costs about $0.06 per come-out roll');
+    expect(copy).toContain('6 of 36 ways');
+  });
+  it('shows the saving when the bet is ON, with the sign ignored', () => {
+    expect(workingCopy(true, -5.6)).toBe(
+      'Working on the come-out. Turning it OFF saves about $0.06 per come-out roll.',
+    );
   });
 });

@@ -364,3 +364,14 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
 export function diceAriaLabel(d: readonly [number, number]): string {
   return `Rolled ${d[0]} and ${d[1]}, total ${d[0] + d[1]}`;
 }
+
+/**
+ * Copy under the Working toggle. `perRollCents` is the expected cost per roll of turning the
+ * bet ON (positive) or OFF (negative); the sign is ignored and the magnitude is shown.
+ */
+export function workingCopy(on: boolean, perRollCents: number): string {
+  const cost = fmtMoney(Math.abs(perRollCents), { exact: true });
+  return on
+    ? `Working on the come-out. Turning it OFF saves about ${cost} per come-out roll.`
+    : `Off on the come-out by table convention. Turning it ON costs about ${cost} per come-out roll and risks the 7, which comes up 6 of 36 ways.`;
+}

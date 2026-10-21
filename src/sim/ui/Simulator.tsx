@@ -55,6 +55,7 @@ import {
   placeAction,
 } from './simHelpers';
 import { betLabel, buildEvFacts, describeRoll, fmtMoney, rollTone } from './text';
+import { workingProp } from './workingProp';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import './sim.css';
 import './simulator.css';
@@ -1016,7 +1017,7 @@ export function Simulator(props: SimulatorInternalProps) {
           quickActions={sheetModel.quick}
           confirmSucker={settings.confirmSuckerBets}
           {...(sheetModel.bet && isToggleable(sheetModel.bet.type)
-            ? { working: { value: isWorking(sheetModel.bet, game), canToggle: true } }
+            ? { working: workingProp(game, sheetModel.bet, settings.rollsPerHour) }
             : {})}
           onTypeChange={(t) => {
             const g = coreRef.current.game;

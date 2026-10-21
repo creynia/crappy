@@ -2,6 +2,17 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const url = '/#/play?speed=instant&seed=1&dice=3-4,3-3,2-2';
 
+/** The odds nudge (a one-time sticky message) would take the toast's place; these tests are about toasts, so it is pre-dismissed. */
+async function hideNudge(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('crappy-sim-hide-odds-hint', '1');
+    } catch {
+      /* no storage: the nudge stays hidden for this page */
+    }
+  });
+}
+
 async function place(page: Page) {
   await page.locator('[data-region="pass"]').click();
   const sheet = page.getByRole('dialog');
@@ -55,6 +66,9 @@ async function underToast(loc: Locator): Promise<boolean> {
 const box = async (page: Page, sel: string) => (await page.locator(sel).first().boundingBox())!;
 
 test.describe('toast overlay', () => {
+  test.beforeEach(async ({ page }) => {
+    await hideNudge(page);
+  });
   for (const vp of [
     { name: 'portrait', width: 390, height: 844 },
     { name: 'landscape', width: 844, height: 390 },
@@ -180,6 +194,7 @@ test.describe('toast overlay', () => {
   test('swipe or tap dismisses a toast; at most two are shown', async ({ browser }) => {
     const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 } });
     const page = await ctx.newPage();
+    await hideNudge(page);
     await page.goto(url);
     await place(page);
     const roll = page.getByRole('button', { name: /^Roll/ });

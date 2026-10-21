@@ -459,12 +459,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
               <span>Unit</span>
               {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
             </div>
-            <div class="sim-ar-group" role="group" aria-label="Odds">
-              <span>Odds</span>
-              {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
-              {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
-              {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
-            </div>
+            {/* a custom system sets its own odds in the builder */}
+            {strategyIds.length === 1 && strategyIds[0] === 'custom' ? null : (
+              <div class="sim-ar-group" role="group" aria-label="Odds">
+                <span>Odds</span>
+                {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
+                {button(oddsMultiple === 0, 'Flat only', () => setOddsMultiple(0))}
+                {button(oddsMultiple === 2, '2x', () => setOddsMultiple(2))}
+              </div>
+            )}
             <div class="sim-ar-group" role="group" aria-label="Stop when ahead by">
               <span>Stop if up</span>
               {STOP_OPTIONS.map((v) =>

@@ -52,7 +52,7 @@
 }
 .sim-sb-nums {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 6px;
 }
 .sim-sb-num {
@@ -79,4 +79,7 @@
 .sim-sb :is(select, input):focus-visible {
   outline: 3px solid var(--sim-focus);
   outline-offset: 2px;
+}
+.sim-sb-num select {
+  min-width: 72px;
 }

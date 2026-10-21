@@ -1,3 +1,4 @@
+import { encodeCustom, PRESETS_AS_CUSTOM } from '../../src/sim/strategy/custom';
 import { expect, test, type Page } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
@@ -101,6 +102,25 @@ test.describe('sandbox', () => {
     await sheet.getByRole('button', { name: 'Cancel' }).click();
     await page.getByRole('button', { name: /^Roll/ }).click(); // 7: Small loses
     await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
+  test('my system: a shared link opens the builder and the system runs (I013)', async ({
+    page,
+    guard,
+  }) => {
+    const molly = encodeCustom(PRESETS_AS_CUSTOM['three-point-molly']!);
+    await page.goto(url(`system=${molly}`));
+    await page.getByRole('button', { name: 'Auto-roll', exact: true }).click();
+    const panel = page.getByTestId('auto-roll-panel');
+    await expect(panel.getByLabel('Strategy')).toHaveValue('custom');
+    const builder = panel.locator('.sim-sb');
+    await expect(builder.locator('[name="comeCount"]')).toHaveValue('2');
+    await builder.locator('[name="numbersKind"]').selectOption('place');
+    await expect(builder.locator('[name="n6"]')).toBeChecked();
+    await guard.check('system-builder');
+    await panel.getByTestId('auto-roll-run').click();
+    await expect(panel.getByTestId('auto-roll-summary')).toContainText('Edge on action');
+    await expect(builder.locator('.sim-sb-link input')).toHaveValue(/^#\/play\?system=[\w-]+$/);
   });
 
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {

@@ -12,6 +12,7 @@ import type {
   Validation,
 } from '../engine/types';
 import type { BetInit } from '../engine/game';
+import { answeredRequirements } from './conditions';
 import type {
   ActionMatcher,
   BetResult,
@@ -253,6 +254,8 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
     return (rt.counters[key] ?? -1) >= (c.autoRollCompleted.minRolls ?? 0);
   }
   if ('acknowledged' in c) return (rt.counters.ack ?? 0) > 0;
+  if ('answered' in c)
+    return c.answered === 'correct' ? (rt.counters.ansOk ?? 0) > 0 : (rt.counters.ans ?? 0) > 0;
   return false;
 }
 
@@ -304,6 +307,13 @@ export function highlightedFor(scene: SceneConfig, step?: SceneStep): BetTypeId[
   return step?.highlightedBets ?? scene.highlightedBets ?? [];
 }
 
+/** Has the step's question been answered enough to unlock the roll (correctly, when the step needs that)? */
+function askAnswered(step: SceneStep, rt: SceneRuntime): boolean {
+  return answeredRequirements(step.completeWhen).includes('correct')
+    ? (rt.counters.ansOk ?? 0) > 0
+    : (rt.counters.ans ?? 0) > 0;
+}
+
 /** True when the Roll button should be locked by the current step, with the reason. */
 export function rollLock(scene: SceneConfig, rt: SceneRuntime, game: GameState): string | null {
   const step = currentStep(scene, rt);
@@ -316,6 +326,8 @@ export function rollLock(scene: SceneConfig, rt: SceneRuntime, game: GameState):
   if (!allowedActionsFor(scene, step).includes('roll'))
     return step?.hint ?? 'Rolling is switched off in this step.';
   if (step && rt.satisfied) return 'Tap Next to continue.';
+  if (step?.ask && (step.ask.mode ?? 'before-roll') === 'before-roll' && !askAnswered(step, rt))
+    return 'Answer the question first.';
   if (
     step &&
     !step.expect &&
@@ -424,6 +436,9 @@ export function observe(
     counters.ack = 1;
   } else if (rt.satisfied) {
     return { runtime: rt, game };
+  } else if (input.kind === 'answered') {
+    bump(counters, 'ans');
+    if (input.correct) counters.ansOk = 1;
   } else if (input.kind === 'previewed') {
     bump(counters, `p:${input.betType}`);
   } else if (input.kind === 'auto-roll-completed') {

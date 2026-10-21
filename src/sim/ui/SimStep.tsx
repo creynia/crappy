@@ -7,6 +7,7 @@ export interface SimStepProps {
   rt: SceneRuntime;
   hintVisible: boolean;
   onNext: () => void;
+  onAnswer?: (choice: number) => void;
   onRestart: () => void;
   /** set on a demo step when it is not playing */
   onReplay?: (() => void) | undefined;
@@ -19,6 +20,7 @@ export function SimStep({
   rt,
   hintVisible,
   onNext,
+  onAnswer,
   onRestart,
   onReplay,
 }: SimStepProps) {
@@ -38,6 +40,8 @@ export function SimStep({
           nextLabel={rt.stepIndex === lastIdx ? 'Finish' : 'Next'}
           done={false}
           onNext={onNext}
+          {...(onAnswer ? { onAnswer } : {})}
+          asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
           onRestart={onRestart}
           {...(onReplay ? { onReplay } : {})}
         />

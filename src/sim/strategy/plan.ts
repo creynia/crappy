@@ -18,6 +18,8 @@ export interface PlanOptions extends Omit<ManyOptions, 'onProgress'> {
   seed?: number;
   /** target bust probability for the bankroll suggestion (default 0.05) */
   targetBust?: number;
+  /** stop counting once the bust rate is certainly above this (the returned rate is then a lower bound) */
+  stopAbove?: number;
   onProgress?(p: number): void;
 }
 
@@ -118,6 +120,9 @@ export function bustRateAt(
         });
         if (r.bustedAtRoll !== null) busts++;
         done++;
+        // already over the limit: the exact rate no longer matters, only that it is above it
+        if (opts.stopAbove !== undefined && busts > opts.stopAbove * sessions)
+          return resolve(busts / sessions);
         if (now() - t0 >= slice && done < sessions) return schedule(step);
       }
       resolve(busts / sessions);
@@ -127,53 +132,56 @@ export function bustRateAt(
 }
 
 export interface BankrollSuggestion {
-  /** smallest bankroll (a multiple of the step) found with bust probability at or under the target; null when none up to the cap */
+  /** a bankroll found with bust probability at or under the target, within `step` of the smallest such; null when none up to the cap */
   bankroll: Cents | null;
   /** bust probability at that bankroll (same seeds as the plan's own estimate) */
   bustRate: number;
   target: number;
   /** the largest bankroll tried, when none worked */
   cap: Cents;
+  /** how closely the answer is pinned down: one bankroll step less was over the target */
+  step: Cents;
 }
 
 /**
- * Smallest bankroll (to the nearest `step`, default $10) whose bust probability is at or under
- * `targetBust` (default 5%). Doubles the bankroll until it is safe, then bisects. Every estimate
- * uses the same seeds, so the answer is deterministic and the bust rate does not rise as the
- * bankroll grows.
+ * A bankroll whose bust probability is at or under `targetBust` (default 5%), within about 3% of the
+ * smallest that does (and never coarser than $10). Doubles from the plan's own bankroll until it is
+ * safe, then bisects. Every estimate uses the same seeds, so the answer is deterministic and the
+ * bust rate does not rise as the bankroll grows. Unsafe candidates are abandoned as soon as they
+ * are certainly over the target, which keeps the search quick.
  */
 export async function suggestBankroll(
   input: PlanInput,
-  opts: PlanOptions & { step?: Cents; capMultiple?: number } = {},
+  opts: PlanOptions & { capMultiple?: number } = {},
 ): Promise<BankrollSuggestion> {
   const target = opts.targetBust ?? 0.05;
-  const step = opts.step ?? 1000;
   const unit = input.strategy.unit;
-  const cap = Math.ceil((unit * (opts.capMultiple ?? 400)) / step) * step;
+  const base = 1000;
+  const cap = Math.ceil((unit * (opts.capMultiple ?? 400)) / base) * base;
   const cache = new Map<Cents, number>();
   const at = async (b: Cents): Promise<number> => {
     let v = cache.get(b);
     if (v === undefined) {
-      v = await bustRateAt(input, b, opts);
+      v = await bustRateAt(input, b, { ...opts, stopAbove: target });
       cache.set(b, v);
     }
     return v;
   };
-  // find a safe upper bound by doubling from one unit
   let lo = 0; // known unsafe (or zero)
-  let hi = Math.max(step, Math.ceil(unit / step) * step);
+  let hi = Math.max(base, Math.ceil(Math.max(unit, input.bankroll) / base) * base);
   while ((await at(hi)) > target) {
     lo = hi;
-    if (hi >= cap) return { bankroll: null, bustRate: cache.get(hi)!, target, cap: hi };
+    if (hi >= cap) return { bankroll: null, bustRate: cache.get(hi)!, target, cap: hi, step: base };
     hi = Math.min(cap, hi * 2);
   }
+  const step = Math.max(base, Math.round((hi * 0.03) / base) * base);
   while (hi - lo > step) {
-    const mid = lo + Math.floor((hi - lo) / 2 / step) * step;
-    if (mid <= lo) break;
+    const mid = lo + Math.max(base, Math.floor((hi - lo) / 2 / base) * base);
+    if (mid >= hi) break;
     if ((await at(mid)) > target) lo = mid;
     else hi = mid;
   }
-  return { bankroll: hi, bustRate: cache.get(hi)!, target, cap };
+  return { bankroll: hi, bustRate: cache.get(hi)!, target, cap, step };
 }
 
 /**

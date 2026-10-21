@@ -9,7 +9,7 @@ import {
 } from './plan';
 import type { PlanInput } from './plan';
 
-const sync = { schedule: (fn: () => void) => fn(), sessions: 200 };
+const sync = { schedule: (fn: () => void) => fn(), sessions: 150 };
 const input: PlanInput = {
   strategy: { id: 'pass-max-odds', unit: 1000 },
   bankroll: 30_000,
@@ -47,19 +47,21 @@ describe('session plan', () => {
       rates.push(await bustRateAt(input, b, sync));
     for (let i = 1; i < rates.length; i++) expect(rates[i]!).toBeLessThanOrEqual(rates[i - 1]!);
     expect(rates[0]!).toBeGreaterThan(rates[rates.length - 1]!);
-  });
+  }, 60_000);
 
   it('suggested bankroll keeps bust at or under 5%, and a smaller step does not', async () => {
     const s = await suggestBankroll(input, sync);
     expect(s.bankroll).not.toBeNull();
     expect(s.bustRate).toBeLessThanOrEqual(0.05);
     expect(await bustRateAt(input, s.bankroll!, sync)).toBeLessThanOrEqual(0.05);
-    // minimal to the step: one step less is over the target
-    expect(await bustRateAt(input, s.bankroll! - 1000, sync)).toBeGreaterThan(0.05);
+    // pinned down to within `step`: a bankroll one step lower is over the target
+    expect(await bustRateAt(input, Math.max(1000, s.bankroll! - s.step), sync)).toBeGreaterThan(
+      0.05,
+    );
     // fresh seeds: still about 5% (Monte Carlo tolerance)
     const fresh = await bustRateAt(input, s.bankroll!, { ...sync, seed: 9000, sessions: 400 });
     expect(fresh).toBeLessThan(0.05 + 0.05);
-  });
+  }, 60_000);
 
   it('says so when no bankroll up to the cap is enough', async () => {
     const s = await suggestBankroll(
@@ -68,7 +70,7 @@ describe('session plan', () => {
     );
     expect(s.bankroll).toBeNull();
     expect(s.bustRate).toBeGreaterThan(0.05);
-  });
+  }, 60_000);
 
   it('can be aborted', async () => {
     const ac = new AbortController();

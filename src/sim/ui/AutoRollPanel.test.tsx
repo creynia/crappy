@@ -80,4 +80,37 @@ describe('AutoRollPanel', () => {
     expect(cost).toBeLessThan(28);
     expect(row.querySelector('td')!.textContent).toMatch(/\.\d\d$/);
   });
+
+  it('"% of money bet" toggle swaps in the edge chart with axis labels and a summary', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} config={{ rollOptions: [100], sessions: [1] }} />, el);
+    await click(el, '[data-testid="auto-roll-run"]');
+    expect(el.querySelector('[data-testid="edge-chart"]')).toBeNull();
+    const toggle = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('% of money bet'),
+    )!;
+    await act(() => {
+      toggle.click();
+    });
+    const chart = el.querySelector('[data-testid="edge-chart"]')!;
+    expect(chart).not.toBeNull();
+    expect(el.querySelector('[data-testid="bankroll-chart"]')).toBeNull();
+    expect(chart.textContent).toContain('Rolls (log scale)');
+    expect(chart.querySelector('svg desc')!.textContent).toContain('House edge');
+    expect(chart.querySelector('[data-role="funnel"]')).not.toBeNull();
+    expect(chart.querySelector('[data-role="house-edge"]')).not.toBeNull();
+  });
+
+  it('scene chart: edge opens on the edge chart', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={7}
+        config={{ rollOptions: [100], sessions: [1], chart: 'edge' }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    expect(el.querySelector('[data-testid="edge-chart"]')).not.toBeNull();
+  });
 });

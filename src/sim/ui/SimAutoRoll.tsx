@@ -39,6 +39,7 @@ export function SimAutoRoll({
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.chart) cfg.chart = ar.chart;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(

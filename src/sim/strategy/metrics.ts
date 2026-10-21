@@ -1,5 +1,5 @@
 import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
-import { betEdge, betVariance, tableExpectedLossPerRoll, toNumber } from '../math';
+import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
@@ -126,50 +126,4 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
   };
-}
-
-/**
- * Spread of "result per dollar wagered" for the strategy's steady layout: after n rolls the ratio
- * (actual result / total wagered) has standard deviation about `sigma / sqrt(n)` around the house
- * edge. Treats every bet's resolutions as independent (variance per roll = variance per
- * resolution / expected rolls per resolution), so it is an approximation, not an exact figure.
- * `sigma` is a pure number (dollars of result per dollar wagered, per square-root roll).
- */
-export function strategyRatioSigma(spec: StrategySpec, rules: TableRules): number {
-  const state = steadyState(spec, rules);
-  let wagered = 0; // cents per roll
-  let variance = 0; // cents^2 per roll
-  for (const b of state.bets) {
-    const lay = b.type === 'dont-pass-odds' || b.type === 'dont-come-odds';
-    if (b.type.endsWith('-odds')) {
-      const parent = state.bets.find((x) => x.id === b.parentId);
-      if (!parent) continue;
-      const maxMult = (lay ? rules.maxLayOdds : rules.maxOdds)[b.point ?? 6];
-      const frac =
-        maxMult > 0 && parent.amount > 0 ? Math.min(1, b.amount / (parent.amount * maxMult)) : 0;
-      // odds sized as an expected multiple of the flat bet over the point distribution
-      const k =
-        b.amount > 0 ? (parent.amount * frac * oddsMultiplePerDecision(rules, lay)) / b.amount : 0;
-      const e = betEdge(parent.type, parent.amount, {
-        phase: 'come-out',
-        point: null,
-        rules,
-      });
-      const rolls = toNumber(e.expectedRolls);
-      const v = toNumber(
-        betVariance(b, { phase: 'point', point: (b.point ?? 6) as PointNumber, rules }),
-      );
-      wagered += (b.amount * k) / rolls;
-      variance += (v * k * k) / rolls;
-      continue;
-    }
-    const ctx = LINE_TYPES.has(b.type)
-      ? { phase: 'come-out' as const, point: null }
-      : { phase: 'point' as const, point: 6 as PointNumber };
-    const e = betEdge(b.type, b.amount, { ...ctx, rules });
-    const rolls = toNumber(e.expectedRolls);
-    wagered += b.amount / rolls;
-    variance += toNumber(betVariance(b, { ...ctx, rules })) / rolls;
-  }
-  return wagered > 0 ? Math.sqrt(variance) / wagered : 0;
 }

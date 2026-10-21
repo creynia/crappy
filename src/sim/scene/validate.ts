@@ -373,6 +373,7 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'chart',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -400,6 +401,8 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
+        c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

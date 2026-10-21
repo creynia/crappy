@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
+  edgeFunnelSigma,
   listStrategies,
   simulateCompare,
   simulateMany,
@@ -19,6 +20,7 @@ import type {
 } from '../strategy';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { EdgeChart, edgeSeries } from './EdgeChart';
 import { TotalsHistogram } from './TotalsHistogram';
 import { fmtMoney } from './text';
 
@@ -51,6 +53,8 @@ export interface AutoRollPanelProps {
     rollOptions?: number[];
     sessions?: number[];
     compareMode?: boolean;
+    /** which chart a single session opens with (default 'bankroll') */
+    chart?: 'bankroll' | 'edge';
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
   };
@@ -88,6 +92,8 @@ type Outcome =
       specs: StrategySpec[];
       cfg: SessionConfig;
       metrics: Metrics[];
+      /** spread of result per dollar wagered, only for a lone single-session run */
+      sigma?: number;
     }
   | {
       kind: 'many';
@@ -146,6 +152,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [seed, setSeed] = useState<number>(props.initialSeed ?? 1);
   const [progress, setProgress] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -190,7 +197,15 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        setOutcome({ kind: 'single', results, specs, cfg, metrics: metricsFor(specs) });
+        const sigma = specs.length === 1 ? edgeFunnelSigma(specs[0]!, rulesInput) : undefined;
+        setOutcome({
+          kind: 'single',
+          results,
+          specs,
+          cfg,
+          metrics: metricsFor(specs),
+          ...(sigma !== undefined ? { sigma } : {}),
+        });
         props.onCompleted?.(results[0]!, results, specs);
       } else {
         const ac = new AbortController();
@@ -476,20 +491,37 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       }));
     }
     const metrics = o.metrics;
+    const canEdge = o.kind === 'single' && o.sigma !== undefined && o.results[0]!.rollsPlayed >= 2;
+    const edgeView = canEdge && chartKind === 'edge';
     return (
       <>
+        {canEdge && (
+          <div class="sim-ar-group" role="group" aria-label="Chart units">
+            {button(chartKind === 'bankroll', 'Bankroll', () => setChartKind('bankroll'))}
+            {button(chartKind === 'edge', 'Show as % of money bet', () => setChartKind('edge'))}
+          </div>
+        )}
         {o.kind === 'many' && (
           <div class="sim-ar-group" role="group" aria-label="Chart">
             {button(chartTab === 'results', 'Session results', () => setChartTab('results'))}
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
         )}
-        <BankrollChart
-          mode={mode}
-          series={series}
-          start={start}
-          sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
-        />
+        {edgeView ? (
+          <EdgeChart
+            label={nameOf(o.specs[0]!.id)}
+            ratio={edgeSeries(o.results[0]!.equity, o.results[0]!.wagered)}
+            edge={o.metrics[0]!.edgeOnAction}
+            sigma={o.sigma!}
+          />
+        ) : (
+          <BankrollChart
+            mode={mode}
+            series={series}
+            start={start}
+            sessions={o.kind === 'many' ? o.results[0]!.sessions : 1}
+          />
+        )}
         <table class="sim-ar-summary" data-testid="auto-roll-summary">
           <thead>
             <tr>

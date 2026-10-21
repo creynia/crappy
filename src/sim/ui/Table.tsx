@@ -25,6 +25,8 @@ export interface TableProps {
   /** the subset of disabledRegions the rules don't offer (announced as "not offered", not "this lesson") */
   unofferedRegions?: ReadonlySet<RegionId>;
   highlightedBets?: readonly BetTypeId[];
+  /** the odds nudge: outline the region of this flat bet type (static under reduced motion) */
+  oddsSpotType?: BetTypeId;
   fieldPays?: { 2: number; 12: number };
   /** bets that just lost: ghost stacks slide to the dealer and fade */
   lostBets?: readonly Bet[];
@@ -151,6 +153,7 @@ export function Table({
   disabledRegions,
   unofferedRegions,
   highlightedBets,
+  oddsSpotType,
   fieldPays = { 2: 2, 12: 2 },
   lostBets,
   wonBets,
@@ -274,11 +277,12 @@ export function Table({
           const disabled = disabledRegions?.has(region.id) ?? false;
           const rbets = byRegion.get(region.id) ?? [];
           const highlighted = rbets.length === 0 && region.betTypes.some((t) => hl.has(t));
+          const oddsSpot = !!oddsSpotType && region.betTypes.includes(oddsSpotType);
           const { x, y, w: rw, h: rh } = region.rect;
           return (
             <g
               key={region.id}
-              class={`sim-region${disabled ? ' is-disabled' : ''}${highlighted ? ' is-highlighted' : ''}${selectedRegion === region.id ? ' is-selected' : ''}`}
+              class={`sim-region${disabled ? ' is-disabled' : ''}${highlighted ? ' is-highlighted' : ''}${oddsSpot ? ' is-odds-spot' : ''}${selectedRegion === region.id ? ' is-selected' : ''}`}
               role="button"
               tabindex={0}
               data-region={region.id}

@@ -13,6 +13,7 @@ import { Table } from './Table';
 import { Toasts } from './Toasts';
 import { portraitLayout, spotPosition } from './layouts';
 import { buildEvFacts } from './text';
+import { OddsHint } from './OddsHint';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
 import type { BetTypeId } from '../engine/types';
@@ -800,6 +801,41 @@ describe('DiceGrid', () => {
     expect(screen.getByText('Win (4)')).toBeTruthy();
     expect(screen.getByText('extra')).toBeTruthy();
     expect(screen.getAllByLabelText(/1 and 1, total 2: wins/)).toHaveLength(1);
+  });
+});
+
+describe('OddsHint', () => {
+  it("lays against a Don't pass and names the room; both buttons call back", () => {
+    render(
+      <OddsHint
+        room={{ betId: 'b', type: 'dont-pass', label: "Don't pass", point: 6, room: 6000 }}
+        onDismiss={() => {}}
+        onHideForever={() => {}}
+      />,
+    );
+    expect(document.querySelector('[data-testid="odds-hint"]')!.textContent).toContain(
+      'Lay $60 odds: 0% edge',
+    );
+    cleanup();
+  });
+  it('states the room and the 0% edge, and both buttons call back', () => {
+    const onDismiss = vi.fn();
+    const onHideForever = vi.fn();
+    render(
+      <OddsHint
+        room={{ betId: 'b', type: 'pass-line', label: 'Pass line', point: 6, room: 3000 }}
+        onDismiss={onDismiss}
+        onHideForever={onHideForever}
+      />,
+    );
+    const text = document.querySelector('[data-testid="odds-hint"]')!.textContent;
+    expect(text).toContain('Add $30 odds: 0% edge');
+    expect(text).toContain('no house edge');
+    expect(document.querySelector('[role=status]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    fireEvent.click(screen.getByRole('button', { name: "Don't show again" }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onHideForever).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -6,6 +6,8 @@ export interface ToastItem {
   id: string;
   text: string;
   tone?: ToastTone;
+  /** a roll's result toast (hidden, not dismissed, while the odds nudge is up) */
+  roll?: boolean;
 }
 export interface ToastsProps {
   toasts: readonly ToastItem[];

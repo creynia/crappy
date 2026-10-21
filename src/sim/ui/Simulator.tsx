@@ -38,6 +38,8 @@ import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
+import { OddsHint, oddsHintText } from './OddsHint';
+import { oddsRoom, type OddsRoom } from './oddsHint';
 import { WinPrompt } from './WinPrompt';
 import {
   saveAskAfterWin,
@@ -139,14 +141,23 @@ export function Simulator(props: SimulatorInternalProps) {
   const [winTarget, setWinTarget] = useState<WinPromptTarget | null>(null);
   const landscape = useLandscape(scene);
 
-  const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
-    const id = `t${++toastN.current}`;
-    setToasts((t) => [...t.slice(-1), { id, text, tone }]);
-  }, []);
   const lastRollText = useRef('');
-  const announce = useCallback((text: string) => {
+  const pushToast = useCallback(
+    (text: string, tone: ToastItem['tone'] = 'info', roll?: boolean) => {
+      const id = `t${++toastN.current}`;
+      setToasts((t) => [...t.slice(-1), { id, text, tone, ...(roll ? { roll } : {}) }]);
+    },
+    [],
+  );
+  const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
+  // A roll's announcement is made by an effect after the render (see below), so that the odds nudge
+  // can join it in the same live update.
+  const [rollSeq, setRollSeq] = useState(0);
+  const rollTextRef = useRef('');
+  const announceRoll = useCallback((text: string) => {
+    rollTextRef.current = text;
     lastRollText.current = text;
-    setLive((l) => ({ text, n: l.n + 1 }));
+    setRollSeq((n) => n + 1);
   }, []);
 
   const watchSpeed = useRef<Speed | null>(null);
@@ -156,7 +167,7 @@ export function Simulator(props: SimulatorInternalProps) {
     pushToast,
     // a replay would flood the live region (one message per roll): it announces only its end
     (text) => {
-      if (watchSpeed.current === null) announce(text);
+      if (watchSpeed.current === null) announceRoll(text);
     },
     (pre, post, events) => {
       // a replayed run is not the player's own history: keep it out of the roll log
@@ -201,6 +212,42 @@ export function Simulator(props: SimulatorInternalProps) {
 
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
+  // One-time odds nudge (scene ui.hints). "Don't show again" is a per-viewer preference in localStorage.
+  const [hideOddsHint, setHideOddsHint] = useState(() => {
+    try {
+      return localStorage.getItem('crappy-sim-hide-odds-hint') === '1';
+    } catch {
+      return false;
+    }
+  });
+  // The nudge is shown once per mount, then stays until dismissed (or the point goes off).
+  const [oddsHint, setOddsHint] = useState<OddsRoom | null>(null);
+  // A table restored with a point on it (a saved table or a shared link) is not a first point: no nudge.
+  const oddsShownOnce = useRef(liveGame.point !== null);
+  // Computed from the state after the roll has finished animating.
+  const oddsNow =
+    ui.hints === true && !hideOddsHint && !panels.auto && !anim.busy ? oddsRoom(liveGame) : null;
+  // the nudge is not sticky: the next roll takes it away (its own toast then shows as usual);
+  // "Don't show again" is the permanent opt-out
+  const oddsHintRoll = useRef(0);
+  useEffect(() => {
+    if (oddsHint && liveGame.rollCount > oddsHintRoll.current) setOddsHint(null);
+  }, [liveGame.rollCount]);
+  useEffect(() => {
+    if (rollSeq === 0) return;
+    const roll = rollTextRef.current;
+    rollTextRef.current = '';
+    if (oddsNow && !oddsShownOnce.current) {
+      oddsShownOnce.current = true;
+      oddsHintRoll.current = liveGame.rollCount;
+      setOddsHint(oddsNow);
+      announce(`${roll} ${oddsHintText(oddsNow)}`);
+    } else announce(roll);
+  }, [rollSeq]);
+  useEffect(() => {
+    if (oddsHint && !anim.busy && liveGame.phase !== 'point') setOddsHint(null);
+  }, [liveGame.phase, anim.busy]);
+  const oddsHintRoom = panels.auto ? null : oddsHint;
   const step = currentStep(scene, rt);
   const demo = useDemoPlayback({
     step,
@@ -256,6 +303,27 @@ export function Simulator(props: SimulatorInternalProps) {
     chip,
   });
   const { sheet } = sh;
+  // "Show odds hints" (Menu) and "Don't show again" (the nudge) share one per-viewer key
+  const setOddsHintsOn = (on: boolean) => {
+    try {
+      if (on) localStorage.removeItem('crappy-sim-hide-odds-hint');
+      else localStorage.setItem('crappy-sim-hide-odds-hint', '1');
+    } catch {
+      /* private mode: the choice just lasts for this session */
+    }
+    setHideOddsHint(!on);
+    if (!on) setOddsHint(null);
+  };
+  // The card is portrait only: it sits in the status block beside the point and dice and takes the
+  // place of that roll's toast. In landscape the outlined odds spot and the announcer carry the hint.
+  const oddsHintCard = !landscape && oddsHintRoom;
+  const oddsHintEl = oddsHintCard ? (
+    <OddsHint
+      room={oddsHintCard}
+      onDismiss={() => setOddsHint(null)}
+      onHideForever={() => setOddsHintsOn(false)}
+    />
+  ) : null;
 
   // ---------- derived UI data ----------
   const onTable = game.bets.reduce((t, b) => t + b.amount, 0);
@@ -429,6 +497,7 @@ export function Simulator(props: SimulatorInternalProps) {
     disabledRegions,
     unofferedRegions,
     highlightedBets: highlighted,
+    oddsSpotType: oddsHintRoom?.type,
     callouts: calloutsFor(scene, step),
     fieldPays: game.rules.fieldPays,
     lostBets: anim.lost,
@@ -503,7 +572,9 @@ export function Simulator(props: SimulatorInternalProps) {
   // text nothing taps, never a betting region or the lesson step card.
   const toastsEl = (
     <Toasts
-      toasts={toasts}
+      // for its one roll the portrait nudge takes the place of the roll toasts (the roll is announced);
+      // other messages ("Link copied") still show
+      toasts={oddsHintCard ? toasts.filter((t) => !t.roll) : toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
       hidden={winShown}
@@ -575,6 +646,7 @@ export function Simulator(props: SimulatorInternalProps) {
           {!landscape ? (
             <div class="sim-status-wrap sim-status-wrap-cost">
               {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
+              {oddsHintEl}
             </div>
           ) : null}
           <div class="sim-felt-body">
@@ -604,7 +676,7 @@ export function Simulator(props: SimulatorInternalProps) {
             {controls}
           </div>
         ) : (
-          controls
+          <>{controls}</>
         )}
       </div>
 
@@ -625,6 +697,9 @@ export function Simulator(props: SimulatorInternalProps) {
                 currentRules={liveGame.rules}
                 settings={settings}
                 setSettings={setSettings}
+                {...(ui.hints === true
+                  ? { oddsHints: { on: !hideOddsHint, onChange: setOddsHintsOn } }
+                  : {})}
                 {...(sandbox
                   ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
                   : {})}

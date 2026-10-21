@@ -7,7 +7,7 @@ import type { ToastItem } from './Toasts';
 /** Plays a roll's timeline: the shown (pre/post) state, tumbling dice, and lost/won chip overlays. */
 export function useAnimationPlayer(
   getSpeed: () => Speed,
-  pushToast: (text: string, tone?: ToastItem['tone']) => void,
+  pushToast: (text: string, tone?: ToastItem['tone'], roll?: boolean) => void,
   announce: (text: string) => void,
   /** a roll has fully played (or was cut short by the next one): the moment its result is shown */
   onFinished?: (pre: GameState, post: GameState, events: GameEvent[]) => void,
@@ -48,7 +48,7 @@ export function useAnimationPlayer(
       player.current = null;
       pending.current = null;
       onFinished?.(pre, post, events);
-      pushToast(text, tone);
+      pushToast(text, tone, true);
       // the one live message per roll (the toast above is visual only)
       announce(rollAnnouncement(events, post, pre.bets));
     };

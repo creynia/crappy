@@ -14,7 +14,7 @@ export const SANDBOX_SCENE: SceneConfig = {
   version: 1,
   bankroll: 50_000,
   allowedBets: 'all',
-  ui: { showSettings: true, showBankroll: true, showHistory: true },
+  ui: { showSettings: true, showBankroll: true, showHistory: true, hints: true },
 };
 
 export function randomSeed(): number {

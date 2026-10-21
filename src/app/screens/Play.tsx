@@ -21,7 +21,7 @@ export function Play({ query }: { query: URLSearchParams }) {
     bankroll: Math.round(s.defaultBankroll * 100),
     allowedBets: 'all',
     ...(isBetTypeId(preset) ? { highlightedBets: [preset] } : {}),
-    ui: { showSettings: true, showBankroll: true, showHistory: true },
+    ui: { showSettings: true, showBankroll: true, showHistory: true, hints: true },
   };
   return (
     <div class="page page-wide">

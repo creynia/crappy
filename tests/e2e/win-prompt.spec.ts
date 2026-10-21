@@ -154,4 +154,26 @@ test.describe('win prompt', () => {
     await page.keyboard.press('Escape');
     await expect(prompt).toHaveCount(0);
   });
+
+  test('the odds nudge is gone by the time the win prompt shows, and stays gone', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name === 'desktop', 'covered on phone sizes');
+    await page.goto(url);
+    await page.locator('[data-region="pass"]').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    await placeSix(page); // 2-2: point 4, the nudge comes up (a card in portrait, an outline in landscape)
+    const hint = page.getByTestId('odds-hint');
+    if (info.project.name === 'phone-landscape')
+      await expect(page.locator('.sim-region.is-odds-spot')).not.toHaveCount(0);
+    else await expect(hint).toBeVisible();
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 3-3: the 6 hits
+    const prompt = page.getByTestId('win-prompt');
+    await expect(prompt).toBeVisible();
+    // the nudge is not sticky: the roll took it away, so the prompt is the only message
+    await expect(hint).toHaveCount(0);
+    await prompt.getByRole('button', { name: /^Same bet/ }).click();
+    await expect(prompt).toHaveCount(0);
+    await expect(hint).toHaveCount(0);
+  });
 });

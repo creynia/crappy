@@ -207,6 +207,135 @@ describe('Simulator roll announcements', () => {
   });
 });
 
+describe('odds nudge', () => {
+  const base: SceneConfig = {
+    id: 'o',
+    version: 1,
+    bankroll: 50000,
+    forcedDice: [
+      [3, 3],
+      [2, 2],
+    ],
+  };
+  const nudge = () => document.querySelector('[data-testid="odds-hint"]');
+  const rollBtn = () => screen.getByRole('button', { name: /^Roll/ });
+  const passTen = (container: Element) => {
+    fireEvent.click(container.querySelector('[data-region="pass"]')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+  };
+  const live = (c: Element) =>
+    c.querySelector('[data-testid="roll-announcer"]')!.textContent.trim();
+
+  it('appears after the point is set, with focus left on Roll, and is announced once', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    expect(nudge()).toBeNull();
+    rollBtn().focus();
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(nudge()).not.toBeNull());
+    expect(nudge()!.textContent).toContain('Add $25 odds: 0% edge');
+    // the nudge follows the roll announcement once the roll has finished
+    expect(live(container)).toMatch(
+      /^Rolled 3 and 3, 6, the hard way\..*Add up to \$25 odds behind your Pass line on 6/,
+    );
+    expect(document.activeElement).toBe(rollBtn());
+  });
+
+  it('"Got it" dismisses it, and it does not come back on the next roll', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(nudge()).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(nudge()).toBeNull();
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(live(container)).toMatch(/\S/));
+    expect(nudge()).toBeNull();
+  });
+
+  it('is not sticky: the next roll takes it away and that roll shows its own toast', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(nudge()).not.toBeNull());
+    fireEvent.click(rollBtn()); // 2-2
+    await waitFor(() => expect(nudge()).toBeNull());
+    await waitFor(() =>
+      expect(container.querySelector('.sim-toasts')!.textContent).toMatch(/4|Hard 4|2 and 2/),
+    );
+  });
+
+  it('landscape shows no card: the odds spot outline carries the hint', async () => {
+    const { container } = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'landscape' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(container.querySelector('.is-odds-spot')).not.toBeNull());
+    expect(nudge()).toBeNull();
+    expect(live(container)).toMatch(/Add up to \$25 odds behind your Pass line on 6/);
+  });
+
+  it('"Don\'t show again" persists across a remount', async () => {
+    const first = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(first.container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(nudge()).not.toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: "Don't show again" }));
+    expect(nudge()).toBeNull();
+    first.unmount();
+    const second = render(
+      <Simulator
+        scene={{ ...base, ui: { hints: true, orientation: 'portrait' } }}
+        initialSettings={instant}
+        onEvent={() => {}}
+      />,
+    );
+    passTen(second.container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(live(second.container)).toMatch(/\S/));
+    expect(nudge()).toBeNull();
+  });
+
+  it('never shows without ui.hints', async () => {
+    const { container } = render(
+      <Simulator scene={base} initialSettings={instant} onEvent={() => {}} />,
+    );
+    passTen(container);
+    fireEvent.click(rollBtn());
+    await waitFor(() => expect(live(container)).toMatch(/\S/));
+    expect(nudge()).toBeNull();
+  });
+});
+
 describe('watch mode', () => {
   it('replays a recorded run on the table, ends at the run result, and exit restores the table', async () => {
     const { container } = render(<Simulator initialSettings={instant} />);

@@ -53,6 +53,8 @@ export interface SceneConfig {
     showSettings?: boolean;
     speed?: 'normal' | 'fast' | 'instant';
     compact?: boolean;
+    /** show the one-time "odds are available, 0% edge" nudge after a point is set */
+    hints?: boolean;
     /** ask Press / Same / Regress / Take down after a place or buy bet wins (off in scenes unless true) */
     winPrompt?: boolean;
     /** hide the step panel's Restart (default shown); a challenge keeps its seed */

@@ -365,11 +365,24 @@
   left: 0;
   right: 0;
   top: 0;
-  bottom: auto;
+  bottom: 0;
   gap: 2px;
-  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
-  max-height: 100%;
+  /* exactly the status block, so the stack ends above the Roll button below it: an item that does
+     not fit wraps into a second column outside the rail (clipped), never half over Roll */
+  flex-flow: column wrap;
+  align-content: flex-start;
   overflow: hidden;
+}
+.sim-land .sim-toasts > * {
+  width: 100%;
+  flex: 0 0 auto;
+}
+/* a toast in front of the Roll row must not take its taps: text passes through, only the dismiss box takes them */
+.sim-land .sim-toast {
+  pointer-events: none;
+}
+.sim-land .sim-toast-x {
+  pointer-events: auto;
 }
 .sim-land .sim-toast > span {
   display: -webkit-box;
@@ -1082,6 +1095,93 @@
   margin-top: 0.375rem;
 }
 
+.sim-odds-hint {
+  /* one row in every orientation: short text plus two 44px icon buttons */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 2px 8px;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  font-size: 0.75rem;
+  pointer-events: auto;
+}
+.sim-odds-hint p {
+  margin: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  /* up to two lines in a narrow rail, never clipped sideways */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.sim-odds-hint-actions {
+  display: flex;
+  gap: 0;
+  flex: 0 0 auto;
+}
+/* portrait: for its one roll the nudge sits in the status block, right of the point badge and the
+   dice (about 136px), on the status row's baseline: 44px tall, clear of the bankroll above-left and of
+   the felt below. It may cover the right of "On table / Session" for that roll. */
+.sim-status-wrap > .sim-odds-hint {
+  position: absolute;
+  /* above the status row's own controls (the cost toggle, the history pills) */
+  z-index: 30;
+  left: 140px;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 0 0 8px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--sim-border);
+}
+.sim-odds-hint-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--sim-text);
+  background: transparent;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-odds-hint {
+    animation: sim-odds-hint-in 0.2s ease-out;
+  }
+}
+@keyframes sim-odds-hint-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* odds nudge: outline the flat bet's region; a gentle pulse only when motion is allowed */
+.sim-region.is-odds-spot rect {
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-dasharray: 6 4;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-region.is-odds-spot rect {
+    animation: sim-odds-spot 1.6s ease-in-out infinite;
+  }
+}
+@keyframes sim-odds-spot {
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
 .sim-chart-legend {
   list-style: none;
   margin: 4px 0 0;

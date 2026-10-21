@@ -489,6 +489,7 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'hints',
         'winPrompt',
         'showRestart',
         'stepPanelLabel',
@@ -513,6 +514,7 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'hints',
         'winPrompt',
         'showRestart',
       ])

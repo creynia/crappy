@@ -373,6 +373,8 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'stopWin',
+        'stopLoss',
       ]);
       c.bool('autoRoll.enabled', a.enabled);
       autoOn = a.enabled === true;
@@ -400,6 +402,8 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.stopWin !== undefined) c.cents('autoRoll.stopWin', a.stopWin, { min: 1 });
+      if (a.stopLoss !== undefined) c.cents('autoRoll.stopLoss', a.stopLoss, { min: 1 });
       if (a.compare !== undefined) {
         if (!Array.isArray(a.compare) || a.compare.length < 2 || a.compare.length > 3)
           c.err('autoRoll.compare', 'must be an array of 2-3 strategy specs');

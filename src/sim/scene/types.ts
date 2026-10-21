@@ -53,6 +53,10 @@ export interface SceneConfig {
     compareMode?: boolean;
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
+    stopWin?: Cents;
+    /** default "stop when behind by" amount, in cents */
+    stopLoss?: Cents;
   };
   steps?: SceneStep[];
 }

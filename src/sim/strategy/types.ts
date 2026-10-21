@@ -89,6 +89,9 @@ export interface ManyResult {
   finals: Int32Array;
   meanFinal: number;
   probAhead: number;
+  /** Share of sessions that ended by reaching SessionConfig.stopWin / stopLoss. */
+  stopWinRate: number;
+  stopLossRate: number;
 }
 export interface ManyOptions {
   onProgress?(p: number): void;

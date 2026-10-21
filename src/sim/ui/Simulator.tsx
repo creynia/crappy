@@ -704,6 +704,8 @@ export function Simulator(props: SimulatorInternalProps) {
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.stopWin !== undefined) cfg.stopWin = ar.stopWin;
+    if (ar.stopLoss !== undefined) cfg.stopLoss = ar.stopLoss;
     return cfg;
   }, [ar]);
   const layoutBets = useMemo(

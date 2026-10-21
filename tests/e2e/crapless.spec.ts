@@ -28,7 +28,9 @@ test.describe('crapless craps', () => {
       'aria-label',
       /Not offered on crapless craps\./,
     );
-    await page.getByRole('button', { name: 'Menu' }).click();
+    // close the Menu panel (a modal sheet on phones, I064) before tapping the felt
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
     await page.locator('[data-region="dont-pass"]').click({ force: true }); // dimmed (aria-disabled) but tappable
     await expect(page.locator('.sim-toast').first()).toContainText("no don't side");
     await expect(page.getByRole('dialog')).toHaveCount(0);

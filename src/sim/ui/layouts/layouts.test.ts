@@ -114,7 +114,11 @@ describe.each([craplessPortraitLayout, craplessLandscapeLayout])(
       );
       for (const n of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const)
         expect(layout.puck[n]).toBeDefined();
-      expect(boxes.find((r) => r.id === 'box-2')!.betTypes).toEqual(['place-2', 'come-odds']);
+      for (const n of [2, 3, 11, 12] as const)
+        expect(boxes.find((r) => r.id === `box-${n}`)!.betTypes, `box-${n}`).toEqual([
+          `place-${n}`,
+          'come-odds',
+        ]);
       expect(boxes.find((r) => r.id === 'box-12')!.sublabel).toBe('Place pays 11 to 2');
       expect(boxes.find((r) => r.id === 'box-3')!.sublabel).toBe('Place pays 11 to 4');
     });

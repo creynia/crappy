@@ -1,3 +1,4 @@
+import { equity } from '../engine/game';
 import type { Cents, GameEvent, GameState } from '../engine/types';
 import type { ManyResult, SessionResult } from '../strategy/types';
 import { describeRoll, fmtMoney } from './text';
@@ -46,7 +47,11 @@ const OUTCOMES: Partial<Record<GameEvent['type'], LogOutcomeKind>> = {
  * The per-roll summary behind the log. `text` comes from describeRoll, the function that also feeds
  * the toast and the screen-reader announcement, so there is one wording.
  */
-export function summarizeRoll(post: GameState, events: readonly GameEvent[]): RollLogEntry | null {
+export function summarizeRoll(
+  pre: GameState,
+  post: GameState,
+  events: readonly GameEvent[],
+): RollLogEntry | null {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
   );
@@ -54,7 +59,7 @@ export function summarizeRoll(post: GameState, events: readonly GameEvent[]): Ro
   let point: LogPointEvent | null = null;
   const outcomes: LogOutcomeKind[] = [];
   for (const e of events) {
-    // a come-out roll can report both a natural/craps and nothing else; keep the puck events last
+    // the puck events (point set / made / seven-out) win over natural / craps
     const p = POINT_EVENTS[e.type];
     if (p && (point === null || p === 'point-set' || p === 'point-made' || p === 'seven-out'))
       point = p;
@@ -68,48 +73,50 @@ export function summarizeRoll(post: GameState, events: readonly GameEvent[]): Ro
     n: r.n,
     dice: [r.dice[0], r.dice[1]],
     total: r.total,
-    text: describeRoll(events),
+    text: describeRoll(events, pre.bets),
     point,
     outcomes,
     net: r.net,
-    bankroll: post.bankroll,
+    bankroll: equity(post),
   };
 }
 
+/** The bankroll an auto-roll run started with, read from the result itself (it may differ from the table's). */
+function startOf(result: SessionResult | ManyResult): Cents {
+  return 'rollsPlayed' in result ? result.finalEquity + result.actualLoss : (result.p50[0] ?? 0);
+}
+
 /** "Auto-roll: 100 rolls, net -$12.40." */
-export function autoRollText(result: SessionResult | ManyResult, bankroll: Cents): string {
+export function autoRollText(result: SessionResult | ManyResult): string {
+  const start = startOf(result);
+  const signed = (n: Cents) => (n === 0 ? '$0' : fmtMoney(n, { sign: true }));
   if ('rollsPlayed' in result) {
-    const net = result.finalEquity - bankroll;
-    return `Auto-roll: ${result.rollsPlayed} ${result.rollsPlayed === 1 ? 'roll' : 'rolls'}, net ${
-      net === 0 ? '$0' : fmtMoney(net, { sign: true })
-    }.`;
+    return `Auto-roll: ${result.rollsPlayed} ${result.rollsPlayed === 1 ? 'roll' : 'rolls'}, net ${signed(result.finalEquity - start)}.`;
   }
   const rolls = Math.max(0, result.p50.length - 1);
-  const median = (result.p50[rolls] ?? bankroll) - bankroll;
-  return `Auto-roll: ${result.sessions} sessions of ${rolls} rolls, median net ${
-    median === 0 ? '$0' : fmtMoney(median, { sign: true })
-  }.`;
+  const median = (result.p50[rolls] ?? start) - start;
+  return `Auto-roll: ${result.sessions} sessions of ${rolls} rolls, median net ${signed(median)}.`;
 }
 
 export function autoRollEntry(
   result: SessionResult | ManyResult,
-  bankrollBefore: Cents,
   game: GameState,
   seq: number,
 ): RollLogEntry {
+  const start = startOf(result);
   const net =
     'rollsPlayed' in result
-      ? result.finalEquity - bankrollBefore
-      : (result.p50[result.p50.length - 1] ?? bankrollBefore) - bankrollBefore;
+      ? result.finalEquity - start
+      : (result.p50[result.p50.length - 1] ?? start) - start;
   return {
     id: `a${seq}`,
     kind: 'auto',
     n: game.rollCount,
-    text: autoRollText(result, bankrollBefore),
+    text: autoRollText(result),
     point: null,
     outcomes: [],
     net,
-    bankroll: game.bankroll,
+    bankroll: equity(game),
   };
 }
 
@@ -124,7 +131,8 @@ export function matchesFilter(e: RollLogEntry, f: LogFilter): boolean {
     case 'losses':
       return e.kind === 'roll' && (e.outcomes.includes('lose') || e.net < 0);
     case 'points':
-      return e.kind === 'roll' && e.point !== null;
+      // the point going up or coming down; a natural or craps on the come-out is not a point event
+      return e.point === 'point-set' || e.point === 'point-made' || e.point === 'seven-out';
   }
 }
 
@@ -132,4 +140,33 @@ export function matchesFilter(e: RollLogEntry, f: LogFilter): boolean {
 export function appendLog(log: readonly RollLogEntry[], e: RollLogEntry): RollLogEntry[] {
   const next = [...log, e];
   return next.length > LOG_LIMIT ? next.slice(next.length - LOG_LIMIT) : next;
+}
+
+const POINTS = new Set<unknown>(['natural', 'craps', 'point-set', 'point-made', 'seven-out']);
+const KINDS = new Set<unknown>(['win', 'lose', 'push', 'returned', 'travel']);
+const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+
+function wellFormed(e: unknown): e is RollLogEntry {
+  if (typeof e !== 'object' || e === null) return false;
+  const o = e as Record<string, unknown>;
+  if (typeof o.id !== 'string' || typeof o.text !== 'string') return false;
+  if (o.kind !== 'roll' && o.kind !== 'auto') return false;
+  if (!finite(o.n) || !finite(o.net) || !finite(o.bankroll)) return false;
+  if (o.point !== null && !POINTS.has(o.point)) return false;
+  if (!Array.isArray(o.outcomes) || !o.outcomes.every((k) => KINDS.has(k))) return false;
+  if (o.kind === 'roll') {
+    const d = o.dice;
+    if (
+      !Array.isArray(d) ||
+      d.length !== 2 ||
+      !d.every((x) => Number.isInteger(x) && x >= 1 && x <= 6)
+    )
+      return false;
+  }
+  return true;
+}
+
+/** A saved log is untrusted: keep only the well-formed entries, and nothing if it is not an array. */
+export function sanitizeLog(v: unknown): RollLogEntry[] {
+  return Array.isArray(v) ? v.filter(wellFormed).slice(-LOG_PERSIST) : [];
 }

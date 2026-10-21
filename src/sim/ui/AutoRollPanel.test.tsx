@@ -137,3 +137,154 @@ describe('AutoRollPanel', () => {
     );
   });
 });
+
+describe('AutoRollPanel starting bankroll', () => {
+  const bustRow = (el: HTMLElement) =>
+    [...el.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find((tr) =>
+      tr.textContent?.startsWith('Busted sessions'),
+    ) ?? null;
+  const bustRate = (el: HTMLElement) => parseFloat(bustRow(el)!.querySelector('td')!.textContent);
+  const clickButton = async (el: HTMLElement, name: string) => {
+    await act(async () => {
+      const b = [...el.querySelectorAll('button')].find((x) => x.textContent === name)!;
+      b.click();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+  };
+
+  it('a $5,000 run starts at $5,000 and busts less often than a $200 run on the same seed', async () => {
+    const config = { rollOptions: [100], sessions: [100] };
+    const small = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, small);
+    await click(small, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => bustRow(small));
+    const smallRate = bustRate(small);
+
+    const big = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, big);
+    await clickButton(big, '$5,000');
+    await click(big, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => bustRow(big));
+    const bigRate = bustRate(big);
+    const start = [...big.querySelectorAll('[data-testid="auto-roll-summary"] tbody tr')].find(
+      (tr) => tr.textContent?.startsWith('Starting bankroll'),
+    )!;
+    expect(start.querySelector('td')!.textContent).toBe('$5,000.00');
+    expect(bigRate).toBeLessThan(smallRate);
+  });
+});
+
+describe('AutoRollPanel bankroll controls', () => {
+  const group = (el: HTMLElement, label: string) =>
+    el.querySelector(`[role="group"][aria-label="${label}"]`) as HTMLElement;
+  const btn = (scope: HTMLElement, text: string) =>
+    [...scope.querySelectorAll('button')].find((b) => b.textContent === text) as HTMLButtonElement;
+  const config = { rollOptions: [100], sessions: [100] };
+
+  it('disables stop-if-down chips above the starting bankroll', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, el);
+    expect(btn(group(el, 'Stop when behind by'), '$250').disabled).toBe(true);
+    expect(btn(group(el, 'Stop when behind by'), '$50').disabled).toBe(false);
+  });
+
+  it('clears a selected stop-if-down that becomes larger than the new bankroll', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel initialSeed={7} bankroll={50_000} config={{ ...config, stopLoss: 25_000 }} />,
+      el,
+    );
+    expect(btn(group(el, 'Stop when behind by'), '$250').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => {
+      btn(group(el, 'Starting bankroll'), '$200').click();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(btn(group(el, 'Stop when behind by'), '$250').getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
+
+  it('marks invalid custom input and clears the error when the field is emptied', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={50_000} config={config} />, el);
+    const input = group(el, 'Starting bankroll').querySelector('input') as HTMLInputElement;
+    await act(async () => {
+      input.value = '4';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(el.querySelector('#bankroll-error')!.textContent).toContain('table minimum');
+    expect(input.getAttribute('aria-describedby')).toBe('bankroll-error');
+    await act(async () => {
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(input.getAttribute('aria-invalid')).toBe('false');
+    expect(el.querySelector('#bankroll-error')).toBeNull();
+  });
+
+  it('shows the table value and disables the Table chip when it is below the table minimum', () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={312_00} config={config} />, el);
+    expect(btn(group(el, 'Starting bankroll'), 'Table ($312)')).toBeTruthy();
+    const small = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={300} config={config} />, small);
+    expect(btn(group(small, 'Starting bankroll'), 'Table ($3)').disabled).toBe(true);
+  });
+
+  it('remembers the sandbox bankroll pick, and ignores storage that throws', async () => {
+    const key = 'crappy.test.autoroll.bankroll';
+    window.localStorage.removeItem(key);
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel initialSeed={7} bankroll={50_000} persistKey={key} config={config} />,
+      el,
+    );
+    await act(async () => {
+      btn(group(el, 'Starting bankroll'), '$1,000').click();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(window.localStorage.getItem(key)).toBe('100000');
+    const again = document.createElement('div');
+    render(
+      <AutoRollPanel initialSeed={7} bankroll={50_000} persistKey={key} config={config} />,
+      again,
+    );
+    expect(btn(group(again, 'Starting bankroll'), '$1,000').getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    window.localStorage.removeItem(key);
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const blocked = document.createElement('div');
+    expect(() =>
+      render(
+        <AutoRollPanel initialSeed={7} bankroll={50_000} persistKey={key} config={config} />,
+        blocked,
+      ),
+    ).not.toThrow();
+    spy.mockRestore();
+  });
+
+  it('a scene with no table equity still runs: Table is disabled and the run uses $500', async () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel initialSeed={7} bankroll={0} config={config} />, el);
+    await waitUntil(() =>
+      btn(group(el, 'Starting bankroll'), '$500').getAttribute('aria-pressed') === 'true'
+        ? true
+        : null,
+    );
+    expect(btn(group(el, 'Starting bankroll'), 'Table ($0.00)').disabled).toBe(true);
+    expect(btn(group(el, 'Starting bankroll'), 'Table ($0.00)').getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+    expect(el.textContent).toContain('Table has $0.00, so runs start at $500.');
+    await click(el, '[data-testid="auto-roll-run"]');
+    await waitUntil(() => el.querySelector('[data-testid="auto-roll-output"]'));
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auto-roll-summary"]')!.textContent).toContain('$500.00');
+  });
+});

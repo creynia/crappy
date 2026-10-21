@@ -299,7 +299,15 @@ const NICKNAME: Record<number, string> = {
 };
 
 /** Bet results of a roll as sentences: "Pass line wins $5.", "Field loses $1.", ... */
-function betResultGroups(events: readonly GameEvent[]): string[] {
+function betResultGroups(events: readonly GameEvent[], bets?: readonly Bet[]): string[] {
+  // a hop bet is named by its pair, which only the bet itself knows
+  const label = (e: Extract<GameEvent, { betId: string; betType: BetTypeId }>): string => {
+    if (e.betType === 'hop') {
+      const hop = bets?.find((b) => b.id === e.betId)?.hop;
+      if (hop) return `Hop ${Math.min(hop[0], hop[1])}-${Math.max(hop[0], hop[1])}`;
+    }
+    return betLabel(e.betType);
+  };
   const wins: string[] = [];
   const losses: string[] = [];
   const pushes: string[] = [];
@@ -311,35 +319,44 @@ function betResultGroups(events: readonly GameEvent[]): string[] {
       progressed.push(
         `${betLabel(e.betType)} ${e.progress.length} of ${e.betType === 'all' ? 10 : e.betType === 'fire' ? 6 : 5}`,
       );
-    else if (e.type === 'bet-won')
-      wins.push(`${betLabel(e.betType)} wins ${fmtMoney(e.profit - e.vig)}`);
-    else if (e.type === 'bet-lost')
-      losses.push(`${betLabel(e.betType)} loses ${fmtMoney(e.amount)}`);
-    else if (e.type === 'bet-pushed') pushes.push(`${betLabel(e.betType)} pushes`);
-    else if (e.type === 'bet-returned') returned.push(`${betLabel(e.betType)} returned`);
+    else if (e.type === 'bet-won') wins.push(`${label(e)} wins ${fmtMoney(e.profit - e.vig)}`);
+    else if (e.type === 'bet-lost') losses.push(`${label(e)} loses ${fmtMoney(e.amount)}`);
+    else if (e.type === 'bet-pushed') pushes.push(`${label(e)} pushes`);
+    else if (e.type === 'bet-returned') returned.push(`${label(e)} returned`);
     else if (e.type === 'bet-travelled')
-      travelled.push(`${betLabel(e.betType)} moves to the ${e.point}`);
+      travelled.push(
+        e.betType === 'dont-come'
+          ? `${label(e)} goes behind the ${e.point}`
+          : `${label(e)} moves to the ${e.point}`,
+      );
   }
   return [wins, losses, pushes, returned, travelled, progressed]
     .filter((g) => g.length)
-    .map((g) => g.join(', ') + '.');
+    .map(
+      (g) =>
+        g.map((x, i) => (i === 0 ? x : x.charAt(0).toLowerCase() + x.slice(1))).join(', ') + '.',
+    );
 }
 
 /**
  * The one live announcement per roll: dice, total, bet results with amounts, bankroll after the roll,
  * and the point state. Built from the roll's events and the state after it.
  */
-export function rollAnnouncement(events: readonly GameEvent[], post: GameState): string {
+export function rollAnnouncement(
+  events: readonly GameEvent[],
+  post: GameState,
+  bets?: readonly Bet[],
+): string {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
   );
-  if (!roll) return describeRoll(events);
+  if (!roll) return describeRoll(events, bets);
   const [a, b] = roll.roll.dice;
   const r = roll.roll;
   let total = String(r.total);
   if (r.hard && r.total >= 4 && r.total <= 10 && r.total % 2 === 0) total += ', the hard way';
   else if (NICKNAME[r.total]) total += `, ${NICKNAME[r.total]}`;
-  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events)];
+  const sentences = [`Rolled ${a} and ${b}, ${total}.`, ...betResultGroups(events, bets)];
   sentences.push(`Bankroll ${fmtMoney(equity(post))}.`);
   const ended = events.find((e) => e.type === 'point-made' || e.type === 'seven-out');
   if (post.point === null)
@@ -354,7 +371,7 @@ export function rollAnnouncement(events: readonly GameEvent[], post: GameState):
   return sentences.join(' ');
 }
 
-export function describeRoll(events: readonly GameEvent[]): string {
+export function describeRoll(events: readonly GameEvent[], bets?: readonly Bet[]): string {
   const roll = events.find(
     (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
   );
@@ -385,7 +402,7 @@ export function describeRoll(events: readonly GameEvent[]): string {
         break;
     }
   }
-  parts.push(...betResultGroups(events));
+  parts.push(...betResultGroups(events, bets));
   if (roll) {
     const net = roll.roll.net;
     parts.push(net === 0 ? 'Net $0.' : `Net ${fmtMoney(net, { sign: true })}.`);

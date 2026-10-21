@@ -42,9 +42,36 @@ describe('RollLog', () => {
   it('scrolls to the focused roll', () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
-    render(<RollLog entries={[entry(1, 500), entry(2, -500)]} focusRoll={1} />);
+    render(<RollLog entries={[entry(1, 500), entry(2, -500)]} focus={{ n: 1, nonce: 1 }} />);
     expect(scroll).toHaveBeenCalled();
-    expect(document.querySelector('[data-roll="1"]')!.className).toContain('is-focus');
+    const el = document.querySelector('[data-roll="1"]') as HTMLElement;
+    expect(el.className).toContain('is-focus');
+    expect(document.activeElement).toBe(el);
+  });
+
+  it('focuses the roll again on a repeat tap, even after a filter was chosen', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const entries = [entry(1, 500), entry(2, -500)];
+    const { rerender } = render(<RollLog entries={entries} focus={{ n: 1, nonce: 1 }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Losses' }));
+    (document.activeElement as HTMLElement).blur();
+    rerender(<RollLog entries={entries} focus={{ n: 1, nonce: 2 }} />);
+    expect(document.activeElement).toBe(document.querySelector('[data-roll="1"]'));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2); // back on All
+  });
+
+  it('renders the newest 100 and offers the rest', () => {
+    const entries = Array.from({ length: 250 }, (_, i) => entry(i + 1, 0));
+    render(<RollLog entries={entries} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(100);
+    expect(screen.getAllByRole('listitem')[0]!.getAttribute('data-roll')).toBe('250');
+    fireEvent.click(screen.getByRole('button', { name: /older rolls/ }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(200);
+  });
+
+  it('the list is keyboard reachable', () => {
+    render(<RollLog entries={[entry(1, 0)]} />);
+    expect(screen.getByRole('list', { name: /newest first/i }).getAttribute('tabindex')).toBe('0');
   });
 
   it('shows an empty state', () => {

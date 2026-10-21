@@ -55,7 +55,7 @@ describe('describeRoll', () => {
       },
     ];
     expect(describeRoll(events)).toBe(
-      '6, the hard way. Point made! Pass line wins $10, Pass odds wins $60. Net +$70.',
+      '6, the hard way. Point made! Pass line wins $10, pass odds wins $60. Net +$70.',
     );
   });
   it('summarizes a seven-out with losses', () => {
@@ -66,7 +66,7 @@ describe('describeRoll', () => {
       { type: 'bet-lost', betId: 'b3', betType: 'field', amount: 500 },
     ];
     expect(describeRoll(events)).toBe(
-      '7. Seven out. Pass line loses $10, Field loses $5. Net -$15.',
+      '7. Seven out. Pass line loses $10, field loses $5. Net -$15.',
     );
   });
   it('subtracts vig from a win and names pushes', () => {

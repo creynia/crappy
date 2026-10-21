@@ -56,11 +56,44 @@ export interface Settings {
   confirmSuckerBets: boolean;
 }
 
-export interface PersistedV1 {
-  version: 1;
+/** A drill item is regenerated from its seed and level (generation is deterministic). */
+export interface PracticeItemRef {
+  seed: number;
+  level: number;
+}
+
+/** Per-drill practice progress (src/app/practice). */
+export interface DrillProgress {
+  /** completed 10-item rounds */
+  rounds: number;
+  /** best round score (first-try correct answers in one round) */
+  best: number;
+  /** score of the last completed round */
+  last?: number;
+  /** consecutive correct answers, carried across rounds */
+  streak: number;
+  bestStreak: number;
+  /** last level played (1-based) */
+  level: number;
+  lastPlayedAt?: number;
+  /** spaced review: items missed on the first try, oldest first; cleared when answered right in a later round */
+  review: PracticeItemRef[];
+}
+
+export const STORAGE_VERSION = 2;
+
+export interface PersistedV2 {
+  version: 2;
   lessons: Record<string, LessonProgress>;
   settings: Settings;
+  /** keyed by drill id */
+  practice: Record<string, DrillProgress>;
 }
+
+/** The current persisted shape (kept as an alias so older imports keep working). */
+export type Persisted = PersistedV2;
+/** @deprecated use `Persisted`; v1 data is migrated to v2 on load. */
+export type PersistedV1 = PersistedV2;
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
@@ -71,8 +104,14 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmSuckerBets: true,
 };
 
-export function defaultPersisted(): PersistedV1 {
-  return { version: 1, lessons: {}, settings: { ...DEFAULT_SETTINGS } };
+export function defaultPersisted(): Persisted {
+  return { version: 2, lessons: {}, settings: { ...DEFAULT_SETTINGS }, practice: {} };
+}
+
+export const REVIEW_LIMIT = 20;
+
+export function emptyDrillProgress(): DrillProgress {
+  return { rounds: 0, best: 0, streak: 0, bestStreak: 0, level: 1, review: [] };
 }
 
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -103,9 +142,56 @@ export function sanitizeSettings(raw: unknown): Settings {
   };
 }
 
-/** Validates arbitrary parsed JSON into PersistedV1; malformed parts fall back to defaults. */
-export function sanitize(raw: unknown): PersistedV1 | null {
-  if (!isObj(raw) || raw.version !== 1) return null;
+const count = (x: unknown): number => Math.max(0, Math.floor(num(x) ?? 0));
+
+export function sanitizeDrillProgress(raw: unknown): DrillProgress {
+  const o = isObj(raw) ? raw : {};
+  const p = emptyDrillProgress();
+  p.rounds = count(o.rounds);
+  p.best = count(o.best);
+  p.streak = count(o.streak);
+  p.bestStreak = Math.max(count(o.bestStreak), p.streak);
+  p.level = Math.max(1, Math.min(9, count(o.level) || 1));
+  const last = num(o.last);
+  if (last !== undefined) p.last = count(last);
+  const at = num(o.lastPlayedAt);
+  if (at !== undefined) p.lastPlayedAt = at;
+  if (Array.isArray(o.review))
+    for (const r of o.review as unknown[]) {
+      const seed = isObj(r) ? num(r.seed) : undefined;
+      const level = isObj(r) ? num(r.level) : undefined;
+      if (seed === undefined || level === undefined || !Number.isInteger(seed)) continue;
+      if (p.review.length >= REVIEW_LIMIT) break;
+      p.review.push({ seed: seed | 0, level: Math.max(1, Math.min(9, Math.floor(level))) });
+    }
+  return p;
+}
+
+/**
+ * Migrations: each step takes the previous version's raw JSON and returns the next version's
+ * raw JSON (sanitized afterwards). v1 → v2 adds `practice`.
+ */
+const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string, unknown>> = {
+  1: (raw) => ({ ...raw, version: 2, practice: {} }),
+};
+
+/** Brings any known older version up to the current one; null for unknown/newer versions. */
+export function migrate(raw: unknown): Record<string, unknown> | null {
+  if (!isObj(raw)) return null;
+  let cur = raw;
+  for (;;) {
+    const v = cur.version;
+    if (v === STORAGE_VERSION) return cur;
+    const step = typeof v === 'number' ? MIGRATIONS[v] : undefined;
+    if (!step) return null;
+    cur = step(cur);
+  }
+}
+
+/** Validates arbitrary parsed JSON (any known version) into the current shape; malformed parts fall back to defaults. */
+export function sanitize(input: unknown): Persisted | null {
+  const raw = migrate(input);
+  if (!raw) return null;
   const lessons: Record<string, LessonProgress> = {};
   if (isObj(raw.lessons)) {
     for (const [id, v] of safeEntries(raw.lessons)) {
@@ -133,11 +219,14 @@ export function sanitize(raw: unknown): PersistedV1 | null {
       lessons[id] = p;
     }
   }
-  return { version: 1, lessons, settings: sanitizeSettings(raw.settings) };
+  const practice: Record<string, DrillProgress> = {};
+  if (isObj(raw.practice))
+    for (const [id, v] of safeEntries(raw.practice)) practice[id] = sanitizeDrillProgress(v);
+  return { version: 2, lessons, settings: sanitizeSettings(raw.settings), practice };
 }
 
 /** Never throws; anything unreadable gives defaults. */
-export function load(storage: StorageLike): PersistedV1 {
+export function load(storage: StorageLike): Persisted {
   try {
     const text = storage.getItem(STORAGE_KEY);
     if (text) return sanitize(JSON.parse(text)) ?? defaultPersisted();
@@ -147,7 +236,7 @@ export function load(storage: StorageLike): PersistedV1 {
   return defaultPersisted();
 }
 
-export function save(storage: StorageLike, data: PersistedV1): boolean {
+export function save(storage: StorageLike, data: Persisted): boolean {
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(data));
     return true;
@@ -157,15 +246,17 @@ export function save(storage: StorageLike, data: PersistedV1): boolean {
 }
 
 // ---- export / import: a base64 code of the JSON (copy-pasteable) ----
+// The 'crappy1:' prefix names the code format, not the data version; codes made by older
+// versions (data version 1) still import and are migrated.
 
-export function encodeExport(data: PersistedV1): string {
+export function encodeExport(data: Persisted): string {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
   let bin = '';
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
   return 'crappy1:' + btoa(bin);
 }
 
-export function decodeImport(code: string): PersistedV1 | null {
+export function decodeImport(code: string): Persisted | null {
   try {
     const t = code.trim();
     if (!t.startsWith('crappy1:')) return null;

@@ -177,3 +177,33 @@ describe('resetLesson (exam retake)', () => {
     expect(s.lesson('constructor')).toBeUndefined();
   });
 });
+
+describe('practice progress', () => {
+  it('tracks streaks, the review list and round bests per drill', () => {
+    const m = new MemoryStorage();
+    const s = new Store(m);
+    expect(s.drill('d')).toBeUndefined();
+    s.recordPracticeAnswer('d', true);
+    s.recordPracticeAnswer('d', true);
+    s.recordPracticeAnswer('d', false, { addReview: { seed: 1, level: 1 } });
+    s.recordPracticeAnswer('d', false, { addReview: { seed: 1, level: 1 } });
+    s.recordPracticeAnswer('d', true, { clearReview: { seed: 9, level: 1 } });
+    expect(s.drill('d')).toMatchObject({
+      streak: 1,
+      bestStreak: 2,
+      review: [{ seed: 1, level: 1 }],
+    });
+    s.recordPracticeAnswer('d', true, { clearReview: { seed: 1, level: 1 } });
+    expect(s.drill('d')?.review).toEqual([]);
+    s.recordPracticeRound('d', 7, 2, 50);
+    s.recordPracticeRound('d', 5, 2, 60);
+    expect(s.drill('d')).toMatchObject({ rounds: 2, best: 7, last: 5, level: 2, lastPlayedAt: 60 });
+    s.setPracticeLevel('d', 3);
+    expect(s.drill('d')?.level).toBe(3);
+    expect(s.drill('constructor')).toBeUndefined();
+    s.flush();
+    expect(new Store(m).drill('d')?.best).toBe(7);
+    s.reset();
+    expect(s.drill('d')).toBeUndefined();
+  });
+});

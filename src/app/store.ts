@@ -2,11 +2,15 @@ import {
   createStorage,
   decodeImport,
   defaultPersisted,
+  emptyDrillProgress,
   encodeExport,
   load,
+  REVIEW_LIMIT,
   save,
+  type DrillProgress,
   type LessonProgress,
-  type PersistedV1,
+  type Persisted,
+  type PracticeItemRef,
   type Settings,
   type StorageLike,
 } from './storage';
@@ -17,7 +21,7 @@ export type LessonStatus = 'new' | 'progress' | 'done';
 const emptyLesson = (): LessonProgress => ({ quizzes: {}, scenes: {} });
 
 export class Store {
-  private data: PersistedV1;
+  private data: Persisted;
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -28,7 +32,7 @@ export class Store {
     this.data = load(storage);
   }
 
-  get snapshot(): PersistedV1 {
+  get snapshot(): Persisted {
     return this.data;
   }
   get settings(): Settings {
@@ -42,7 +46,7 @@ export class Store {
     };
   };
 
-  private commit(next: PersistedV1) {
+  private commit(next: Persisted) {
     this.data = next; // new object identity on every change
     this.listeners.forEach((l) => l());
     if (this.timer) clearTimeout(this.timer);
@@ -132,6 +136,57 @@ export class Store {
     });
   }
 
+  // ---- practice drills (src/app/practice) ----
+
+  /** Saved progress for a drill, if it was ever played. */
+  drill(id: string): DrillProgress | undefined {
+    return Object.hasOwn(this.data.practice, id) ? this.data.practice[id] : undefined;
+  }
+
+  private patchDrill(id: string, fn: (p: DrillProgress) => DrillProgress) {
+    const cur = this.drill(id) ?? emptyDrillProgress();
+    this.commit({ ...this.data, practice: { ...this.data.practice, [id]: fn(cur) } });
+  }
+
+  /**
+   * One answered drill item: updates the running streak and the spaced-review list
+   * (`addReview`: missed on the first try; `clearReview`: a review item answered right).
+   */
+  recordPracticeAnswer(
+    drillId: string,
+    ok: boolean,
+    opts: { addReview?: PracticeItemRef; clearReview?: PracticeItemRef } = {},
+  ) {
+    const same = (a: PracticeItemRef) => (b: PracticeItemRef) =>
+      a.seed === b.seed && a.level === b.level;
+    this.patchDrill(drillId, (p) => {
+      const streak = ok ? p.streak + 1 : 0;
+      let review = p.review;
+      if (opts.clearReview) review = review.filter((r) => !same(opts.clearReview!)(r));
+      if (opts.addReview && !review.some(same(opts.addReview)))
+        review = [...review, { ...opts.addReview }].slice(-REVIEW_LIMIT);
+      return { ...p, streak, bestStreak: Math.max(p.bestStreak, streak), review };
+    });
+  }
+
+  /** A finished round: counts it and keeps the best score. */
+  recordPracticeRound(drillId: string, score: number, level: number, now = Date.now()) {
+    this.patchDrill(drillId, (p) => ({
+      ...p,
+      rounds: p.rounds + 1,
+      best: Math.max(p.best, score),
+      last: score,
+      level,
+      lastPlayedAt: now,
+    }));
+  }
+
+  /** Remember the level picked for a drill. */
+  setPracticeLevel(drillId: string, level: number) {
+    if (this.drill(drillId)?.level === level) return;
+    this.patchDrill(drillId, (p) => ({ ...p, level }));
+  }
+
   updateSettings(patch: Partial<Settings>) {
     this.commit({ ...this.data, settings: { ...this.data.settings, ...patch } });
   }
@@ -147,7 +202,7 @@ export class Store {
     return true;
   }
 
-  /** Clear lesson progress (keeps settings unless `settings` is true). */
+  /** Clear lesson and practice progress (keeps settings unless `settings` is true). */
   reset(settings = false) {
     const fresh = defaultPersisted();
     this.commit(settings ? fresh : { ...fresh, settings: this.data.settings });

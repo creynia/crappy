@@ -182,7 +182,9 @@ function combinedEdge(
   if (oddsAmount <= 0 || flatAmount <= 0) return null;
   // Per DECISION of the flat bet: the odds wagered depend on which point is made, so use the same fraction
   // of the table maximum at every point (max odds on 3-4-5x gives Pass + odds 0.374%, DP + 6x lay 0.273%).
-  const flat = fracToNumber(betEdge(flatType, flatAmount, ctx).perResolved);
+  // Exact ratio: fracToNumber truncates to 6 decimals, which put the combined figure ~3e-5 off.
+  const perResolved = betEdge(flatType, flatAmount, ctx).perResolved;
+  const flat = Number(perResolved.n) / Number(perResolved.d);
   const lay = flatType === 'dont-pass' || flatType === 'dont-come';
   const parentBet = flatType === 'pass-line' || flatType === 'dont-pass' ? null : (flatBet ?? null);
   const point = parentBet?.point ?? state.point ?? 6;

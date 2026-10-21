@@ -191,3 +191,62 @@
 .pr-missed li {
   margin: 0.4rem 0;
 }
+
+/* ---------- Call the bet ---------- */
+.pr-call {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-table {
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+.pr-call .sim-stack-hit {
+  cursor: pointer;
+}
+.sim-call rect {
+  fill: #fff;
+  stroke: #1d2b22;
+  stroke-width: 2;
+}
+.sim-call text {
+  fill: #1d2b22;
+  font-weight: 700;
+}
+.sim-call.is-selected rect {
+  fill: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-call.is-right rect {
+  fill: var(--sim-win, #2f9e44);
+  stroke: #fff;
+}
+.sim-call.is-wrong rect {
+  fill: var(--sim-loss, #c92a2a);
+  stroke: #fff;
+}
+.sim-call.is-right text,
+.sim-call.is-wrong text {
+  fill: #fff;
+}
+.pr-call-sel {
+  margin: 0;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+.pr-choice.is-picked {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+.pr-call-check {
+  justify-self: start;
+}
+.pr-call-why {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.pr-call-why li.wrong {
+  color: var(--bad);
+  font-weight: 600;
+}

@@ -38,7 +38,17 @@ export interface TableProps {
   onRegionTap?: (id: RegionId) => void;
   /** `betId` is the first bet of that type at the spot; `allIds` lists every bet merged into the stack. */
   onStackTap?: (betId: string, allIds: readonly string[]) => void;
+  /**
+   * Read-only drill overlay, keyed by a stack's first bet id: a badge under the stack whose text
+   * also ends the stack's accessible name (e.g. a learner's "Wins" call, marked right or wrong).
+   */
+  annotate?: ReadonlyMap<string, StackAnnotation>;
   class?: string;
+}
+
+export interface StackAnnotation {
+  text: string;
+  tone: 'pending' | 'selected' | 'right' | 'wrong';
 }
 
 const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', 'tall', 'small']);
@@ -120,6 +130,7 @@ export function Table({
   selectedRegion,
   onRegionTap,
   onStackTap,
+  annotate,
   class: cls,
 }: TableProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -244,13 +255,20 @@ export function Table({
         >
           {stacks.map((s) => {
             const nums = s.betIds.length;
+            const note = annotate?.get(s.betIds[0]!);
+            const r = layout.chipRadius;
             return (
               <g
                 key={s.key}
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
+                aria-label={
+                  note
+                    ? `${betLabel(s.type)}${s.caption ? ` ${s.caption}` : ''}, ${fmtMoney(s.amount)}: ${note.text}`
+                    : `Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`
+                }
+                aria-pressed={note ? note.tone === 'selected' : undefined}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);
@@ -269,10 +287,24 @@ export function Table({
                   x={s.x}
                   y={s.y}
                   amount={s.amount}
-                  r={layout.chipRadius}
+                  r={r}
                   off={s.off}
                   {...(s.caption ? { caption: s.caption } : {})}
                 />
+                {note ? (
+                  <g class={`sim-call is-${note.tone}`} aria-hidden="true">
+                    <rect
+                      x={s.x - r * 1.6}
+                      y={s.y - r * 0.45}
+                      width={r * 3.2}
+                      height={r * 1.25}
+                      rx={r * 0.3}
+                    />
+                    <text x={s.x} y={s.y + r * 0.45} font-size={r * 0.85} text-anchor="middle">
+                      {note.text}
+                    </text>
+                  </g>
+                ) : null}
               </g>
             );
           })}

@@ -169,6 +169,10 @@ export function simulateMany(
     const finals = new Int32Array(sessions);
     let busts = 0;
     let ahead = 0;
+    let stopWins = 0;
+    let stopLosses = 0;
+    let sumRolls = 0;
+    let sumExpLoss = 0;
     let sumFinal = 0;
     let done = 0;
     // phase 2 state
@@ -197,6 +201,10 @@ export function simulateMany(
           }
           if (bustAt !== null) busts++;
           if (r.finalEquity > cfg.bankroll) ahead++;
+          if (r.endedBy === 'stop-win') stopWins++;
+          if (r.endedBy === 'stop-loss') stopLosses++;
+          sumRolls += r.rollsPlayed;
+          sumExpLoss += r.expectedLoss;
           finals[done] = r.finalEquity;
           sumFinal += r.finalEquity;
           done++;
@@ -234,6 +242,10 @@ export function simulateMany(
         finals,
         meanFinal: sumFinal / sessions,
         probAhead: ahead / sessions,
+        stopWinRate: stopWins / sessions,
+        stopLossRate: stopLosses / sessions,
+        meanRollsPlayed: sumRolls / sessions,
+        meanExpectedLoss: sumExpLoss / sessions,
       });
     };
     if (sessions < 1) return reject(new Error('sessions must be >= 1'));

@@ -10,6 +10,7 @@ import {
   hopSpot,
   spotPosition,
 } from './index';
+import { BADGE_HEIGHT, badgeWidth } from '../ChipStack';
 import { HOP_BAND, stackExtent } from './hopSlots';
 import type { ChipSpotKey, Point2, Rect, TableLayout } from './types';
 
@@ -192,19 +193,30 @@ describe('chip spots: every bet type renders at its documented spot (simulator.m
     '$id: odds offset on the flat keep both amount badges readable and the flat tappable',
     (layout) => {
       const r = layout.chipRadius;
-      const badge = { w: 1.5 * r, h: 0.84 * r }; // ChipStack badge, for amounts up to "$99"
+      const bh = BADGE_HEIGHT * r;
       for (const n of [4, 5, 6, 8, 9, 10] as const) {
         const s = findRegion(layout, `box-${n}`)!.chipSpots;
+        const why = `${layout.id} ${n}`;
         for (const [flat, odds] of [
           [s['come-point']!, s.odds!],
           [s['dc-point']!, s['dc-odds']!],
         ] as const) {
-          const dx = Math.abs(odds.x - flat.x);
-          const dy = Math.abs(odds.y - flat.y);
-          expect(dx >= badge.w || dy >= badge.h, `${layout.id} ${n}`).toBe(true);
-          expect(dist(odds, flat), `${layout.id} ${n}`).toBeGreaterThan(r); // centre not covered
-          expect(dist(odds, flat), `${layout.id} ${n}`).toBeLessThan(2 * r); // still "on" it
+          expect(dist(odds, flat), why).toBeGreaterThan(r); // the odds chips clear the flat's centre
+          expect(dist(odds, flat), why).toBeLessThan(2 * r); // still "on" it
         }
+        // come odds up to "$1,000": the odds badge (about 1.1r below the odds spot) stays clear
+        // of the flat's centre, so a tap there opens the come bet; the two badges don't overlap
+        const come = s['come-point']!;
+        const odds = s.odds!;
+        const half = badgeWidth('$1,000', r) / 2;
+        expect(odds.x - half, why).toBeGreaterThan(come.x);
+        expect(Math.abs(odds.y - come.y), why).toBeGreaterThanOrEqual(bh);
+        // lay odds up to "$100" beside a "$25" don't come: both badges readable
+        const dc = s['dc-point']!;
+        const lay = s['dc-odds']!;
+        expect(lay.x - dc.x, why).toBeGreaterThanOrEqual(
+          badgeWidth('$100', r) / 2 + badgeWidth('$25', r) / 2,
+        );
       }
     },
   );

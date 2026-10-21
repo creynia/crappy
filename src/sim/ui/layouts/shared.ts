@@ -34,8 +34,8 @@ function boxBetTypes(n: PointNumber): BetTypeId[] {
  * that both amount badges show and a tap on the flat's centre still hits the flat. Lay odds on a
  * don't-come bet go beside it (the top bar has no room above).
  */
-export const ODDS_OFFSET = { dx: 0.8, dy: -0.9 } as const;
-export const DC_ODDS_OFFSET = { dx: 1.6, dy: 0 } as const;
+export const ODDS_OFFSET = { dx: 1.35, dy: -0.9 } as const;
+export const DC_ODDS_OFFSET = { dx: 1.75, dy: 0 } as const;
 /** Height of the shaded top bar (don't come), as a fraction of the box height. */
 export const BOX_BAR = 0.27;
 /** How far a full stack (5 chips) rises above its spot, in viewBox units. */

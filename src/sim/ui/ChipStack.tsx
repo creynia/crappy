@@ -99,6 +99,13 @@ export interface ChipStackProps {
 
 const STACK_LIMIT = 5;
 
+/** Width of the amount badge under a stack, e.g. "$1,000" (layout tests use it for spacing). */
+export function badgeWidth(text: string, r: number): number {
+  return Math.max(r * 1.5, text.length * r * 0.34 + r * 0.5);
+}
+/** Height of the amount badge; its centre sits about 1.1r below the stack's spot. */
+export const BADGE_HEIGHT = 0.84;
+
 /** Up to 5 chips (offset -6 units each) plus an amount badge. Purely decorative: the region label announces the bet. */
 export function ChipStack({
   x,
@@ -116,7 +123,7 @@ export function ChipStack({
   const bottomFirst = [...chips].reverse(); // largest at the bottom
   const thick = Math.max(4, r * 0.14);
   const text = fmtMoney(amount);
-  const bw = Math.max(r * 1.5, text.length * r * 0.34 + r * 0.5);
+  const bw = badgeWidth(text, r);
   return (
     <g
       class={`sim-stack${off ? ' is-off' : ''}${cls ? ' ' + cls : ''}`}

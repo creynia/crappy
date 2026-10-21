@@ -46,6 +46,8 @@ const BONUS_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['fire', 'all', '
 interface Placed {
   key: string;
   region: RegionDef;
+  /** travelled come / don't come (and their odds): the number they sit on */
+  point: number | null;
   type: BetTypeId;
   x: number;
   y: number;
@@ -102,6 +104,7 @@ function placeBets(
       stacks.set(key, {
         key,
         region,
+        point: /^(come|dont-come)(-odds)?$/.test(b.type) ? b.point : null,
         type: b.type,
         x: pos.x,
         y: pos.y,
@@ -266,7 +269,7 @@ export function Table({
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`}
+                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet${s.point ? ` on ${s.point}` : ''}, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);

@@ -336,6 +336,10 @@ describe('Table chip placement (dealer positions)', () => {
       g.getAttribute('data-stack'),
     );
     expect(order).toEqual(['c', 'o']);
+    const name = (id: string) =>
+      document.querySelector(`[data-stack="${id}"]`)!.getAttribute('aria-label');
+    expect(name('c')).toBe('Edit Come bet on 8, $5');
+    expect(name('o')).toMatch(/^Edit Come odds bet on 8, \$15$/i);
     const pos = (id: string) =>
       document.querySelector(`[data-stack="${id}"] .sim-stack`)!.getAttribute('transform');
     expect(pos('o')).not.toEqual(pos('c'));

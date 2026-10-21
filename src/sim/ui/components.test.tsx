@@ -364,6 +364,18 @@ describe('BetSheet', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Confirm' }).disabled).toBe(true);
   });
 
+  it("type switcher shows each option's edge with a text tier", () => {
+    sheet({
+      typeOptions: [
+        { id: 'place-4', label: 'Place 4', enabled: true, edgeText: '6.67%', tier: 'poor' },
+        { id: 'buy-4', label: 'Buy 4', enabled: false, edgeText: '1.67%', tier: 'good' },
+      ],
+      selectedType: 'place-4',
+    });
+    expect(screen.getByRole('radio', { name: /Place 4.*6\.67%.*Costly/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /Buy 4.*1\.67%.*Good bet/ })).toBeTruthy();
+  });
+
   it('segmented control reports type changes and disables illegal types', () => {
     const p = sheet({
       typeOptions: [

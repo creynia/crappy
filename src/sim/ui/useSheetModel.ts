@@ -18,7 +18,7 @@ import {
   parentFor,
   placeAction,
 } from './simHelpers';
-import { betLabel, buildEvFacts, fmtMoney } from './text';
+import { betLabel, buildEvFacts, fmtMoney, typeEdgeLabel } from './text';
 import type { SimulatorEvent } from './types';
 import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
@@ -114,6 +114,7 @@ export function buildSheetModel(
         return {
           id: t,
           label: betLabel(t),
+          ...(typeEdgeLabel(t, sheet.amount, game) ?? {}),
           enabled: allowed && hasParent,
           ...(!allowed
             ? { reason: 'Not available in this lesson' }

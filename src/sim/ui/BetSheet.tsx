@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Action, BetTypeId, Cents } from '../engine/types';
-import type { ActionPreview } from '../math/types';
+import type { ActionPreview, EdgeTier } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
 import { DiceGrid } from './DiceGrid';
 import './sim.css';
@@ -12,6 +12,9 @@ export interface TypeOption {
   label: string;
   enabled: boolean;
   reason?: string;
+  /** house edge per bet resolved at the sheet's amount, e.g. "6.67%" */
+  edgeText?: string;
+  tier?: EdgeTier;
 }
 export interface QuickAction {
   id: 'min' | 'double' | 'max-odds' | 'fix-units';
@@ -169,6 +172,12 @@ export function BetSheet(p: BetSheetProps) {
                 onClick={() => p.onTypeChange(t.id)}
               >
                 {t.label}
+                {t.edgeText ? (
+                  <span class="sim-seg-edge" data-tier={t.tier}>
+                    {t.edgeText}
+                    {t.tier ? ` ${TIER_LABEL[t.tier]}` : ''}
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>

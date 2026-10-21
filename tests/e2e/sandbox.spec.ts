@@ -103,6 +103,33 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
+  test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
+    await page.goto(url());
+    const buy4 = async () => {
+      await page.locator('[data-region="box-4"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('radio', { name: /^Buy/ }).click();
+      const text = await sheet.locator('.sim-headline').innerText();
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      return text;
+    };
+    expect(await buy4()).toContain('1.67%');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const menu = page.locator('.sim-menu');
+    await menu.getByLabel('Rules').selectOption('custom');
+    const form = page.locator('form.sim-rules');
+    await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
+    await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await form.getByRole('button', { name: /^Apply/ }).click();
+    await expect(form).toHaveCount(0);
+    await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    expect(await buy4()).toContain('4.76%');
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
@@ -468,5 +495,54 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
+  });
+
+  test('roll log keeps every roll and a history pill opens it at that roll', async ({ page }) => {
+    await page.goto('/#/play?speed=instant&seed=1&' + dice('3-3', '2-2', '3-4'));
+    await place(page, 'pass');
+    await roll(page); // point 6
+    await roll(page); // 4: nothing
+    await roll(page); // 7: seven out
+    await page.getByRole('button', { name: 'Log' }).click();
+    const items = page.getByRole('list', { name: /Rolls, newest first/ }).getByRole('listitem');
+    await expect(items).toHaveCount(3);
+    await expect(items.first()).toContainText('Seven out.');
+    await expect(items.last()).toContainText('Point is 6.');
+    await page.getByRole('button', { name: 'Losses' }).click();
+    await expect(items).toHaveCount(1);
+    // tapping the oldest pill in the status strip focuses that roll (the compact landscape rail has no strip)
+    await page.getByRole('button', { name: 'All' }).click();
+    const pill = page.locator('.sim-history [data-roll="1"]');
+    if (await pill.isVisible()) {
+      await pill.click();
+      await expect(page.locator('.sim-log-entry.is-focus')).toContainText('Point is 6.');
+    }
+  });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await clear('.sim-session-panel h3');
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    await expect(auto).toBeInViewport({ ratio: 0.5 });
+    await expect(auto).toBeFocused();
   });
 });

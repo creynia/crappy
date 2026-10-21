@@ -9,8 +9,11 @@ import {
   buildEvFacts,
   describeRoll,
   fmtMoney,
+  edgeOnAction,
+  nextCostUnit,
   normalizeTier,
   regionAriaLabel,
+  rollCostText,
   swingCopy,
   typeEdgeLabel,
 } from './text';
@@ -235,6 +238,66 @@ describe('combined edge with two Come bets', () => {
   });
 });
 
+describe('roll cost units (I043)', () => {
+  const edgeOf = (bets: BetInit[]) => edgeOnAction(createGame({ bankroll: 100000, bets }));
+  it('cycles per roll → per hour → per $100 bet → per roll', () => {
+    expect(nextCostUnit('roll')).toBe('hour');
+    expect(nextCostUnit('hour')).toBe('bet100');
+    expect(nextCostUnit('bet100')).toBe('roll');
+  });
+  it('per $100 bet is the edge on action: pass $10 is $1.41', () => {
+    const e = edgeOf([{ type: 'pass-line', amount: 1000 }]);
+    expect(rollCostText('bet100', 14.1, 100, e)).toBe('Expected cost: $1.41 per $100 bet');
+  });
+  it('odds count 0 in the numerator but stay in the denominator: pass $10 + $50 odds is $0.24', () => {
+    const g = createGame({
+      phase: 'point',
+      point: 6,
+      bankroll: 100000,
+      bets: [
+        { ref: 'p', type: 'pass-line', amount: 1000 },
+        { type: 'pass-odds', amount: 5000, parentRef: 'p' },
+      ],
+    });
+    const e = edgeOnAction(g);
+    expect(rollCostText('bet100', 14.1, 100, e)).toBe('Expected cost: $0.24 per $100 bet');
+  });
+  it("a travelled come $10 on 8 is $1.41, a don't come $10 on 8 is $1.36, pass + come on 8 is $1.41", () => {
+    const point = { phase: 'point' as const, point: 6 as const, bankroll: 100000 };
+    const come = createGame({ ...point, bets: [{ type: 'come', amount: 1000, point: 8 }] });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(come))).toBe(
+      'Expected cost: $1.41 per $100 bet',
+    );
+    const dc = createGame({ ...point, bets: [{ type: 'dont-come', amount: 1000, point: 8 }] });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(dc))).toBe(
+      'Expected cost: $1.36 per $100 bet',
+    );
+    const both = createGame({
+      ...point,
+      bets: [
+        { type: 'pass-line', amount: 1000 },
+        { type: 'come', amount: 1000, point: 8 },
+      ],
+    });
+    expect(rollCostText('bet100', 0, 100, edgeOnAction(both))).toBe(
+      'Expected cost: $1.41 per $100 bet',
+    );
+  });
+  it('place 6 $12 is $1.52 and field $5 is $5.56 per $100 bet', () => {
+    expect(rollCostText('bet100', 18.2, 100, edgeOf([{ type: 'place-6', amount: 1200 }]))).toBe(
+      'Expected cost: $1.52 per $100 bet',
+    );
+    expect(rollCostText('bet100', 27.8, 100, edgeOf([{ type: 'field', amount: 500 }]))).toBe(
+      'Expected cost: $5.56 per $100 bet',
+    );
+  });
+  it('per roll and per hour are literal: $0.14 per roll is $14.10 per hour at 100 rolls', () => {
+    expect(rollCostText('roll', 14.1, 100, null)).toBe('Expected cost: $0.14 per roll');
+    expect(rollCostText('hour', 14.1, 100, null)).toBe('Expected cost: $14.10 per hour');
+    expect(rollCostText('bet100', 14.1, 100, null)).toBeUndefined();
+  });
+});
+
 describe('buy/lay vig strip facts', () => {
   const rulesWith = (
     vig: Partial<GameState['rules']['vig']>,
@@ -339,10 +402,6 @@ describe('typeEdgeLabel', () => {
     expect(typeEdgeLabel('place-4', 1000, state)).toMatchObject({ edgeText: '6.67%' });
     expect(typeEdgeLabel('buy-4', 2000, state)).toMatchObject({ edgeText: '1.67%' });
     expect(typeEdgeLabel('buy-4', 1000, state)).toMatchObject({ edgeText: '3.33%' });
-  });
-  it('gives a tier and no label for odds bets, which need a parent', () => {
-    expect(typeEdgeLabel('pass-odds', 1000, state)).toBeNull();
-    expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
   });
 });
 

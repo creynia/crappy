@@ -18,6 +18,7 @@ import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
+import { CostToggle } from './CostToggle';
 import { SimMenu } from './SimMenu';
 import { PanelSheet, type PanelId, type PanelTab } from './PanelSheet';
 import {
@@ -566,9 +567,10 @@ export function Simulator(props: SimulatorInternalProps) {
       hidden={winShown}
     />
   );
-  const status = (compact: boolean) => (
+  const status = (compact: boolean, rowExtra?: unknown) => (
     <StatusBar
       {...(compact ? { compact } : {})}
+      {...(rowExtra ? { rowExtra } : {})}
       bankroll={game.bankroll}
       onTable={onTable}
       session={session}
@@ -631,8 +633,8 @@ export function Simulator(props: SimulatorInternalProps) {
           {/* portrait: the toast layer hangs from the top of the status row, so it never reaches
               anything above the simulator (the page's Challenge link) */}
           {!landscape ? (
-            <div class="sim-status-wrap">
-              {status(false)}
+            <div class="sim-status-wrap sim-status-wrap-cost">
+              {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
               {toastsEl}
             </div>
           ) : null}

@@ -4,6 +4,7 @@ import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from 
 import { betEdge, lossPerRoll, toNumber } from '../math';
 import { POINT_PHASE_SHARE, offOnComeOut } from '../math/ev';
 import { isLineLike } from '../math/outcomes';
+import { customIsProgressive } from './custom';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
@@ -69,9 +70,11 @@ interface MollyRates {
   flatPerRoll: number;
   oddsPerRoll: Record<PointNumber, number>;
 }
-const mollyCache = new Map<boolean, MollyRates>();
-function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
-  const cached = mollyCache.get(comeOddsOnComeOut);
+const mollyCache = new Map<string, MollyRates>();
+/** `maxComes`: how many come bets the layout keeps on numbers (the three-point Molly: 2). */
+function mollyRates(comeOddsOnComeOut: boolean, maxComes = 2): MollyRates {
+  const ck = `${comeOddsOnComeOut}|${maxComes}`;
+  const cached = mollyCache.get(ck);
   if (cached) return cached;
   // come bets are { number, has odds }: odds are laid at a decision in the point phase, so a come bet
   // that travels on the roll that ends the hand has none until the next point is set
@@ -123,7 +126,7 @@ function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
       }
       // the next decision is in the point phase: odds go behind every come bet on a number
       if (p !== 0) for (const c of cs) c.f = true;
-      if (p !== 0 && cs.length < 2 && !box) box = true;
+      if (p !== 0 && cs.length < maxComes && !box) box = true;
       cs.sort((a, b) => a.n - b.n || Number(a.f) - Number(b.f));
       out.push({ to: add({ p, cs, box }), pr: WAYS[t]! / 36, flat, odds });
     }
@@ -144,46 +147,47 @@ function mollyRates(comeOddsOnComeOut: boolean): MollyRates {
       POINTS.forEach((pt, k) => (oddsPerRoll[pt] += v[i]! * e.pr * e.odds[k]!));
     }
   const out = { flatPerRoll, oddsPerRoll };
-  mollyCache.set(comeOddsOnComeOut, out);
+  mollyCache.set(ck, out);
   return out;
 }
 
 /**
- * Lay 4 and lay 10 resolutions per roll, each. Lay bets work on the come-out and a lay that wins on a 7
- * stays up, but one that loses to its number comes down and is only re-placed once a point is set. Exact
- * Markov chain over (point, which lays are up). Independent of the rules and the unit.
+ * Lay bet resolutions per roll, for each laid number. Lay bets work on the come-out and a lay that wins
+ * on a 7 stays up, but one that loses to its number comes down and is only re-placed once a point is
+ * set. Exact Markov chain over (point, which lays are up). Independent of the rules and the unit.
+ * `numbers` is the set laid (Lay the 4 and 10: [4, 10]).
  */
-let layCache: { 4: number; 10: number } | undefined;
-function layRates(): { 4: number; 10: number } {
-  if (layCache) return layCache;
-  // state: p (0 = come-out, else the point) x up mask (bit 0 = lay 4, bit 1 = lay 10)
+const layCache = new Map<string, Partial<Record<PointNumber, number>>>();
+function layRates(numbers: readonly PointNumber[]): Partial<Record<PointNumber, number>> {
+  const ck = numbers.join(',');
+  const cached = layCache.get(ck);
+  if (cached) return cached;
+  const k = numbers.length;
+  const full = (1 << k) - 1;
   const idx = (p: number, mask: number) =>
-    (p === 0 ? 0 : POINTS.indexOf(p as PointNumber) + 1) * 4 + mask;
-  const n = 7 * 4;
-  const edges: Array<Array<{ to: number; pr: number; r4: number; r10: number }>> = [];
+    (p === 0 ? 0 : POINTS.indexOf(p as PointNumber) + 1) * (full + 1) + mask;
+  const n = 7 * (full + 1);
+  const edges: Array<Array<{ to: number; pr: number; res: number[] }>> = [];
   for (let p = 0; p <= 10; p++) {
     if (p !== 0 && !POINTS.includes(p as PointNumber)) continue;
-    for (let mask = 0; mask < 4; mask++) {
+    for (let mask = 0; mask <= full; mask++) {
       const out: (typeof edges)[number] = [];
       for (let t = 2; t <= 12; t++) {
         let m = mask;
-        let r4 = 0;
-        let r10 = 0;
-        // a lay that wins on a 7 stays up; one that loses to its number comes down
-        if (m & 1 && (t === 7 || t === 4)) {
-          r4++;
-          if (t === 4) m &= ~1;
-        }
-        if (m & 2 && (t === 7 || t === 10)) {
-          r10++;
-          if (t === 10) m &= ~2;
-        }
+        const res = numbers.map(() => 0);
+        numbers.forEach((num, bit) => {
+          // a lay that wins on a 7 stays up; one that loses to its number comes down
+          if (m & (1 << bit) && (t === 7 || t === num)) {
+            res[bit]!++;
+            if (t === num) m &= ~(1 << bit);
+          }
+        });
         let np = p;
         if (p === 0) {
           if (!NON_POINT_ROLLS.includes(t)) np = t;
         } else if (t === 7 || t === p) np = 0;
-        if (np !== 0) m = 3; // the next decision is in the point phase: missing lays go up
-        out.push({ to: idx(np, m), pr: WAYS[t]! / 36, r4, r10 });
+        if (np !== 0) m = full; // the next decision is in the point phase: missing lays go up
+        out.push({ to: idx(np, m), pr: WAYS[t]! / 36, res });
       }
       edges[idx(p, mask)] = out;
     }
@@ -194,15 +198,35 @@ function layRates(): { 4: number; 10: number } {
     for (let i = 0; i < n; i++) for (const e of edges[i] ?? []) w[e.to]! += v[i]! * e.pr;
     v = w;
   }
-  let r4 = 0;
-  let r10 = 0;
-  for (let i = 0; i < n; i++)
-    for (const e of edges[i] ?? []) {
-      r4 += v[i]! * e.pr * e.r4;
-      r10 += v[i]! * e.pr * e.r10;
-    }
-  layCache = { 4: r4, 10: r10 };
-  return layCache;
+  const rates: Partial<Record<PointNumber, number>> = {};
+  numbers.forEach((num, bit) => {
+    let r = 0;
+    for (let i = 0; i < n; i++) for (const e of edges[i] ?? []) r += v[i]! * e.pr * e.res[bit]!;
+    rates[num] = r;
+  });
+  layCache.set(ck, rates);
+  return rates;
+}
+
+/**
+ * The analytic chains a layout is priced from, found from its structure rather than its id, so a custom
+ * system (I013) built like a preset gets the preset's numbers. `molly`: pass plus up to `comes` come bets,
+ * one odds multiple for all; `lays`: lay bets re-placed only in the point phase. A custom build with come
+ * bets the Molly chain does not cover (don't side, or come odds unlike the line odds) is approximate.
+ */
+function chainsOf(spec: StrategySpec): {
+  molly: number | null;
+  lays: PointNumber[];
+  approximate: boolean;
+} {
+  if (spec.id === 'three-point-molly') return { molly: 2, lays: [], approximate: false };
+  if (spec.id === 'lay-4-10') return { molly: null, lays: [4, 10], approximate: false };
+  const c = spec.id === 'custom' ? spec.custom : undefined;
+  if (!c) return { molly: null, lays: [], approximate: false };
+  const lays = c.numbers?.kind === 'lay' ? c.numbers.bets.map((b) => b.n) : [];
+  if (!c.come || !c.line) return { molly: null, lays, approximate: false };
+  const same = c.line.side === 'pass' && c.come.odds === c.line.odds;
+  return { molly: same ? c.come.count : null, lays, approximate: !same };
 }
 
 const COME_NUMBERS: PointNumber[] = [8, 5, 9, 10, 4];
@@ -341,7 +365,8 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const m = parent.amount > 0 ? b.amount / parent.amount : 0;
     return m >= cap - 1e-9 ? Infinity : m;
   };
-  const molly = spec.id === 'three-point-molly';
+  const chains = chainsOf(spec);
+  const molly = chains.molly !== null;
   for (const b of state.bets) {
     if (b.type.endsWith('-odds')) {
       const parent = state.bets.find((x) => x.id === b.parentId);
@@ -357,13 +382,15 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
       continue;
     }
     onTable += b.amount / 100;
-    if (molly) continue;
+    // the Molly chain prices the line and come bets; anything else a custom system adds is priced below
+    if (molly && isLineLike(b.type)) continue;
     // NOTE: come bets outside the Molly (my-layout, other presets) take this generic line path: each is
     // priced as one bet amortized over a whole decision, with share 1. That is exact for one come bet in
     // steady state but not for layouts that keep several cycling (see I091 for per-decision pricing).
-    if (spec.id === 'lay-4-10' && (b.type === 'lay-4' || b.type === 'lay-10')) {
+    const layN = b.type.startsWith('lay-') ? (Number(b.type.slice(4)) as PointNumber) : null;
+    if (layN !== null && chains.lays.includes(layN)) {
       // up through come-outs but re-placed only in the point phase: priced from the chain
-      const rate = layRates()[b.type === 'lay-4' ? 4 : 10];
+      const rate = layRates(chains.lays)[layN]!;
       const e = betEdge(b.type, b.amount, ctx);
       lossCents += rate * b.amount * toNumber(e.perResolved);
       action += (rate * b.amount) / 100;
@@ -386,11 +413,11 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     const pass = state.bets.find((b) => b.type === 'pass-line');
     const passOdds = state.bets.find((b) => b.type === 'pass-odds');
     if (pass) {
-      const rates = mollyRates(r.comeOddsWorkOnComeOut);
+      const rates = mollyRates(r.comeOddsWorkOnComeOut, chains.molly!);
       const mult = passOdds ? oddsMult(passOdds, pass, false) : 0;
       const e = betEdge('pass-line', pass.amount, { phase: 'come-out', point: null, rules: r });
-      lossCents = rates.flatPerRoll * pass.amount * toNumber(e.perResolved);
-      action = rates.flatPerRoll * (pass.amount / 100);
+      lossCents += rates.flatPerRoll * pass.amount * toNumber(e.perResolved);
+      action += rates.flatPerRoll * (pass.amount / 100);
       for (const n of POINTS)
         action += rates.oddsPerRoll[n] * (pass.amount / 100) * Math.min(mult, r.maxOdds[n]);
     }
@@ -416,7 +443,11 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
     avgAction: onTable,
-    ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
+    ...(APPROXIMATE.has(spec.id) ||
+    chains.approximate ||
+    (spec.id === 'custom' && customIsProgressive(spec.custom))
+      ? { approximate: true }
+      : {}),
   };
 }
 

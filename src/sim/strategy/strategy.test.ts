@@ -15,6 +15,7 @@ import {
   strategyMetrics,
 } from './index';
 import type { LayoutBet, StrategyId, StrategySpec } from './index';
+import { PRESETS_AS_CUSTOM } from './custom';
 
 const eloss = (s: GameState) => toNumber(tableExpectedLossPerRoll(s));
 const layout: LayoutBet[] = [
@@ -31,6 +32,7 @@ const spec = (id: StrategyId, extra: Partial<StrategySpec> = {}): StrategySpec =
   id,
   unit: 500,
   ...(id === 'my-layout' ? { layout } : {}),
+  ...(id === 'custom' ? { custom: PRESETS_AS_CUSTOM['iron-cross']! } : {}),
   ...extra,
 });
 const IDS = listStrategies().map((s) => s.id);

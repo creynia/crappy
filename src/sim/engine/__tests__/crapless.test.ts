@@ -344,6 +344,21 @@ describe('crapless in auto-roll and scenes', () => {
     for (const id of ['pass-max-odds', 'place-6-8', 'lay-4-10'] as const)
       expect(strategyAvailable({ id, unit: 1000 }, 'crapless')).toBe(true);
     const { strategyMetrics } = await import('../../strategy');
+    // custom systems (I013): a don't-side build is unavailable on crapless, a pass build is fine
+    const dontCustom = {
+      id: 'custom' as const,
+      unit: 1000,
+      custom: { line: { side: 'dont' as const, odds: 'max' as const } },
+    };
+    const passCustom = {
+      id: 'custom' as const,
+      unit: 1000,
+      custom: { line: { side: 'pass' as const, odds: 'max' as const } },
+    };
+    expect(strategyAvailable(dontCustom, 'crapless')).toBe(false);
+    expect(strategyAvailable(dontCustom, 'standard-vegas')).toBe(true);
+    expect(strategyAvailable(passCustom, 'crapless')).toBe(true);
+    expect(strategyMetrics(dontCustom, resolveRules('crapless')).unavailable).toBe(true);
     const m = strategyMetrics({ id: 'dont-pass-max-lay', unit: 1000 }, resolveRules('crapless'));
     expect(m.unavailable).toBe(true);
     expect(m.edgeOnAction).toBe(0);

@@ -49,6 +49,9 @@ export function strategyAvailable(spec: StrategySpec, rules: SessionConfig['rule
 export function simulateSession(cfg: SessionConfig): SessionResult {
   const impl = getImpl(cfg.strategy.id);
   const stopAtBust = cfg.stopAtBust ?? true;
+  // a custom system's own stops apply when the run sets none (I013)
+  const stopWin = cfg.stopWin ?? cfg.strategy.custom?.stopWin;
+  const stopLoss = cfg.stopLoss ?? cfg.strategy.custom?.stopLoss;
   const start = cfg.bankroll;
   const expectedLossFn = makeExpectedLossFn();
   const varianceFn = makeVarianceFn();
@@ -123,11 +126,11 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     wag[i] = state.stats.totalWagered;
     if (e > peak) peak = e;
     else if (peak - e > maxDd) maxDd = peak - e;
-    if (cfg.stopWin !== undefined && e - start >= cfg.stopWin) {
+    if (stopWin !== undefined && e - start >= stopWin) {
       endedBy = 'stop-win';
       break;
     }
-    if (cfg.stopLoss !== undefined && start - e >= cfg.stopLoss) {
+    if (stopLoss !== undefined && start - e >= stopLoss) {
       endedBy = 'stop-loss';
       break;
     }

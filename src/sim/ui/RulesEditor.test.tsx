@@ -160,7 +160,7 @@ describe('auto-roll panel: custom rules', () => {
       <AutoRollPanel config={{ defaultStrategy: { id: 'field-every-roll', unit: 500 } }} />,
     );
     const sel = [...container.querySelectorAll('select')].find((s) =>
-      [...s.options].some((o) => o.value === 'custom'),
+      [...s.options].some((o) => o.value === 'standard-vegas'),
     )!;
     change(sel, 'custom');
     change(container.querySelector('[name="field12"]'), '3');
@@ -187,7 +187,7 @@ describe('auto-roll panel: custom rules', () => {
   it('a form equal to a preset selects that preset', () => {
     const { container } = render(<AutoRollPanel />);
     const sel = [...container.querySelectorAll('select')].find((s) =>
-      [...s.options].some((o) => o.value === 'custom'),
+      [...s.options].some((o) => o.value === 'standard-vegas'),
     )!;
     change(sel, 'custom');
     change(container.querySelector('[name="odds"]'), '100x');

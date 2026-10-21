@@ -2,6 +2,7 @@ import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS, resolveRules } from '../engine/rules';
 import type { RulePresetId } from '../engine/types';
+import { validateCustom } from '../strategy/custom';
 import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
 import { runScript, stageFor } from './runner';
@@ -322,7 +323,7 @@ class Ctx {
   }
   strategySpec(path: string, v: unknown) {
     if (!isObj(v)) return this.err(path, 'must be an object');
-    this.keys(path, v, ['id', 'unit', 'oddsMultiple', 'layout']);
+    this.keys(path, v, ['id', 'unit', 'oddsMultiple', 'layout', 'custom']);
     const ids = listStrategies().map((s) => s.id as string);
     if (!ids.includes(v.id as string))
       this.err(`${path}.id`, `unknown strategy id ${JSON.stringify(v.id)}`);
@@ -341,6 +342,12 @@ class Ctx {
           this.cents(`${path}.layout[${i}].amount`, b.amount, { min: 1 });
         });
     }
+    // I013: a custom system is required by, and only allowed on, the `custom` strategy
+    if (v.id === 'custom') {
+      if (v.custom === undefined)
+        this.err(`${path}.custom`, 'the custom strategy needs its system');
+      else for (const e of validateCustom(v.custom, `${path}.custom`)) this.errors.push(e);
+    } else if (v.custom !== undefined) this.err(`${path}.custom`, 'only applies to id "custom"');
   }
 }
 
@@ -482,6 +489,7 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'winPrompt',
         'showRestart',
         'stepPanelLabel',
       ]);
@@ -505,6 +513,7 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'winPrompt',
         'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);

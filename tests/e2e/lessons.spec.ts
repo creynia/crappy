@@ -93,6 +93,27 @@ test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ pa
   await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
 });
 
+test('lesson 7: the demo scene plays, skips on tap and replays', async ({ page, guard }) => {
+  await page.goto('/#/learn/come-bets');
+  const scene = await openScene(page, 2);
+  const replay = scene.getByRole('button', { name: 'Replay the demo' });
+  // it starts by itself when the scene loads; Replay shows once the demo is over
+  await expect(scene.locator('.sim-step-text')).toContainText('Watch two Come bets');
+  await expect(replay).toBeVisible({ timeout: 25_000 });
+  await expect(scene.locator('.sim-history')).toContainText('9'); // both scripted rolls were 9s
+  const money = () => scene.locator('.sim-status-money').innerText();
+  const finished = await money();
+  // the first tap may only skip the last roll's animation, so tap until the demo is playing again
+  await expect(async () => {
+    await replay.click({ timeout: 1000 });
+    await expect(replay).toHaveCount(0, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await scene.getByTestId('simulator').click({ position: { x: 4, y: 4 } }); // tap skips to the end
+  await expect(replay).toBeVisible();
+  expect(await money()).toBe(finished); // the replay ends in the same state
+  await guard.check('lesson-demo-done');
+});
+
 test('lesson 7: the call-the-bet question locks Roll until answered', async ({ page }) => {
   await page.goto('/#/learn/come-bets');
   const scene = await openScene(page, 1);

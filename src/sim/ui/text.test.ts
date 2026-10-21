@@ -3,7 +3,8 @@ import type { Bet, GameEvent, RollRecord } from '../engine/types';
 import { portraitLayout } from './layouts';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
-import type { Action, GameState } from '../engine/types';
+import type { Action, BetTypeId, GameState } from '../engine/types';
+import type { BetInit } from '../engine';
 import { buildEvFacts, describeRoll, fmtMoney, normalizeTier, regionAriaLabel } from './text';
 
 const rec = (over: Partial<RollRecord>): RollRecord => ({
@@ -174,5 +175,54 @@ describe('tiers and ev facts', () => {
   });
   it('returns null for a roll', () => {
     expect(facts({ type: 'roll' })).toBeNull();
+  });
+});
+
+describe('combined edge with two Come bets', () => {
+  // Come $10 on 4 and Come $10 on 6. The figure for 6 must use 6's max odds (5x), not 4's (3x).
+  const come4 = { ref: 'c4', type: 'come', amount: 1000, point: 4 } as const;
+  const come6 = { ref: 'c6', type: 'come', amount: 1000, point: 6 } as const;
+  const odds6 = (amount: number) => ({ type: 'come-odds', amount, parentRef: 'c6' }) as const;
+  const two = (extra: BetInit[] = []) =>
+    createGame({ phase: 'point', point: 8, bankroll: 100000, bets: [come4, come6, ...extra] });
+  const single = (extra: BetInit[] = []) =>
+    createGame({ phase: 'point', point: 8, bankroll: 100000, bets: [come6, ...extra] });
+  const byType = (s: GameState, type: BetTypeId, point?: number) =>
+    s.bets.find((b) => b.type === type && (point === undefined || b.point === point))!;
+  const combinedOf = (s: GameState, action: Action) =>
+    buildEvFacts(previewAction(s, action), s)!.combined;
+
+  it('odds placed on the 6 come bet use 6 max odds (5x), not the 4 point (3x)', () => {
+    const s = two();
+    const action = {
+      type: 'place-bet',
+      betType: 'come-odds',
+      amount: 2000,
+      parentId: byType(s, 'come', 6).id,
+    } as const;
+    const ref = single();
+    const refAction = { ...action, parentId: byType(ref, 'come', 6).id };
+    expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
+    expect(combinedOf(s, action)!.label).toBe('Come + Odds');
+    // $20 odds on the 6 (5x max = $50): 6's max odds, not 4's 3x.
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(7 / 1045, 12);
+  });
+
+  it('set-amount on the odds of the 6 come bet uses the managed bet', () => {
+    const s = two([odds6(5000)]);
+    const ref = single([odds6(2000)]);
+    const action = { type: 'set-amount', betId: byType(s, 'come-odds').id, amount: 2000 } as const;
+    const refAction = { ...action, betId: byType(ref, 'come-odds').id };
+    expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(7 / 1045, 12);
+  });
+
+  it('set-amount on the 6 come bet itself uses its own point', () => {
+    const s = two([odds6(5000)]);
+    const ref = single([odds6(5000)]);
+    const action = { type: 'set-amount', betId: byType(s, 'come', 6).id, amount: 2000 } as const;
+    const refAction = { ...action, betId: byType(ref, 'come').id };
+    expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(14 / 2365, 12);
   });
 });

@@ -116,3 +116,27 @@ export interface StrategyMetrics {
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
 }
+
+/** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */
+export type SweepMultiple = number | 'max';
+export interface SweepConfig {
+  strategy: StrategyId;
+  unit: Cents;
+  oddsMultiples: SweepMultiple[];
+  rolls: number;
+  seed: number;
+  bankroll: Cents;
+  rules?: Partial<TableRules> | RulePresetId;
+}
+export interface SweepRow {
+  multiple: SweepMultiple;
+  /** Analytic edge on total action, as a fraction (0.0141 = 1.41%). */
+  edgeOnAction: number;
+  /** Analytic expected loss over `rolls` rolls, in cents. */
+  expectedLossCents: number;
+  /** Standard deviation of the final result (cents) over the sessions. */
+  sdFinal: number;
+  probAhead: number;
+  bustRate: number;
+  meanFinal: number;
+}

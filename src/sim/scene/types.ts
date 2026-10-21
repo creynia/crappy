@@ -57,6 +57,8 @@ export interface SceneConfig {
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */
     stopLoss?: Cents;
+    /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
+    sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
 }

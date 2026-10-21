@@ -1,18 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-/** Screen point of a chip stack's spot (its bottom chip's centre). */
+/** Screen centre of a chip stack's bottom chip (its shadow ellipse sits right under it). */
 async function stackCentre(stack: Locator) {
-  return stack.evaluate((g) => {
-    const svg = g.closest('svg')!;
-    const m = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(
-      g.querySelector('.sim-stack')!.getAttribute('transform')!,
-    )!;
-    const p = svg.createSVGPoint();
-    p.x = Number(m[1]);
-    p.y = Number(m[2]);
-    const s = p.matrixTransform(svg.getScreenCTM()!);
-    return { x: s.x, y: s.y };
-  });
+  const box = await stack.locator('.sim-stack > ellipse').first().boundingBox();
+  if (!box) throw new Error('stack not visible');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
 async function confirm(page: Page) {

@@ -1,5 +1,6 @@
 import type { SceneConfig, SceneRuntime, SceneStep } from '../scene/types';
 import { StepPanel } from './StepPanel';
+import type { TokenResolver } from './stepTokens';
 
 export interface SimStepProps {
   scene: SceneConfig;
@@ -11,6 +12,7 @@ export interface SimStepProps {
   onRestart: () => void;
   /** set on a demo step when it is not playing */
   onReplay?: (() => void) | undefined;
+  resolve?: TokenResolver;
 }
 
 /** Guided-lesson step panel, or the "Done" panel once the scene is complete. */
@@ -23,6 +25,7 @@ export function SimStep({
   onAnswer,
   onRestart,
   onReplay,
+  resolve,
 }: SimStepProps) {
   const guided = !!scene.steps?.length;
   const lastIdx = (scene.steps?.length ?? 1) - 1;
@@ -32,6 +35,7 @@ export function SimStep({
     <>
       {guided && step ? (
         <StepPanel
+          resolve={resolve}
           step={step}
           index={rt.stepIndex}
           total={scene.steps!.length}

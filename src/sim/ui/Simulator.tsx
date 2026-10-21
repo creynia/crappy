@@ -14,6 +14,7 @@ import { SimMenu } from './SimMenu';
 import { PanelSheet, type PanelId, type PanelTab } from './PanelSheet';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { resolverFor } from './stepTokens';
 import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
@@ -287,9 +288,19 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
+      resolve={resolverFor(game)}
     />
   );
 
+  // Toasts overlay the status block (above the felt in portrait, the rail's status in landscape):
+  // text nothing taps, never a betting region or the lesson step card.
+  const toastsEl = (
+    <Toasts
+      toasts={toasts}
+      onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+      autoDismissMs={toastDurationMs(settings.speed)}
+    />
+  );
   const status = (compact: boolean) => (
     <StatusBar
       {...(compact ? { compact } : {})}
@@ -341,12 +352,16 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            {landscape ? null : toastsEl}
           </div>
         </div>
         {landscape ? (
           <div class="sim-rail">
             {stepEl}
-            {status(true)}
+            <div class="sim-status-wrap">
+              {status(true)}
+              {toastsEl}
+            </div>
             {controls}
           </div>
         ) : (
@@ -357,11 +372,6 @@ export function Simulator(props: SimulatorInternalProps) {
       <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
         <span key={live.n}>{live.text}</span>
       </div>
-      <Toasts
-        toasts={toasts}
-        onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
-        autoDismissMs={toastDurationMs(settings.speed)}
-      />
 
       {(() => {
         const panelEls = (

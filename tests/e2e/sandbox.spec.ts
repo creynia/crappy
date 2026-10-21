@@ -836,3 +836,83 @@ test('in landscape the odds nudge does not cover the felt or the controls', asyn
     await context.close();
   }
 });
+
+test('the odds nudge clears the Challenge card in portrait, and in landscape Roll stays clickable under toasts', async ({
+  browser,
+}) => {
+  type Box = { x: number; y: number; width: number; height: number };
+  const meets = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  for (const vp of [
+    { width: 390, height: 844 },
+    { width: 360, height: 740 },
+  ]) {
+    const context = await browser.newContext({ viewport: vp });
+    const page = await context.newPage();
+    await page.goto('/#/play?speed=instant&dice=3-3');
+    await page.locator('[data-region="pass"]').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    const hint = await page.getByTestId('odds-hint').boundingBox();
+    const card = await page
+      .getByRole('button', { name: /^Challenge: 300/ })
+      .first()
+      .boundingBox();
+    expect(hint).not.toBeNull();
+    if (card)
+      expect(
+        meets(hint!, card),
+        `nudge covers the Challenge card at ${vp.width}x${vp.height}`,
+      ).toBe(false);
+    await context.close();
+  }
+  for (const vp of [
+    { width: 844, height: 390 },
+    { width: 667, height: 375 },
+  ]) {
+    const context = await browser.newContext({ viewport: vp });
+    const page = await context.newPage();
+    await page.goto('/#/play?speed=instant&dice=3-3');
+    await page.locator('[data-region="pass"]').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    const roll = page.getByRole('button', { name: /^Roll/ });
+    await roll.click();
+    await expect(page.getByTestId('odds-hint')).toBeVisible();
+    // the nudge is up: Roll is what is under its centre
+    const centreIsRoll = async () => {
+      const b = await roll.boundingBox();
+      expect(b).not.toBeNull();
+      return page.evaluate(
+        ({ x, y }) => {
+          const doc = (
+            globalThis as unknown as {
+              document: {
+                elementFromPoint(x: number, y: number): { closest(sel: string): unknown } | null;
+              };
+            }
+          ).document;
+          const el = doc.elementFromPoint(x, y);
+          return !!el && !!el.closest('.sim-roll');
+        },
+        { x: b!.x + b!.width / 2, y: b!.y + b!.height / 2 },
+      );
+    };
+    expect(
+      await centreIsRoll(),
+      `Roll not clickable under the nudge at ${vp.width}x${vp.height}`,
+    ).toBe(true);
+    // the nudge goes; a later roll's toast must not hide Roll either
+    await page.getByRole('button', { name: 'Got it' }).click();
+    await roll.click();
+    const rb = await roll.boundingBox();
+    for (const t of await page.locator('.sim-toast').all()) {
+      const tb = await t.boundingBox();
+      if (tb && rb)
+        expect(meets(tb, rb), `a toast covers Roll at ${vp.width}x${vp.height}`).toBe(false);
+    }
+    expect(await centreIsRoll(), `a toast covers Roll's centre at ${vp.width}x${vp.height}`).toBe(
+      true,
+    );
+    await context.close();
+  }
+});

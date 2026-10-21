@@ -39,6 +39,7 @@ export function OddsHint({ room, onDismiss, onHideForever }: OddsHintProps) {
           type="button"
           class="sim-odds-hint-btn"
           aria-label="Got it"
+          aria-describedby={descId}
           title="Got it"
           onClick={onDismiss}
         >
@@ -48,6 +49,7 @@ export function OddsHint({ room, onDismiss, onHideForever }: OddsHintProps) {
           type="button"
           class="sim-odds-hint-btn"
           aria-label="Don't show again"
+          aria-describedby={descId}
           title="Don't show again"
           onClick={onHideForever}
         >

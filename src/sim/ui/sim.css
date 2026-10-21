@@ -367,8 +367,9 @@
   top: 0;
   bottom: auto;
   gap: 2px;
-  /* stacked toasts stay in front of the Roll row instead of tucking behind it */
-  z-index: 25;
+  /* never taller than the status block, so the stack ends above the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
 }
 /* a toast in front of the Roll row must not take its taps: text passes through, only the dismiss box takes them */
 .sim-land .sim-toast {

@@ -629,6 +629,16 @@ describe('BetSheet', () => {
     expect(document.querySelector('[data-line="combined"]')).toBeNull();
   });
 
+  it('buy and lay sheets list the vig strip with the current amount marked; other bets do not', () => {
+    sheet({ ...real('buy-4', 3900), confirmSucker: false });
+    const strip = lines('vig-strip');
+    expect(strip.textContent).toContain('$39 0.85% (this bet)');
+    expect(strip.querySelectorAll('li').length).toBeGreaterThan(0);
+    cleanup();
+    sheet({ ...real('place-6', 600), confirmSucker: false });
+    expect(document.querySelector('[data-line="vig-strip"]')).toBeNull();
+  });
+
   it('hard 4 is not marked one-roll and pays 7 to 1', () => {
     sheet({ ...real('hard-4', 500), confirmSucker: false });
     expect(lines('hour').querySelector('strong')).toBeNull();

@@ -617,3 +617,39 @@
   margin: 0;
   min-height: 1.2em;
 }
+
+/* immersive play (the app header is hidden, see app.css): the table takes the full height */
+@media (orientation: landscape) and (max-height: 520px) {
+  .is-immersive .sim-land .sim-table-wrap {
+    max-width: calc((100dvh - 12px) * 1.875);
+  }
+  /* a slim rail (chips in two rows) gives the table the width that its height needs */
+  .is-immersive .sim-land .sim-main {
+    grid-template-columns: minmax(0, 1fr) 160px;
+    gap: 6px;
+  }
+  .is-immersive .sim-rail .sim-rack {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+  .is-immersive .sim-rail .sim-chipbtn {
+    width: 44px;
+  }
+  .is-immersive .sim-rail .sim-tab {
+    min-height: 44px;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+  }
+  .is-immersive .sim-rail .sim-ctl-row {
+    gap: 4px;
+  }
+  /* the rail never makes the page scroll: the cost line goes, and a very short screen scrolls the rail itself */
+  .is-immersive .sim-rail .sim-roll-cost {
+    display: none;
+  }
+  .is-immersive .sim-rail {
+    max-height: calc(100dvh - 8px);
+    overflow-y: auto;
+  }
+}

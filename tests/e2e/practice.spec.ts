@@ -92,3 +92,21 @@ for (const [w, h] of [
       .toBeGreaterThanOrEqual(44);
   });
 }
+
+test('practice: an EV quiz round runs to the summary', async ({ page }) => {
+  await page.goto('/#/practice');
+  await page.getByRole('link', { name: /EV quiz/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'EV quiz' })).toBeVisible();
+  await expect(page.locator('.pr-choice').first()).toContainText(/%|\$/);
+  const summary = page.locator('.pr-summary');
+  for (let i = 0; i < 40 && !(await summary.isVisible()); i++) {
+    await page.locator('.pr-choice').first().click();
+    const feedback = page.locator('.pr-feedback');
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toContainText(/^(Correct\.|Not quite\.)/);
+    // the right answer is marked, whether or not it was the one picked
+    await expect(page.locator('.pr-choice.right')).toHaveCount(1);
+    await page.getByRole('button', { name: /^(Next|See results)$/ }).click();
+  }
+  await expect(summary.getByRole('heading', { name: /Round complete: \d+ of 10/ })).toBeVisible();
+});

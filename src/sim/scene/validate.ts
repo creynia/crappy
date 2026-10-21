@@ -460,6 +460,7 @@ export function validateScene(
         'showSettings',
         'speed',
         'compact',
+        'winPrompt',
         'showRestart',
         'stepPanelLabel',
       ]);
@@ -483,6 +484,7 @@ export function validateScene(
         'showRoll',
         'showSettings',
         'compact',
+        'winPrompt',
         'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);

@@ -182,7 +182,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
 }
 .sim-session-panel h3 {
   margin: 0 0 6px;

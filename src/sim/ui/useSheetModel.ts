@@ -186,6 +186,8 @@ interface SheetDeps {
   setCore: (c: Core) => void;
   emit: (e: SimulatorEvent) => void;
   pushToast: (text: string, tone?: 'info') => void;
+  /** live announcement for messages that are not roll results */
+  announce: (text: string) => void;
   doAction: (a: Action) => DoActionResult;
   /** the displayed game (animation-aware) and live scene state, for the model */
   game: GameState;
@@ -224,6 +226,7 @@ export function useSheetModel(d: SheetDeps) {
     const allowedTypes = region.betTypes.filter((t) => betTypeAllowed(sceneRef.current, r, t));
     if (!allowedTypes.length) {
       d.pushToast('That bet is not available in this lesson.', 'info');
+      d.announce('That bet is not available in this lesson.');
       return;
     }
     let type = defaultBetForRegion(region, g);

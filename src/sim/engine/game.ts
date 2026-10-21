@@ -51,8 +51,8 @@ export interface ApplyOptions {
   expectedLossFn?: (s: GameState) => number;
   /** Expected loss (cents) per bet type for the roll about to happen. */
   expectedLossByTypeFn?: (s: GameState) => Partial<Record<BetTypeId, number>>;
-  /** Variance (cents^2) of one resolution of `bet`, given the pre-roll state; summed into stats.variance. */
-  varianceFn?: (bet: Bet, s: GameState) => number;
+  /** Variance (cents^2) of what the roll about to happen adds to the session result, given the pre-roll state; summed into stats.variance. */
+  varianceFn?: (s: GameState) => number;
 }
 
 function addBet(
@@ -293,12 +293,7 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       const r = resolveRoll(s, dice, forced);
       let out = r.state;
       if (opts?.varianceFn) {
-        let v = 0;
-        for (const e of r.events) {
-          if (e.type !== 'bet-won' && e.type !== 'bet-lost' && e.type !== 'bet-pushed') continue;
-          const bet = state.bets.find((b) => b.id === e.betId);
-          if (bet) v += opts.varianceFn(bet, state);
-        }
+        const v = opts.varianceFn(state);
         if (v) out = { ...out, stats: { ...out.stats, variance: out.stats.variance + v } };
       }
       if (loss || byTypeLoss) {

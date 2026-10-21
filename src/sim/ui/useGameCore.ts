@@ -12,7 +12,7 @@ import type {
 } from '../engine/types';
 import { tableExpectedLossPerRoll, expectedLossByTypePerRoll } from '../math/ev';
 import { toNumber } from '../math/fraction';
-import { makeVarianceFn } from '../math/luck';
+import { makeVarianceFn } from '../math';
 import { gateAction } from '../scene';
 import type { SceneConfig, SceneInput } from '../scene/types';
 import type { SimulatorEvent } from './types';
@@ -30,9 +30,9 @@ interface GameCoreOptions {
   onRolled: (pre: GameState, post: GameState, events: GameEvent[]) => void;
 }
 
-/** Game state + scene runtime, scene observation (feed) and the gated action dispatcher. */
 const varianceFn = makeVarianceFn();
 
+/** Game state + scene runtime, scene observation (feed) and the gated action dispatcher. */
 export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: GameCoreOptions) {
   const [core, setCoreState] = useState<Core>(boot.core);
   const coreRef = useRef(core);

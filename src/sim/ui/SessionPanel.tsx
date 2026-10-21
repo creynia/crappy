@@ -60,16 +60,23 @@ export function SessionPanel({ stats, rollCount }: SessionPanelProps) {
         Luck: {fmtMoney(luck, { sign: true })} — {luckText(band)}
       </p>
       {band.z !== null ? (
-        <div
-          class="sim-luck-bar"
-          role="img"
-          aria-label={`Luck is ${band.z.toFixed(1)} typical swings from expected, on a scale from -2 to +2`}
-        >
-          <span class="sim-luck-mid" />
-          <span
-            class="sim-luck-marker"
-            style={{ left: `${(Math.max(-2.5, Math.min(2.5, band.z)) + 2.5) * 20}%` }}
-          />
+        <div class="sim-luck-scale">
+          <div
+            class="sim-luck-bar"
+            role="img"
+            aria-label={`Luck is ${band.z.toFixed(1)} typical swings from expected, on a scale from -2 to +2`}
+          >
+            <span class="sim-luck-mid" />
+            <span
+              class="sim-luck-marker"
+              style={{ left: `${(Math.max(-2.5, Math.min(2.5, band.z)) + 2.5) * 20}%` }}
+            />
+          </div>
+          <div class="sim-luck-ticks" aria-hidden="true">
+            <span style={{ left: '10%' }}>-2</span>
+            <span style={{ left: '50%' }}>0</span>
+            <span style={{ left: '90%' }}>+2</span>
+          </div>
         </div>
       ) : null}
       {rows.length ? (

@@ -18,8 +18,10 @@ export function loadSandbox(key: string): PersistedSandbox | null {
     if (!raw) return null;
     const p = JSON.parse(raw) as PersistedSandbox;
     if (p?.v !== 1 || p.game?.version !== 1 || !Array.isArray(p.game.bets)) return null;
-    // saves from before the luck band have no variance
-    if (typeof p.game.stats.variance !== 'number') p.game.stats.variance = 0;
+    // Saves from before luck was tracked have no variance. If they already hold results the luck
+    // cannot be reconstructed, so mark it unknown (NaN) instead of showing an absurd z.
+    const stats = p.game.stats;
+    if (typeof stats.variance !== 'number') stats.variance = stats.expectedLoss > 0 ? NaN : 0;
     return p;
   } catch {
     return null;

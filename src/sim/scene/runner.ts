@@ -1,5 +1,5 @@
 import { BET_TYPES, sameHop } from '../engine/bets';
-import { createGame } from '../engine/game';
+import { createGame, equity } from '../engine/game';
 import { findMergeTarget, findParent, maxOddsAmount } from '../engine/validate';
 import type {
   Action,
@@ -12,8 +12,10 @@ import type {
   Validation,
 } from '../engine/types';
 import type { BetInit } from '../engine/game';
+import { answeredRequirements } from './conditions';
 import type {
   ActionMatcher,
+  BetResult,
   Condition,
   SceneConfig,
   SceneInput,
@@ -184,9 +186,16 @@ function eventBetType(e: GameEvent): BetTypeId | undefined {
   return 'betType' in e ? e.betType : undefined;
 }
 
+const RESOLVED_EVENT: Record<BetResult, GameEvent['type']> = {
+  won: 'bet-won',
+  lost: 'bet-lost',
+  pushed: 'bet-pushed',
+};
+
 function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
   if ('all' in c) return c.all.every((x) => evaluate(x, rt, game));
   if ('any' in c) return c.any.some((x) => evaluate(x, rt, game));
+  if ('not' in c) return !evaluate(c.not, rt, game);
   if ('action' in c) return (rt.counters[actKey(c.action)] ?? 0) >= (c.count ?? 1);
   if ('event' in c) return (rt.counters[evKey(c.event, c.betType)] ?? 0) >= (c.count ?? 1);
   if ('rolls' in c) return game.rollCount - rt.stepStartRoll >= c.rolls;
@@ -194,10 +203,20 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
   if ('point' in c) return game.point === c.point;
   if ('betOnTable' in c)
     return game.bets.some(
-      (b) => b.type === c.betOnTable.type && b.amount >= (c.betOnTable.minAmount ?? 1),
+      (b) =>
+        b.type === c.betOnTable.type &&
+        b.amount >= (c.betOnTable.minAmount ?? 1) &&
+        (c.betOnTable.point === undefined || b.point === c.betOnTable.point),
     );
+  if ('betResolved' in c) {
+    const { type, result } = c.betResolved;
+    const outcomes: BetResult[] = result ? [result] : ['won', 'lost', 'pushed'];
+    return outcomes.some((r) => (rt.counters[evKey(RESOLVED_EVENT[r], type)] ?? 0) > 0);
+  }
   if ('bankrollAtLeast' in c) return game.bankroll >= c.bankrollAtLeast;
   if ('bankrollAtMost' in c) return game.bankroll <= c.bankrollAtMost;
+  if ('equityAtLeast' in c) return equity(game) >= c.equityAtLeast;
+  if ('equityAtMost' in c) return equity(game) <= c.equityAtMost;
   if ('previewed' in c) return (rt.counters[`p:${c.previewed}`] ?? 0) > 0;
   if ('autoRollCompleted' in c) {
     const om = c.autoRollCompleted.oddsMultiple;
@@ -205,6 +224,8 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
     return (rt.counters[key] ?? -1) >= (c.autoRollCompleted.minRolls ?? 0);
   }
   if ('acknowledged' in c) return (rt.counters.ack ?? 0) > 0;
+  if ('answered' in c)
+    return c.answered === 'correct' ? (rt.counters.ansOk ?? 0) > 0 : (rt.counters.ans ?? 0) > 0;
   return false;
 }
 
@@ -212,6 +233,7 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
 function matchersOf(c: Condition, out: ActionMatcher[] = []): ActionMatcher[] {
   if ('all' in c) c.all.forEach((x) => matchersOf(x, out));
   else if ('any' in c) c.any.forEach((x) => matchersOf(x, out));
+  else if ('not' in c) matchersOf(c.not, out);
   else if ('action' in c) out.push(c.action);
   return out;
 }
@@ -220,14 +242,18 @@ function matchersOf(c: Condition, out: ActionMatcher[] = []): ActionMatcher[] {
 export function conditionNeedsRoll(c: Condition): boolean {
   if ('all' in c) return c.all.some(conditionNeedsRoll);
   if ('any' in c) return c.any.some(conditionNeedsRoll);
+  if ('not' in c) return conditionNeedsRoll(c.not);
   if ('action' in c) return c.action.type === 'roll';
   return (
     'rolls' in c ||
     'event' in c ||
     'phase' in c ||
     'point' in c ||
+    'betResolved' in c ||
     'bankrollAtLeast' in c ||
-    'bankrollAtMost' in c
+    'bankrollAtMost' in c ||
+    'equityAtLeast' in c ||
+    'equityAtMost' in c
   );
 }
 
@@ -251,6 +277,13 @@ export function highlightedFor(scene: SceneConfig, step?: SceneStep): BetTypeId[
   return step?.highlightedBets ?? scene.highlightedBets ?? [];
 }
 
+/** Has the step's question been answered enough to unlock the roll (correctly, when the step needs that)? */
+function askAnswered(step: SceneStep, rt: SceneRuntime): boolean {
+  return answeredRequirements(step.completeWhen).includes('correct')
+    ? (rt.counters.ansOk ?? 0) > 0
+    : (rt.counters.ans ?? 0) > 0;
+}
+
 /** True when the Roll button should be locked by the current step, with the reason. */
 export function rollLock(scene: SceneConfig, rt: SceneRuntime, game: GameState): string | null {
   const step = currentStep(scene, rt);
@@ -263,6 +296,8 @@ export function rollLock(scene: SceneConfig, rt: SceneRuntime, game: GameState):
   if (!allowedActionsFor(scene, step).includes('roll'))
     return step?.hint ?? 'Rolling is switched off in this step.';
   if (step && rt.satisfied) return 'Tap Next to continue.';
+  if (step?.ask && (step.ask.mode ?? 'before-roll') === 'before-roll' && !askAnswered(step, rt))
+    return 'Answer the question first.';
   if (
     step &&
     !step.expect &&
@@ -371,6 +406,9 @@ export function observe(
     counters.ack = 1;
   } else if (rt.satisfied) {
     return { runtime: rt, game };
+  } else if (input.kind === 'answered') {
+    bump(counters, 'ans');
+    if (input.correct) counters.ansOk = 1;
   } else if (input.kind === 'previewed') {
     bump(counters, `p:${input.betType}`);
   } else if (input.kind === 'auto-roll-completed') {

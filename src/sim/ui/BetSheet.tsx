@@ -3,6 +3,7 @@ import type { Action, BetTypeId, Cents } from '../engine/types';
 import type { ActionPreview } from '../math/types';
 import { fmtMoney, fmtPct, fracToNumber, normalizeTier, TIER_LABEL, type EvFacts } from './text';
 import { DiceGrid } from './DiceGrid';
+import { OddsTree } from './OddsTree';
 import './sim.css';
 
 export type SheetPreview = ActionPreview;
@@ -276,26 +277,30 @@ export function BetSheet(p: BetSheetProps) {
             </button>
             {whyOpen ? (
               <div class="sim-why">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Outcome</th>
-                      <th scope="col">Chance</th>
-                      <th scope="col">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.explanation.rows.map((r, i) => (
-                      <tr key={i}>
-                        <td>{r.label}</td>
-                        <td>
-                          {ways(r.ways, r.outOf)} ({fmtPct(fracToNumber(r.probability), 1)})
-                        </td>
-                        <td>{fmtMoney(fracToNumber(r.net), { sign: true, exact: true })}</td>
+                {preview.explanation.tree ? (
+                  <OddsTree tree={preview.explanation.tree} />
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Outcome</th>
+                        <th scope="col">Chance</th>
+                        <th scope="col">Result</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {preview.explanation.rows.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.label}</td>
+                          <td>
+                            {ways(r.ways, r.outOf)} ({fmtPct(fracToNumber(r.probability), 1)})
+                          </td>
+                          <td>{fmtMoney(fracToNumber(r.net), { sign: true, exact: true })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
                 {preview.explanation.grid ? (
                   <DiceGrid grid={preview.explanation.grid} note={preview.explanation.gridNote} />
                 ) : null}

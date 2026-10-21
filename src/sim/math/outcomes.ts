@@ -25,6 +25,8 @@ export interface RawOutcome {
   /** Dice combinations producing this row, out of the deciding combinations (unreduced). Absent for compound rows. */
   ways?: number;
   outOf?: number;
+  /** The point this row went through before resolving (line and come bets). */
+  via?: PointNumber;
 }
 export interface Distribution {
   rows: RawOutcome[];
@@ -123,7 +125,7 @@ function distribution(
   const { groups, none } = enumerate(bet, phase, point, rules);
   const vigPaid = bet.vigPaid;
   const immediate: { w: number; row: Omit<RawOutcome, 'probability'> }[] = [];
-  const continuing: { w: number; sub: Distribution }[] = [];
+  const continuing: { w: number; sub: Distribution; point: PointNumber }[] = [];
   let resolvingWays = 0;
 
   for (const g of groups) {
@@ -137,7 +139,7 @@ function distribution(
         rules,
         `${prefix}Point ${res.point}, then `,
       );
-      continuing.push({ w, sub });
+      continuing.push({ w, sub, point: res.point });
       continue;
     }
     resolvingWays += w;
@@ -176,7 +178,7 @@ function distribution(
         rules,
         `${prefix}Point ${n}, then `,
       );
-      continuing.push({ w, sub });
+      continuing.push({ w, sub, point: n });
     }
   }
 
@@ -192,7 +194,7 @@ function distribution(
       const p = frac(c.w, 36);
       for (const r of c.sub.rows) {
         const { ways: _w, outOf: _o, ...rest } = r;
-        rows.push({ ...rest, probability: mul(r.probability, p) });
+        rows.push({ ...rest, via: rest.via ?? c.point, probability: mul(r.probability, p) });
       }
       rolls = add(rolls, mul(p, c.sub.expectedRolls));
     }
@@ -272,6 +274,7 @@ export function toOutcomes(d: Distribution): Outcome[] {
     outOf: r.outOf ?? Number(r.probability.d),
     probability: r.probability,
     net: r.net,
+    ...(r.via === undefined ? {} : { via: r.via }),
   }));
 }
 

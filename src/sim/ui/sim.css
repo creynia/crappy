@@ -367,8 +367,9 @@
   top: 0;
   bottom: auto;
   gap: 2px;
-  /* stacked toasts and the nudge stay visible (not clipped); they sit above the Roll row while shown */
-  z-index: 25;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
 }
 .sim-land .sim-toast > span {
   display: -webkit-box;

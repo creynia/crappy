@@ -3,8 +3,9 @@
 import type { AnyDrill } from '../types';
 import { callTheBet } from './callTheBet';
 import { lineCalls } from './lineCalls';
+import { ways } from './ways';
 
-export const DRILLS: readonly AnyDrill[] = [lineCalls, callTheBet];
+export const DRILLS: readonly AnyDrill[] = [lineCalls, ways, callTheBet];
 
 export function getDrill(id: string): AnyDrill | undefined {
   return DRILLS.find((d) => d.id === id);

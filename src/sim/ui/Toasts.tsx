@@ -79,7 +79,7 @@ function ToastView({
 
 export function Toasts({ toasts, onDismiss, autoDismissMs }: ToastsProps) {
   return (
-    <div class="sim-toasts" role="status" aria-live="polite">
+    <div class="sim-toasts">
       {toasts.map((t) => (
         <ToastView key={t.id} t={t} onDismiss={onDismiss} ms={autoDismissMs} />
       ))}

@@ -1,4 +1,5 @@
-import type { GameState } from '../engine/types';
+import { isDicePair } from '../engine/bets';
+import type { Bet, GameState } from '../engine/types';
 
 /** Sandbox state saved under `crappy:sim:${key}:v1`. Every access is guarded: storage may be missing or full. */
 export interface PersistedSandbox {
@@ -18,6 +19,9 @@ export function loadSandbox(key: string): PersistedSandbox | null {
     if (!raw) return null;
     const p = JSON.parse(raw) as PersistedSandbox;
     if (p?.v !== 1 || p.game?.version !== 1 || !Array.isArray(p.game.bets)) return null;
+    // States saved before hop bets (I035) have no `hop` field and load as-is; a hop without its pair is corrupt.
+    const bets: readonly Bet[] = p.game.bets;
+    if (bets.some((b) => b.type === 'hop' && !isDicePair(b.hop))) return null;
     return p;
   } catch {
     return null;

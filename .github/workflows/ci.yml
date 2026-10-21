@@ -49,3 +49,25 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report
+
+  visual:
+    needs: check
+    runs-on: ubuntu-latest
+    # Advisory: pixel baselines are environment-sensitive, so this never blocks merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: VISUAL=1 npx playwright test --project=visual
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: |
+            playwright-report
+            test-results

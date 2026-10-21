@@ -488,4 +488,31 @@ test.describe('sandbox flows', () => {
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
   });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await clear('.sim-session-panel h3');
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    await expect(auto).toBeInViewport({ ratio: 0.5 });
+    await expect(auto).toBeFocused();
+  });
 });

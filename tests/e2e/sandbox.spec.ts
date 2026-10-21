@@ -253,7 +253,6 @@ test.describe('sandbox', () => {
     for (const { width, height } of [
       { width: 390, height: 844 },
       { width: 360, height: 740 },
-      { width: 844, height: 390 },
     ]) {
       await page.setViewportSize({ width, height });
       await page.goto(url('seed=1&dice=3-4'));

@@ -247,6 +247,15 @@ export function Simulator(props: SimulatorInternalProps) {
     />
   );
 
+  // Toasts overlay the status block (above the felt in portrait, the rail's status in landscape):
+  // text nothing taps, never a betting region or the lesson step card.
+  const toastsEl = (
+    <Toasts
+      toasts={toasts}
+      onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+      autoDismissMs={toastDurationMs(settings.speed)}
+    />
+  );
   const status = (compact: boolean) => (
     <StatusBar
       {...(compact ? { compact } : {})}
@@ -293,17 +302,16 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
-            <Toasts
-              toasts={toasts}
-              onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
-              autoDismissMs={toastDurationMs(settings.speed)}
-            />
+            {landscape ? null : toastsEl}
           </div>
         </div>
         {landscape ? (
           <div class="sim-rail">
             {stepEl}
-            {status(true)}
+            <div class="sim-status-wrap">
+              {status(true)}
+              {toastsEl}
+            </div>
             {controls}
           </div>
         ) : (

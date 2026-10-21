@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const url = '/#/play?speed=instant&seed=1&dice=3-4,3-3,2-2';
 
@@ -7,6 +7,24 @@ async function place(page: Page) {
   const sheet = page.getByRole('dialog');
   await sheet.getByRole('button', { name: 'Confirm' }).click();
   await expect(sheet).toHaveCount(0);
+}
+
+/** True when a toast sits on top of the centre of the element. */
+async function underToast(loc: Locator): Promise<boolean> {
+  const b = (await loc.boundingBox())!;
+  return loc.evaluate(
+    (_el: unknown, pt: { x: number; y: number }) =>
+      (
+        globalThis as unknown as {
+          document: {
+            elementFromPoint(x: number, y: number): { closest(s: string): unknown } | null;
+          };
+        }
+      ).document
+        .elementFromPoint(pt.x, pt.y)
+        ?.closest('.sim-toast') != null,
+    { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+  );
 }
 
 const box = async (page: Page, sel: string) => (await page.locator(sel).first().boundingBox())!;
@@ -59,22 +77,50 @@ test.describe('toast overlay', () => {
       for (const region of ['pass', 'come', 'place-6', 'place-8']) {
         const loc = page.locator(`[data-region="${region}"]`);
         if ((await loc.count()) === 0) continue;
-        const b = (await loc.first().boundingBox())!;
-        const covered = await loc.first().evaluate(
-          (_el: unknown, pt: { x: number; y: number }) =>
-            (
-              globalThis as unknown as {
-                document: {
-                  elementFromPoint(x: number, y: number): { closest(s: string): unknown } | null;
-                };
-              }
-            ).document
-              .elementFromPoint(pt.x, pt.y)
-              ?.closest('.sim-toast') != null,
-          { x: b.x + b.width / 2, y: b.y + b.height / 2 },
-        );
-        expect(covered, `${region} is under a toast`).toBe(false);
+        expect(await underToast(loc.first()), `${region} is under a toast`).toBe(false);
       }
+      expect(await underToast(roll), 'Roll is under a toast').toBe(false);
+    });
+  }
+
+  for (const vp of [
+    { name: 'landscape phone', width: 844, height: 390 },
+    { name: 'desktop', width: 1280, height: 800 },
+  ]) {
+    test(`in a lesson, toasts never cover the step card, Restart or the table (${vp.name})`, async ({
+      page,
+    }, info) => {
+      test.skip(info.project.name !== 'mobile', 'sets its own viewports');
+      await page.setViewportSize(vp);
+      await page.goto('/#/learn/pass-line');
+      const scene = page.locator('section.scene').first();
+      await scene.scrollIntoViewIfNeeded();
+      await scene.getByRole('radio', { name: '$10 chip' }).click();
+      await scene.locator('[data-region="pass"]').click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+      const roll = scene.getByRole('button', { name: /^Roll/ });
+      await roll.click();
+      await roll.click();
+      await expect(scene.locator('.sim-toast')).toHaveCount(2);
+      const targets = [
+        scene.locator('.sim-step-text'),
+        scene.getByRole('button', { name: 'Restart' }),
+        scene.locator('[data-region="pass"]'),
+        scene.locator('[data-region="place-6"]'),
+        scene.locator('[data-region="place-8"]'),
+        roll,
+      ];
+      for (const t of targets) {
+        if ((await t.count()) === 0) continue;
+        expect(
+          await underToast(t.first()),
+          `${await t
+            .first()
+            .innerText()
+            .catch(() => '')} covered`,
+        ).toBe(false);
+      }
+      await scene.screenshot({ path: `test-results/lesson-toasts-${vp.name}.png` });
     });
   }
 

@@ -344,8 +344,8 @@
 /* ---------- toasts ---------- */
 /* An overlay, never part of the page flow: showing or dismissing a toast must not move anything, and
    it must never sit on a betting region. Portrait: just above the felt, over the status row (bankroll
-   and last dice, which nothing taps). Landscape (`.sim-land`, chosen in code): over the top of the
-   side rail, again the status text. Positioned against the felt body, not the viewport, so it never
+   and last dice, which nothing taps). Landscape (`.sim-land`, chosen in code): over the status block
+   in the side rail, below any lesson step card. Positioned against the felt body, not the viewport, so it never
    lands on the app header or the tab bar. */
 .sim-toasts {
   position: absolute;
@@ -358,12 +358,14 @@
   gap: 4px;
   pointer-events: none;
 }
+.sim-status-wrap {
+  position: relative;
+}
 .sim-land .sim-toasts {
-  left: calc(100% + 8px);
-  right: auto;
+  left: 0;
+  right: 0;
   top: 0;
   bottom: auto;
-  width: min(300px, 28vw);
   gap: 2px;
 }
 .sim-land .sim-toast {

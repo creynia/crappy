@@ -117,6 +117,7 @@ export function Simulator(props: SimulatorInternalProps) {
     pushToast,
     clearAnimation: anim.clear,
     skipAnimation: anim.skip,
+    animBusy: anim.busy,
   });
 
   // ---------- events + effects ----------
@@ -274,7 +275,7 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
-      onReplay={step?.play && !demo.playing ? demo.replay : undefined}
+      onReplay={step?.play && demo.canReplay && !demo.playing ? demo.replay : undefined}
     />
   );
 

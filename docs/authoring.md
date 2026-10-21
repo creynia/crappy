@@ -80,6 +80,13 @@ Rules:
 - A condition that is already true when a step starts completes that step at once. Equity does not
   change when a bet is placed, so wait for a roll (for example `forcedDice` that loses) before
   testing equity.
+- A **demo step** has `play: [{ action, say?, pauseMs? }]` (1-30 frames). When the step starts, the
+  actions are played one at a time (bets, and rolls with `dice: [a, b]`) with `say` shown as a caption,
+  then control is handed back; the learner can tap to skip to the end or press Replay. Scripted actions
+  skip the step's `allowedActions` gate, and instant speed (reduced motion) plays them all at once.
+  `validateScene` replays each script from the scene start plus that step's `setup` and reports an
+  illegal frame with the step id, so give a demo step the `setup` it needs and complete it with
+  `acknowledged` (its own actions also count toward `completeWhen`).
 - Quiz `q`, `options` and `explain` are plain text (not Markdown); HTML is escaped, not rendered.
 - Headings: write `##` (or any level); the compiler shifts the lesson's headings so the shallowest becomes an `<h2>` under the page's `<h1>`.
 - `quiz` blocks are a YAML list of `{ id?, q, options, answer, explain }`. The id defaults to

@@ -21,6 +21,8 @@ export interface DemoPlaybackOptions {
   /** stop roll animations (replay and skip) */
   clearAnimation: () => void;
   skipAnimation: () => void;
+  /** a roll animation is running: the demo only counts as over once the last one has played */
+  animBusy: boolean;
 }
 
 /**
@@ -31,6 +33,10 @@ export interface DemoPlaybackOptions {
 export function useDemoPlayback(o: DemoPlaybackOptions) {
   const [playing, setPlaying] = useState(false);
   const [epoch, setEpoch] = useState(0);
+  /** every frame has been dispatched; waiting for the last roll animation */
+  const [tail, setTail] = useState(false);
+  /** the demo of the current step has played at least once, so Replay makes sense */
+  const [canReplay, setCanReplay] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queue = useRef<PlayFrame[]>([]);
   const startedFor = useRef(-1);
@@ -46,6 +52,8 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
     stopTimer();
     queue.current = [];
     setPlaying(false);
+    setTail(false);
+    setCanReplay(startedFor.current >= 0);
   };
   const dispatch = (f: PlayFrame) => {
     if (f.say) opts.current.pushToast(f.say, 'info');
@@ -56,7 +64,11 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
     const f = queue.current.shift();
     if (!f) return finish();
     dispatch(f);
-    if (queue.current.length === 0) return finish();
+    if (queue.current.length === 0) {
+      stopTimer();
+      setTail(true);
+      return;
+    }
     const wait =
       opts.current.getSpeed() === 'instant'
         ? 0
@@ -67,6 +79,7 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
   const start = (frames: readonly PlayFrame[]) => {
     stopTimer();
     queue.current = [...frames];
+    setCanReplay(false);
     setPlaying(true);
     next();
   };
@@ -80,10 +93,17 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
     start(step.play);
     return undefined;
   }, [o.stepIndex, o.done, epoch]);
+  useEffect(() => {
+    if (tail && !o.animBusy) {
+      setTail(false);
+      finish();
+    }
+  }, [tail, o.animBusy]);
   useEffect(() => () => stopTimer(), []);
 
   return {
     playing,
+    canReplay,
     /** the scene was reset: the next step 0 may play again */
     reset: () => {
       startedFor.current = -1;
@@ -102,6 +122,7 @@ export function useDemoPlayback(o: DemoPlaybackOptions) {
       stopTimer();
       opts.current.skipAnimation();
       while (queue.current.length) dispatch(queue.current.shift()!);
+      opts.current.skipAnimation();
       finish();
     },
   };

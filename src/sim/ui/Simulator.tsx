@@ -157,7 +157,8 @@ export function Simulator(props: SimulatorInternalProps) {
   });
   // The nudge is shown once per mount, then stays until dismissed (or the point goes off).
   const [oddsHint, setOddsHint] = useState<OddsRoom | null>(null);
-  const oddsShownOnce = useRef(false);
+  // A table restored with a point on it (a saved table or a shared link) is not a first point: no nudge.
+  const oddsShownOnce = useRef(liveGame.point !== null);
   // Computed from the state after the roll has finished animating.
   const oddsNow =
     ui.hints === true && !hideOddsHint && !panels.auto && !anim.busy ? oddsRoom(liveGame) : null;

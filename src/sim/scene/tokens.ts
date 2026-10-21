@@ -1,31 +1,42 @@
 import { isBetTypeId } from '../engine/bets';
 
-/** `{{name}}` or `{{name:arg}}` inside step text, hint or math. */
-export const TOKEN_RE = /\{\{\s*([a-z-]+)(?::([a-z0-9-]+))?\s*\}\}/g;
+/** Anything inside `{{ }}`, so a malformed token is caught too (validation rejects what does not parse). */
+const LOOSE = /\{\{([^}]*)\}\}/g;
+/** A token must be exactly `name` or `name:arg`: no spaces, names are letters, args are lowercase ids. */
+const STRICT = /^([A-Za-z]+)(?::([a-z0-9_-]+))?$/;
 
-const SIMPLE = ['bankroll', 'point', 'onTable', 'session'] as const;
-const WITH_BET = ['ev', 'edge'] as const;
+const SIMPLE: readonly string[] = ['bankroll', 'point', 'onTable', 'session'];
+const WITH_BET: readonly string[] = ['ev', 'edge'];
 
-/** Problems with the tokens in a string, for validateScene. Empty when every token is known. */
+/** The parsed token, or null when the inside of `{{ }}` is not a known token. */
+export function parseToken(inner: string): { name: string; arg?: string } | null {
+  const m = STRICT.exec(inner);
+  if (!m) return null;
+  const name = m[1]!;
+  const arg = m[2];
+  if (SIMPLE.includes(name) && arg === undefined) return { name };
+  if (WITH_BET.includes(name) && arg !== undefined && isBetTypeId(arg)) return { name, arg };
+  return null;
+}
+
+/** Problems with the tokens in a string, for validateScene. Empty when every `{{ }}` is a known token. */
 export function tokenProblems(text: string): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(TOKEN_RE)) {
-    const [raw, name, arg] = m as unknown as [string, string, string | undefined];
-    const ok =
-      ((SIMPLE as readonly string[]).includes(name) && arg === undefined) ||
-      ((WITH_BET as readonly string[]).includes(name) && arg !== undefined && isBetTypeId(arg));
-    if (!ok) out.push(`unknown token ${raw}`);
+  for (const m of text.matchAll(LOOSE)) {
+    if (!parseToken(m[1]!)) out.push(`unknown token ${m[0]}`);
   }
   return out;
 }
 
-/** Replaces each known token with `resolve(name, arg)`; tokens the resolver does not know stay as written. */
+/** Replaces each known token with `resolve(name, arg)`; anything else stays as written. */
 export function replaceTokens(
   text: string,
   resolve: (name: string, arg?: string) => string | undefined,
 ): string {
-  return text.replace(TOKEN_RE, (raw, name: string, arg: string | undefined) => {
-    const v = resolve(name, arg);
+  return text.replace(LOOSE, (raw, inner: string) => {
+    const t = parseToken(inner);
+    if (!t) return raw;
+    const v = resolve(t.name, t.arg);
     return v === undefined ? raw : v;
   });
 }

@@ -279,7 +279,7 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
-      resolve={resolverFor(liveGame)}
+      resolve={resolverFor(game)}
     />
   );
 

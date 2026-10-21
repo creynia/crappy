@@ -58,3 +58,21 @@ describe('StepPanel with live tokens', () => {
     );
   });
 });
+
+describe('StepPanel with onTable', () => {
+  it('renders {{onTable}} as the chips on the table, not as raw braces', () => {
+    const { container } = render(
+      <StepPanel
+        step={{ id: 's', text: 'You have {{onTable}} out.', completeWhen: { acknowledged: true } }}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => {}}
+        resolve={resolverFor(withPassLine())}
+      />,
+    );
+    expect(container.querySelector('.sim-step-text')!.textContent).toBe('You have $5 out.');
+  });
+});

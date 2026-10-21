@@ -18,6 +18,24 @@ describe('step tokens', () => {
     expect(tokenProblems('{{bankroll:5}}')).toEqual(['unknown token {{bankroll:5}}']);
   });
 
+  it('rejects malformed tokens: wrong case, bad bet ids, spaces and stray characters', () => {
+    for (const bad of [
+      '{{Bankroll}}',
+      '{{ev:Pass-line}}',
+      '{{ev: pass-line}}',
+      '{{ev:place_6}}',
+      '{{bankroll }}',
+      '{{ ev:pass-line}}',
+      '{{}}',
+    ]) {
+      expect(tokenProblems(bad), bad).toEqual([`unknown token ${bad}`]);
+    }
+  });
+
+  it('accepts onTable and the other camel-case token', () => {
+    expect(tokenProblems('Chips {{onTable}} and point {{point}}')).toEqual([]);
+  });
+
   it('validateScene reports a bad token in step text with its path', () => {
     const r = validateScene({
       id: 'x',
@@ -26,6 +44,12 @@ describe('step tokens', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.join('\n')).toContain('steps[0].text: unknown token {{ev:nope}}');
+  });
+
+  it('replaces onTable (a camel-case name) through replaceTokens', () => {
+    expect(replaceTokens('Chips {{onTable}}', (n) => (n === 'onTable' ? '$5' : undefined))).toBe(
+      'Chips $5',
+    );
   });
 
   it('replaces known tokens and leaves unknown ones as written', () => {

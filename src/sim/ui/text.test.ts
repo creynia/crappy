@@ -13,6 +13,7 @@ import {
   normalizeTier,
   regionAriaLabel,
   rollCostText,
+  typeEdgeLabel,
 } from './text';
 import { tableExpectedLossPerRoll } from '../math/ev';
 import { toNumber } from '../math/fraction';
@@ -263,5 +264,18 @@ describe('roll cost units (I043)', () => {
       `Expected cost: ${fmtMoney(Math.round((perRoll / action) * 10_000), { exact: true })} per $100 bet`,
     );
     expect(rollCostText('bet100', perRoll, 100, 0)).toBeUndefined();
+  });
+});
+
+describe('typeEdgeLabel', () => {
+  const state = createGame({ bankroll: 100000 });
+  it('box-4 options show their house edge at the sheet amount', () => {
+    expect(typeEdgeLabel('place-4', 1000, state)).toMatchObject({ edgeText: '6.67%' });
+    expect(typeEdgeLabel('buy-4', 2000, state)).toMatchObject({ edgeText: '1.67%' });
+    expect(typeEdgeLabel('buy-4', 1000, state)).toMatchObject({ edgeText: '3.33%' });
+  });
+  it('gives a tier and no label for odds bets, which need a parent', () => {
+    expect(typeEdgeLabel('pass-odds', 1000, state)).toBeNull();
+    expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
   });
 });

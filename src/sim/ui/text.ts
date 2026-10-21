@@ -8,7 +8,7 @@ import {
   isHardHop,
 } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge } from '../math';
+import { betEdge, edgeTier as tierOf } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -457,6 +457,25 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
 
 export function diceAriaLabel(d: readonly [number, number]): string {
   return `Rolled ${d[0]} and ${d[1]}, total ${d[0] + d[1]}`;
+}
+
+/**
+ * Edge shown under each bet-type option in the sheet's switcher: house edge per bet resolved at
+ * the sheet's current amount, plus its tier. Odds bets depend on a parent bet, so they get none.
+ */
+export function typeEdgeLabel(
+  type: BetTypeId,
+  amount: Cents,
+  state: Pick<GameState, 'phase' | 'point' | 'rules'>,
+): { edgeText: string; tier: EdgeTier } | null {
+  if (BET_TYPES[type].category === 'odds') return null;
+  try {
+    const e = betEdge(type, amount, { phase: state.phase, point: state.point, rules: state.rules });
+    const edge = Math.max(0, fracToNumber(e.perResolved));
+    return { edgeText: fmtPct(edge), tier: tierOf(e.perResolved) };
+  } catch {
+    return null;
+  }
 }
 
 export interface WorkingCopyInput {

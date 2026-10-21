@@ -16,3 +16,4 @@ export { previewAction, suggestAlternative } from './preview';
 export { explainBet } from './explain';
 export { edgeTier } from './tiers';
 export { money as formatCents, pct as formatEdge } from './format';
+export { rollEffectGrid, countEffects, worksNow, type RollEffect } from './outcomes';

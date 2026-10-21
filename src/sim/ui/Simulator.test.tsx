@@ -220,7 +220,10 @@ describe('odds nudge', () => {
     fireEvent.click(rollBtn());
     await waitFor(() => expect(nudge()).not.toBeNull());
     expect(nudge()!.textContent).toContain('Add up to $25 odds behind your Pass line on 6');
-    expect(live(container)).toContain('Add up to $25 odds behind your Pass line on 6');
+    // the nudge follows the roll announcement once the roll has finished
+    expect(live(container)).toMatch(
+      /^Rolled 3 and 3, 6, the hard way\..*Add up to \$25 odds behind your Pass line on 6/,
+    );
     expect(document.activeElement).toBe(rollBtn());
   });
 

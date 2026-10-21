@@ -546,3 +546,26 @@ test.describe('sandbox flows', () => {
     await expect(auto).toBeFocused();
   });
 });
+
+test('the odds nudge shows after a roll and Roll stays in view, portrait and landscape', async ({
+  browser,
+}) => {
+  for (const vp of [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    // a fresh context per orientation: the sandbox persists its table between visits
+    const context = await browser.newContext({ viewport: vp });
+    const page = await context.newPage();
+    await page.goto('/#/play?speed=instant&dice=3-3');
+    await page.locator('[data-region="pass"]').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    const roll = page.getByRole('button', { name: /^Roll/ });
+    await roll.click();
+    await expect(page.getByTestId('odds-hint')).toBeVisible();
+    const box = await roll.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
+    await context.close();
+  }
+});

@@ -101,11 +101,20 @@ export function Simulator(props: SimulatorInternalProps) {
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
+  // the last roll's announcement, so the odds nudge can follow it in the same message
+  const rollTextRef = useRef('');
+  const announceRoll = useCallback(
+    (text: string) => {
+      rollTextRef.current = text;
+      announce(text);
+    },
+    [announce],
+  );
 
   const anim = useAnimationPlayer(
     () => settingsRef.current.speed,
     pushToast,
-    announce,
+    announceRoll,
     (pre, post, events) => {
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
@@ -136,13 +145,19 @@ export function Simulator(props: SimulatorInternalProps) {
   const [oddsHintKey, setOddsHintKey] = useState<string | null>(null);
   // Once per mount: the first time a point gives odds room. Never while the auto-roll panel is open.
   const oddsShownOnce = useRef(false);
-  const oddsNow = ui.hints === true && !hideOddsHint && !panels.auto ? oddsRoom(liveGame) : null;
+  // Only after the roll has finished animating, so the nudge is not announced mid-roll.
+  const oddsNow =
+    ui.hints === true && !hideOddsHint && !panels.auto && !anim.busy ? oddsRoom(liveGame) : null;
   const oddsNowKey = oddsNow ? `${oddsNow.betId}:${oddsNow.point}` : null;
   useEffect(() => {
     if (!oddsNow || oddsShownOnce.current) return;
     oddsShownOnce.current = true;
     setOddsHintKey(oddsNowKey);
-    announce(oddsHintText(oddsNow));
+    // one announcement: the roll that just finished, then the nudge
+    const roll = rollTextRef.current;
+    rollTextRef.current = '';
+    const nudge = oddsHintText(oddsNow);
+    announce(roll ? `${roll} ${nudge}` : nudge);
   }, [oddsNowKey]);
   const oddsHintRoom = oddsNow && oddsHintKey === oddsNowKey ? oddsNow : null;
   const step = currentStep(scene, rt);
@@ -376,13 +391,13 @@ export function Simulator(props: SimulatorInternalProps) {
           <div class="sim-rail">
             {stepEl}
             {status(true)}
-            {oddsHintEl}
             {controls}
+            {oddsHintEl}
           </div>
         ) : (
           <>
-            {oddsHintEl}
             {controls}
+            {oddsHintEl}
           </>
         )}
       </div>

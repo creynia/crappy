@@ -931,21 +931,25 @@
 }
 
 .sim-odds-hint {
-  margin: 8px 12px;
-  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--sim-border);
   border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 .sim-odds-hint p {
-  margin: 0 0 8px;
+  margin: 0;
+  flex: 1 1 200px;
 }
 .sim-odds-hint-actions {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 .sim-odds-hint-actions button {
   min-height: 44px;

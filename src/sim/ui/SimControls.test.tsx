@@ -39,15 +39,12 @@ function controls(
 }
 
 describe('cost unit toggle (I043)', () => {
-  it('starts per roll, cycles to per hour, per $100 bet and back, and announces each change', () => {
+  it('starts per roll, cycles to per hour, per $100 bet and back, and shows each change', () => {
     render(controls());
     const btn = () => document.querySelector('.sim-cost-cycle') as HTMLButtonElement;
     expect(btn().textContent).toBe('Expected cost: $0.04 per roll');
     fireEvent.click(btn());
     expect(btn().textContent).toBe('Expected cost: $4.19 per hour');
-    expect(document.querySelector('[role="status"]')!.textContent).toBe(
-      'Expected cost: $4.19 per hour',
-    );
     fireEvent.click(btn());
     expect(btn().textContent).toBe('Expected cost: $1.41 per $100 bet');
     fireEvent.click(btn());

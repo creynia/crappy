@@ -66,7 +66,6 @@ export function SimControls(p: SimControlsProps) {
       ? undefined
       : rollCostText(costUnit, expectedCost, p.rollsPerHour ?? 100, edge);
   const next = nextCostUnit(costUnit);
-  const [announced, setAnnounced] = useState('');
   const lockId = useId();
   return (
     <div class="sim-controls">
@@ -97,16 +96,11 @@ export function SimControls(p: SimControlsProps) {
               onClick={() => {
                 setCostUnit(next);
                 writeCostUnit(next);
-                const nextText = rollCostText(next, expectedCost, p.rollsPerHour ?? 100, edge);
-                setAnnounced(nextText ?? '');
               }}
             >
               {costText}
             </button>
           ) : null}
-          <span class="sim-sr" role="status" aria-live="polite">
-            {announced}
-          </span>
         </div>
       ) : null}
       {p.lock && ui.showRoll !== false ? (

@@ -159,6 +159,9 @@ export async function suggestBankroll(
   } = {},
 ): Promise<BankrollSuggestion> {
   const target = opts.targetBust ?? 0.05;
+  // aim a little under the target from the start (4% for 5%): the final check is stricter than the
+  // probes, so searching to the same margin means it usually passes first time and no work is repeated
+  const goal = target * 0.8;
   const unit = input.strategy.unit;
   const base = 1000;
   const cap = Math.ceil((unit * (opts.capMultiple ?? 400)) / base) * base;
@@ -169,7 +172,7 @@ export async function suggestBankroll(
       v = await bustRateAt(input, b, {
         ...opts,
         sessions: opts.searchSessions ?? Math.min(opts.sessions ?? PLAN_SESSIONS, 150),
-        stopAbove: target,
+        stopAbove: goal,
       });
       cache.set(b, v);
     }
@@ -177,7 +180,7 @@ export async function suggestBankroll(
   };
   let lo = 0; // known unsafe (or zero)
   let hi = Math.max(base, Math.ceil(Math.max(unit, input.bankroll) / base) * base);
-  while ((await at(hi)) > target) {
+  while ((await at(hi)) > goal) {
     lo = hi;
     if (hi >= cap) return { bankroll: null, bustRate: cache.get(hi)!, target, cap: hi, step: base };
     hi = Math.min(cap, hi * 2);
@@ -186,14 +189,14 @@ export async function suggestBankroll(
   while (hi - lo > step) {
     const mid = lo + Math.max(base, Math.floor((hi - lo) / 2 / base) * base);
     if (mid >= hi) break;
-    if ((await at(mid)) > target) lo = mid;
+    if ((await at(mid)) > goal) lo = mid;
     else hi = mid;
   }
   // The search picks the first candidate that looks safe on its own seeds, which flatters it. Check the
-  // winner on a larger, independent set of seeds and step up until it holds with a margin (4.5% when the
+  // winner on a larger, independent set of seeds and step up until it holds with a margin (4% when the
   // target is 5%), so "gets that under 5%" is true of the real thing, not just of the sample.
   const verifySessions = opts.verifySessions ?? 1000;
-  const margin = target * 0.9;
+  const margin = goal;
   let verified = hi;
   let vRate = 1;
   for (let i = 0; i < 12; i++) {

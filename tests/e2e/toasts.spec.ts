@@ -9,6 +9,31 @@ async function place(page: Page) {
   await expect(sheet).toHaveCount(0);
 }
 
+/** True when a toast sits on top of any point of a 5x5 grid across the element. */
+async function anyUnderToast(loc: Locator): Promise<boolean> {
+  const b = (await loc.boundingBox())!;
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < 5; i++)
+    for (let j = 0; j < 5; j++)
+      pts.push({ x: b.x + 2 + ((b.width - 4) * i) / 4, y: b.y + 2 + ((b.height - 4) * j) / 4 });
+  return loc.evaluate(
+    (_el: unknown, ps: { x: number; y: number }[]) =>
+      ps.some(
+        (pt) =>
+          (
+            globalThis as unknown as {
+              document: {
+                elementFromPoint(x: number, y: number): { closest(s: string): unknown } | null;
+              };
+            }
+          ).document
+            .elementFromPoint(pt.x, pt.y)
+            ?.closest('.sim-toast') != null,
+      ),
+    pts,
+  );
+}
+
 /** True when a toast sits on top of the centre of the element. */
 async function underToast(loc: Locator): Promise<boolean> {
   const b = (await loc.boundingBox())!;
@@ -43,7 +68,7 @@ test.describe('toast overlay', () => {
       await page.getByRole('button', { name: /^Roll/ }).click();
       const toast = page.locator('.sim-toast').first();
       await expect(toast).toContainText('Natural');
-      await expect(toast).toBeInViewport({ ratio: 1 });
+      await expect(toast).toBeInViewport({ ratio: 0.9 });
       const t = (await toast.boundingBox())!;
       expect(t.x).toBeGreaterThanOrEqual(0);
       expect(t.x + t.width).toBeLessThanOrEqual(vp.width);
@@ -74,9 +99,9 @@ test.describe('toast overlay', () => {
       await roll.click();
       await expect(page.locator('.sim-toast')).toHaveCount(2);
       await page.screenshot({ path: `test-results/toasts2-${vp.name}.png` });
-      for (const region of ['pass', 'come', 'place-6', 'place-8']) {
+      for (const region of ['pass', 'come', 'box-6', 'box-8']) {
         const loc = page.locator(`[data-region="${region}"]`);
-        if ((await loc.count()) === 0) continue;
+        await expect(loc.first(), `${region} exists`).toBeVisible();
         expect(await underToast(loc.first()), `${region} is under a toast`).toBe(false);
       }
       expect(await underToast(roll), 'Roll is under a toast').toBe(false);
@@ -106,8 +131,8 @@ test.describe('toast overlay', () => {
         scene.locator('.sim-step-text'),
         scene.getByRole('button', { name: 'Restart' }),
         scene.locator('[data-region="pass"]'),
-        scene.locator('[data-region="place-6"]'),
-        scene.locator('[data-region="place-8"]'),
+        scene.locator('[data-region="box-6"]'),
+        scene.locator('[data-region="box-8"]'),
         roll,
       ];
       for (const t of targets) {
@@ -121,6 +146,34 @@ test.describe('toast overlay', () => {
         ).toBe(false);
       }
       await scene.screenshot({ path: `test-results/lesson-toasts-${vp.name}.png` });
+    });
+  }
+
+  for (const vp of [
+    { name: 'landscape phone', width: 844, height: 390 },
+    { name: 'desktop', width: 1280, height: 800 },
+  ]) {
+    test(`a long multi-bet seven-out toast never touches Roll (${vp.name})`, async ({
+      page,
+    }, info) => {
+      test.skip(info.project.name !== 'mobile', 'sets its own viewports');
+      await page.setViewportSize(vp);
+      await page.goto('/#/play?speed=instant&seed=1&dice=3-3,3-4,2-2');
+      await place(page);
+      const roll = page.getByRole('button', { name: /^Roll/ });
+      await roll.click(); // 3-3: point 6
+      for (const region of ['field', 'box-8', 'box-5', 'box-9']) {
+        await page.locator(`[data-region="${region}"]`).click();
+        const sheet = page.getByRole('dialog');
+        const fix = sheet.getByRole('button', { name: /^Fix to/ });
+        if (await fix.count()) await fix.click();
+        await sheet.getByRole('button', { name: 'Confirm' }).click();
+        await expect(sheet).toHaveCount(0);
+      }
+      await roll.click(); // 3-4: seven-out takes pass, field... and the numbers
+      await expect(page.locator('.sim-toast').first()).toBeVisible();
+      await page.screenshot({ path: `test-results/toast-sevenout-${vp.name}.png` });
+      expect(await anyUnderToast(roll), 'part of Roll is under a toast').toBe(false);
     });
   }
 

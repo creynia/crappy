@@ -55,9 +55,9 @@ describe('session plan', () => {
     expect(s.bankroll).not.toBeNull();
     expect(s.bustRate).toBeLessThanOrEqual(0.05);
     expect(await bustRateAt(input, s.bankroll!, sync)).toBeLessThanOrEqual(0.05);
-    // pinned down to within `step`: a bankroll one step lower is over the target
-    expect(await bustRateAt(input, Math.max(1000, s.bankroll! - s.step), sync)).toBeGreaterThan(
-      0.05,
+    // not wildly pessimistic: two steps lower is already over the 4% the search aims for
+    expect(await bustRateAt(input, Math.max(1000, s.bankroll! - 2 * s.step), sync)).toBeGreaterThan(
+      0.04,
     );
     // seeds the search never saw: the claim "under 5%" holds for the real thing, not just the sample
     // (1500 sessions: standard error 0.6%, so 6.5% would be 2.5 sigma over; twice the target fails)
@@ -82,7 +82,7 @@ describe('session plan', () => {
       { ...sync, capMultiple: 20 },
     );
     expect(s.bankroll).toBeNull();
-    expect(s.bustRate).toBeGreaterThan(0.05);
+    expect(s.bustRate).toBeGreaterThan(0.04);
   }, 60_000);
 
   it('can be aborted', async () => {

@@ -130,6 +130,10 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.sim-step-count .sim-linkbtn {
+  min-height: 44px;
+  padding: 0 0.5rem;
+}
 .sim-step-text,
 .sim-step-hint,
 .sim-step-math p {

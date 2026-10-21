@@ -572,8 +572,9 @@ export function Simulator(props: SimulatorInternalProps) {
   // text nothing taps, never a betting region or the lesson step card.
   const toastsEl = (
     <Toasts
-      // for its one roll the portrait nudge takes the place of that roll's toast (the roll is announced)
-      toasts={oddsHintCard ? [] : toasts}
+      // for its one roll the portrait nudge takes the place of the roll toasts (the roll is announced);
+      // other messages ("Link copied") still show
+      toasts={oddsHintCard ? toasts.filter((t) => !t.roll) : toasts}
       onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
       autoDismissMs={toastDurationMs(settings.speed)}
       hidden={winShown}

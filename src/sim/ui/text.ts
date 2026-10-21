@@ -8,6 +8,7 @@ import {
   isHardHop,
 } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
+import { maxOddsAmount } from '../engine/validate';
 import { betEdge, betEV, betStdDev, edgeTier as tierOf, pointWinProb, toNumber } from '../math';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
@@ -127,7 +128,14 @@ export interface EvFacts {
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
   /** Pass/Come (or Don't/Don't Come) bet already on a point: its current value (cents) and chance to win. */
-  holdValue?: { cents: number; winChance: string; point: number; label: string } | null;
+  holdValue?: {
+    cents: number;
+    winChance: string;
+    point: number;
+    label: string;
+    /** odds room is left behind this bet (so the nudge to add odds makes sense) */
+    canAddOdds: boolean;
+  } | null;
   /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
   swingCents?: number | null;
 }
@@ -342,24 +350,34 @@ const HOLD_LABEL: Partial<Record<BetTypeId, string>> = {
 function holdValueOf(
   bet: Bet | undefined,
   type: BetTypeId,
-  state: Pick<GameState, 'rules' | 'phase' | 'point'>,
+  state: Pick<GameState, 'rules' | 'phase' | 'point' | 'bets'>,
 ): EvFacts['holdValue'] {
   const label = HOLD_LABEL[type];
-  if (!bet || !label || bet.amount <= 0 || state.phase !== 'point') return null;
-  const point = bet.point ?? state.point;
+  if (!bet || !label || bet.amount <= 0) return null;
+  // pass lines are on a point only in the point phase; come bets once they have a number
+  const point = type === 'pass-line' || type === 'dont-pass' ? state.point : bet.point;
+  if (type === 'pass-line' || type === 'dont-pass' ? state.phase !== 'point' : bet.point === null)
+    return null;
   if (point !== 4 && point !== 5 && point !== 6 && point !== 8 && point !== 9 && point !== 10)
     return null;
   const ctx = { phase: 'point' as const, point, rules: state.rules };
   const cents = toNumber(betEV({ type, amount: bet.amount, point }, ctx));
   const w = pointWinProb(point);
-  return { cents, winChance: `${w.n} in ${w.d}`, point, label };
+  const hasOdds = state.bets.some((b) => b.parentId === bet.id);
+  const canAddOdds = !hasOdds && maxOddsAmount(state as GameState, bet.id) > 0;
+  return { cents, winChance: `${w.n} in ${w.d}`, point, label, canAddOdds };
 }
 
-/** Plain sentence for a contract bet's current value. */
+/** Plain sentence for a flat line or come bet already on a point: its current value. */
 export function holdValueText(h: NonNullable<EvFacts['holdValue']>): string {
-  const worth = `worth ${fmtMoney(h.cents, { sign: true })} right now`;
-  if (h.label === 'Pass line' || h.label === 'Come')
-    return `${h.label} on ${h.point}: ${worth} (wins ${h.winChance}). It can't come down, so the best move is to add odds (0% edge).`;
+  const worth = `worth ${fmtMoney(h.cents, { sign: true, exact: true })} right now`;
+  const line = h.label === 'Pass line' || h.label === 'Come';
+  if (line) {
+    const tail = h.canAddOdds
+      ? " It can't come down, so the best move is to add odds (0% edge)."
+      : " It can't come down.";
+    return `${h.label} on ${h.point}: ${worth} (wins ${h.winChance}).${tail}`;
+  }
   return `${h.label} on ${h.point}: ${worth}. Taking it down gives this up.`;
 }
 

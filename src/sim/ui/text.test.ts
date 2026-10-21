@@ -9,6 +9,7 @@ import {
   buildEvFacts,
   describeRoll,
   fmtMoney,
+  edgeOnAction,
   nextCostUnit,
   normalizeTier,
   regionAriaLabel,
@@ -239,43 +240,46 @@ describe('combined edge with two Come bets', () => {
 });
 
 describe('roll cost units (I043)', () => {
+  const edgeOf = (
+    bets: Parameters<typeof createGame>[0] extends infer O
+      ? O extends { bets?: infer B }
+        ? B
+        : never
+      : never,
+  ) => edgeOnAction(createGame({ bankroll: 100000, bets }));
   it('cycles per roll → per hour → per $100 bet → per roll', () => {
     expect(nextCostUnit('roll')).toBe('hour');
     expect(nextCostUnit('hour')).toBe('bet100');
     expect(nextCostUnit('bet100')).toBe('roll');
   });
-  it('pass $10 + place-6 $12 layout: per roll, per hour and per $100 bet', () => {
-    const game = createGame({
+  it('per $100 bet is the edge on action: pass $10 is $1.41', () => {
+    const e = edgeOf([{ type: 'pass-line', amount: 1000 }]);
+    expect(rollCostText('bet100', 14.1, 100, e)).toBe('Expected cost: $1.41 per $100 bet');
+  });
+  it('odds count 0 in the numerator but stay in the denominator: pass $10 + $50 odds is $0.24', () => {
+    const g = createGame({
+      phase: 'point',
+      point: 6,
       bankroll: 100000,
       bets: [
-        { type: 'pass-line', amount: 1000 },
-        { type: 'place-6', amount: 1200 },
+        { ref: 'p', type: 'pass-line', amount: 1000 },
+        { type: 'pass-odds', amount: 5000, parentRef: 'p' },
       ],
     });
-    const perRoll = toNumber(tableExpectedLossPerRoll(game));
-    const action = 2200;
-    expect(rollCostText('roll', perRoll, 100, action)).toBe(
-      `Expected cost: ${fmtMoney(Math.round(perRoll), { exact: true })} per roll`,
-    );
-    expect(rollCostText('hour', perRoll, 100, action)).toBe(
-      `Expected cost: ${fmtMoney(Math.round(perRoll * 100), { exact: true })} per hour`,
-    );
-    expect(rollCostText('bet100', perRoll, 100, action)).toBe(
-      `Expected cost: ${fmtMoney(Math.round((perRoll / action) * 10_000), { exact: true })} per $100 bet`,
-    );
-    expect(rollCostText('bet100', perRoll, 100, 0)).toBeUndefined();
+    const e = edgeOnAction(g);
+    expect(rollCostText('bet100', 14.1, 100, e)).toBe('Expected cost: $0.24 per $100 bet');
   });
-});
-
-describe('typeEdgeLabel', () => {
-  const state = createGame({ bankroll: 100000 });
-  it('box-4 options show their house edge at the sheet amount', () => {
-    expect(typeEdgeLabel('place-4', 1000, state)).toMatchObject({ edgeText: '6.67%' });
-    expect(typeEdgeLabel('buy-4', 2000, state)).toMatchObject({ edgeText: '1.67%' });
-    expect(typeEdgeLabel('buy-4', 1000, state)).toMatchObject({ edgeText: '3.33%' });
+  it('place 6 $12 is $1.52 and field $5 is $5.56 per $100 bet', () => {
+    expect(rollCostText('bet100', 18.2, 100, edgeOf([{ type: 'place-6', amount: 1200 }]))).toBe(
+      'Expected cost: $1.52 per $100 bet',
+    );
+    expect(rollCostText('bet100', 27.8, 100, edgeOf([{ type: 'field', amount: 500 }]))).toBe(
+      'Expected cost: $5.56 per $100 bet',
+    );
   });
-  it('gives a tier and no label for odds bets, which need a parent', () => {
-    expect(typeEdgeLabel('pass-odds', 1000, state)).toBeNull();
-    expect(typeEdgeLabel('place-4', 1000, state)!.tier).toBe('poor');
+  it('per roll and per hour are literal: $0.14 per roll is $14.10 per hour at 100 rolls', () => {
+    expect(rollCostText('roll', 14.1, 100, null)).toBe('Expected cost: $0.14 per roll');
+    expect(rollCostText('hour', 14.1, 100, null)).toBe('Expected cost: $14.10 per hour');
+    expect(rollCostText('bet100', 14.1, 100, null)).toBeUndefined();
   });
 });

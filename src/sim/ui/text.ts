@@ -9,6 +9,7 @@ import {
 } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
 import { betEdge, edgeTier as tierOf } from '../math';
+import { edgeOfBet } from '../math/ev';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
@@ -541,21 +542,43 @@ export function nextCostUnit(u: CostUnit): CostUnit {
   return COST_UNIT_NEXT[u];
 }
 
-/** Expected cost in the chosen unit, e.g. "Expected cost: $5.86 per hour"; undefined when it has no meaning. */
+/**
+ * Edge on action: the house's expected take over every dollar on the table, as a fraction.
+ * Odds bets count 0 in the numerator (no house edge) but stay in the denominator.
+ */
+export function edgeOnAction(
+  state: Pick<GameState, 'bets' | 'phase' | 'point' | 'rules'>,
+): number | null {
+  let weighted = 0;
+  let total = 0;
+  for (const b of state.bets) {
+    total += b.amount;
+    if (BET_TYPES[b.type].category === 'odds') continue;
+    // line bets carry their own house edge (pass 1.41%), whatever the table point
+    const e =
+      BET_TYPES[b.type].category === 'line'
+        ? edgeOfBet({ ...b, point: null }, { phase: 'come-out', point: null, rules: state.rules })
+        : edgeOfBet(b, { phase: state.phase, point: state.point, rules: state.rules });
+    weighted += b.amount * fracToNumber(e.perResolved);
+  }
+  return total > 0 ? weighted / total : null;
+}
+
+/** Expected cost in the chosen unit, e.g. "Expected cost: $1.41 per $100 bet"; undefined when it has no meaning. */
 export function rollCostText(
   unit: CostUnit,
   perRollCents: number,
   rollsPerHour: number,
-  actionCents: number,
+  edgeOnActionFraction: number | null,
 ): string | undefined {
   const value =
     unit === 'roll'
       ? perRollCents
       : unit === 'hour'
         ? perRollCents * rollsPerHour
-        : actionCents > 0
-          ? (perRollCents / actionCents) * 10_000
-          : null;
+        : edgeOnActionFraction === null
+          ? null
+          : edgeOnActionFraction * 10_000;
   if (value === null) return undefined;
   const amount = value > 0 && value < 1 ? '<1¢' : fmtMoney(Math.round(value), { exact: true });
   return `Expected cost: ${amount} ${COST_UNIT_LABEL[unit]}`;

@@ -5,7 +5,7 @@ import { toNumber } from '../math/fraction';
 import type { SceneConfig } from '../scene/types';
 import { ChipRack } from './ChipRack';
 import { RollButton } from './RollButton';
-import { COST_UNIT_LABEL, nextCostUnit, rollCostText, type CostUnit } from './text';
+import { COST_UNIT_LABEL, edgeOnAction, nextCostUnit, rollCostText, type CostUnit } from './text';
 
 /** Open state of the panels the tab row toggles. */
 export interface Panels {
@@ -59,13 +59,14 @@ function writeCostUnit(u: CostUnit): void {
 export function SimControls(p: SimControlsProps) {
   const { ui, game } = p;
   const expectedCost = toNumber(tableExpectedLossPerRoll(game));
-  const action = game.bets.reduce((sum, b) => sum + b.amount, 0);
   const [costUnit, setCostUnit] = useState<CostUnit>(readCostUnit);
+  const edge = edgeOnAction(game);
   const costText =
     game.bets.length === 0
       ? undefined
-      : rollCostText(costUnit, expectedCost, p.rollsPerHour ?? 100, action);
+      : rollCostText(costUnit, expectedCost, p.rollsPerHour ?? 100, edge);
   const next = nextCostUnit(costUnit);
+  const [announced, setAnnounced] = useState('');
   const lockId = useId();
   return (
     <div class="sim-controls">
@@ -86,18 +87,27 @@ export function SimControls(p: SimControlsProps) {
           rolling={p.busy}
         />
       ) : null}
-      {costText && ui.showRoll !== false ? (
-        <button
-          type="button"
-          class="sim-cost-cycle"
-          aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
-          onClick={() => {
-            setCostUnit(next);
-            writeCostUnit(next);
-          }}
-        >
-          {costText}
-        </button>
+      {ui.showRoll !== false ? (
+        <div class="sim-cost-slot">
+          {costText ? (
+            <button
+              type="button"
+              class="sim-cost-cycle"
+              aria-label={`${costText}. Tap to show ${COST_UNIT_LABEL[next]}.`}
+              onClick={() => {
+                setCostUnit(next);
+                writeCostUnit(next);
+                const nextText = rollCostText(next, expectedCost, p.rollsPerHour ?? 100, edge);
+                setAnnounced(nextText ?? '');
+              }}
+            >
+              {costText}
+            </button>
+          ) : null}
+          <span class="sim-sr" role="status" aria-live="polite">
+            {announced}
+          </span>
+        </div>
       ) : null}
       {p.lock && ui.showRoll !== false ? (
         <p class="sim-lock" id={lockId}>

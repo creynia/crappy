@@ -197,13 +197,15 @@ describe('combined edge with two Come bets', () => {
     const action = {
       type: 'place-bet',
       betType: 'come-odds',
-      amount: 5000,
+      amount: 2000,
       parentId: byType(s, 'come', 6).id,
     } as const;
     const ref = single();
     const refAction = { ...action, parentId: byType(ref, 'come', 6).id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
     expect(combinedOf(s, action)!.label).toBe('Come + Odds');
+    // $20 odds on the 6 (5x max = $50): 6's max odds, not 4's 3x.
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(7 / 1045, 6);
   });
 
   it('set-amount on the odds of the 6 come bet uses the managed bet', () => {
@@ -212,6 +214,7 @@ describe('combined edge with two Come bets', () => {
     const action = { type: 'set-amount', betId: byType(s, 'come-odds').id, amount: 2000 } as const;
     const refAction = { ...action, betId: byType(ref, 'come-odds').id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(7 / 1045, 6);
   });
 
   it('set-amount on the 6 come bet itself uses its own point', () => {
@@ -220,5 +223,6 @@ describe('combined edge with two Come bets', () => {
     const action = { type: 'set-amount', betId: byType(s, 'come', 6).id, amount: 2000 } as const;
     const refAction = { ...action, betId: byType(ref, 'come').id };
     expect(combinedOf(s, action)).toEqual(combinedOf(ref, refAction));
+    expect(combinedOf(s, action)!.edge).toBeCloseTo(14 / 2365, 6);
   });
 });

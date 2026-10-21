@@ -128,8 +128,6 @@ const ODDS_FLAT: Partial<Record<BetTypeId, BetTypeId>> = {
   'dont-come-odds': 'dont-come',
 };
 
-const a2 = (a: Action): string | undefined => (a.type === 'place-bet' ? a.parentId : undefined);
-
 /** Combined flat + odds edge per dollar, when the flat bet has (or is getting) odds. */
 function combinedEdge(
   type: BetTypeId,
@@ -145,8 +143,8 @@ function combinedEdge(
   let label: string;
   const flatLink = FLAT_ODDS[type];
   const parentType = ODDS_FLAT[type];
-  // The bet the action manages: the flat bet for set-amount on it, or the odds bet for set-amount on odds.
-  // Every lookup below goes through these, so a second Come bet never falls back to the first one.
+  // The bet being edited (a Come/Pass bet or an odds bet). Every lookup below goes through it,
+  // so a second Come bet never falls back to the first one.
   const managed =
     action.type === 'set-amount' ? state.bets.find((b) => b.id === action.betId) : undefined;
   let flatBet: Bet | undefined;
@@ -162,7 +160,11 @@ function combinedEdge(
     flatBet = managed;
     label = flatLink.label;
   } else if (parentType) {
-    const parentId = managed ? managed.parentId : a2(action);
+    const parentId = managed
+      ? managed.parentId
+      : action.type === 'place-bet'
+        ? action.parentId
+        : undefined;
     const parent = parentId
       ? state.bets.find((b) => b.id === parentId)
       : state.bets.find((b) => b.type === parentType);

@@ -6,6 +6,7 @@ import {
   fmtMoney,
   fmtPct,
   fracToNumber,
+  holdValueText,
   normalizeTier,
   swingCopy,
   TIER_LABEL,
@@ -90,7 +91,9 @@ export function BetSheet(p: BetSheetProps) {
   const [whyOpen, setWhyOpen] = useState(!!p.forceWhyOpen);
   const [armed, setArmed] = useState(false);
   const contract = mode === 'manage' ? p.contract : undefined;
-  const tier = contract ? ('free' as const) : normalizeTier(preview.tier);
+  // a flat line or come bet already on a point is shown by its current value, not as a sucker or expected loss
+  const hold = facts?.holdValue ?? null;
+  const tier = contract || hold ? ('free' as const) : normalizeTier(preview.tier);
   const valid = preview.validation.ok;
   const needsSecondTap = tier === 'avoid' && confirmSucker && valid;
   const removeNeedsSecondTap =
@@ -270,23 +273,31 @@ export function BetSheet(p: BetSheetProps) {
           <section class="sim-ev" aria-label="Expected value">
             <div class="sim-ev-head">
               <span
-                class={`sim-badge sim-badge-${contract ? 'neutral' : tier}`}
-                data-tier={contract ? 'contract' : tier}
+                class={`sim-badge sim-badge-${contract || hold ? 'neutral' : tier}`}
+                data-tier={contract ? 'contract' : hold ? 'on-table' : tier}
               >
-                {contract ? 'Contract bet' : TIER_LABEL[tier]}
+                {contract ? 'Contract bet' : hold ? 'On the table' : TIER_LABEL[tier]}
               </span>
               <span class="sim-headline">
-                {contract ? 'It stays up until it wins or loses.' : preview.headline}
+                {contract ? 'It stays up until it wins or loses.' : hold ? '' : preview.headline}
               </span>
             </div>
-            {tier === 'avoid' ? (
+            {tier === 'avoid' && !hold ? (
               <p class="sim-banner" role="note">
                 {edgePct !== null
                   ? `Sucker bet: the house keeps ${fmtPct(edgePct)} on average.`
                   : 'Sucker bet: this gives up expected value.'}
               </p>
             ) : null}
-            {facts ? <EvLines facts={facts} /> : <p class="sim-detail">{preview.detail}</p>}
+            {hold ? (
+              <p class="sim-hold-value" data-line="hold-value">
+                {holdValueText(hold)}
+              </p>
+            ) : facts && !contract ? (
+              <EvLines facts={facts} />
+            ) : (
+              <p class="sim-detail">{preview.detail}</p>
+            )}
             {preview.alternative ? (
               <div class="sim-alt">
                 <p>{preview.alternative.message}</p>

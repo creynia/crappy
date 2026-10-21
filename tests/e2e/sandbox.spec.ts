@@ -244,6 +244,25 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
+  test('wide status values at 360x740 keep the status height and Roll y of the no-toggle layout', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto(url('seed=1&dice=3-4&bankroll=250&bets=pass-line:100'));
+    await expect(page.locator('.sim-cost-toggle')).toHaveCount(1);
+    const status = await page.locator('.sim-status').first().boundingBox();
+    const roll = await page.locator('.sim-roll').boundingBox();
+    const cost = await page.locator('.sim-cost-toggle').boundingBox();
+    await page.addStyleTag({ content: '.sim-cost-toggle { display: none !important; }' });
+    const statusBase = await page.locator('.sim-status').first().boundingBox();
+    const rollBase = await page.locator('.sim-roll').boundingBox();
+    expect(Math.abs(status!.height - statusBase!.height), 'wide status height').toBeLessThanOrEqual(
+      1,
+    );
+    expect(Math.abs(roll!.y - rollBase!.y), 'wide roll y').toBeLessThanOrEqual(1);
+    expect(cost!.height, 'wide toggle 44px').toBeGreaterThanOrEqual(44);
+  });
+
   test('cost toggle sits in the status line; Roll does not move or get covered', async ({
     page,
   }) => {

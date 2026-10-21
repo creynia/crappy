@@ -5,6 +5,7 @@ import type { GameState, RulePresetId } from '../engine/types';
 import type { SceneConfig, SceneInput } from '../scene/types';
 import type { ManyResult, SessionConfig, SessionResult, StrategySpec } from '../strategy/types';
 import { AutoRollPanel } from './AutoRollPanel';
+import { StreakLab } from './StreakLab';
 import type { SimulatorEvent } from './types';
 
 export interface SimAutoRollProps {
@@ -83,6 +84,16 @@ export function SimAutoRoll({
       oddsMultiple: om === undefined ? 'default' : om,
     });
   };
+  if (ar?.lab === 'streaks')
+    return (
+      <section class="sim-auto" aria-label="Auto-roll">
+        <StreakLab
+          onCompleted={(rolls) =>
+            feedInput({ kind: 'auto-roll-completed', rolls, oddsMultiple: 'default' })
+          }
+        />
+      </section>
+    );
   return (
     <section class="sim-auto" aria-label="Auto-roll">
       <AutoRollPanel

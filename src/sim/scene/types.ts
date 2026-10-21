@@ -57,6 +57,8 @@ export interface SceneConfig {
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */
     stopLoss?: Cents;
+    /** starting bankroll for the auto-roll runs, in cents; default is the scene bankroll */
+    bankroll?: Cents;
     /** odds-multiple sweep table instead of the normal form: numbers are x the flat bet, 'max' the table maximum */
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
@@ -80,9 +82,20 @@ export interface SceneStep {
   allowedActions?: ActionType[];
   highlightedBets?: BetTypeId[];
   expect?: ActionMatcher[];
+  /** An in-sim question. With mode 'before-roll' (default) Roll stays locked until it is answered. */
+  ask?: StepAsk;
   completeWhen: Condition;
   advance?: 'auto' | 'button';
   showEV?: boolean;
+}
+
+export interface StepAsk {
+  q: string;
+  options: string[];
+  /** index into `options` */
+  answer: number;
+  explain: string;
+  mode?: 'before-roll' | 'any';
 }
 
 export interface ActionMatcher {
@@ -116,7 +129,9 @@ export type Condition =
   | { equityAtMost: Cents }
   | { previewed: BetTypeId }
   | { autoRollCompleted: { minRolls?: number; oddsMultiple?: number | 'default' } }
-  | { acknowledged: true };
+  | { acknowledged: true }
+  /** the step's `ask` was answered (true) or answered correctly ('correct') */
+  | { answered: true | 'correct' };
 
 export interface SceneRuntime {
   stepIndex: number;
@@ -131,4 +146,5 @@ export type SceneInput =
   | { kind: 'action'; action: Action; events: GameEvent[] }
   | { kind: 'previewed'; betType: BetTypeId }
   | { kind: 'acknowledged' }
+  | { kind: 'answered'; correct: boolean }
   | { kind: 'auto-roll-completed'; rolls: number; oddsMultiple?: number | 'default' };

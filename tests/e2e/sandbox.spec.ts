@@ -103,6 +103,33 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
+  test('custom rules: upfront vig changes the buy 4 edge (I033)', async ({ page, guard }) => {
+    await page.goto(url());
+    const buy4 = async () => {
+      await page.locator('[data-region="box-4"]').click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('radio', { name: /^Buy/ }).click();
+      const text = await sheet.locator('.sim-headline').innerText();
+      await sheet.getByRole('button', { name: 'Cancel' }).click();
+      return text;
+    };
+    expect(await buy4()).toContain('1.67%');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const menu = page.locator('.sim-menu');
+    await menu.getByLabel('Rules').selectOption('custom');
+    const form = page.locator('form.sim-rules');
+    await form.getByLabel('Buy/lay vig paid').selectOption('upfront');
+    await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
+    await guard.check('rules-editor-open');
+    // every select in the editor is a 44px tap target, even inside the menu
+    for (const sel of await form.locator('select').all())
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await form.getByRole('button', { name: /^Apply/ }).click();
+    await expect(form).toHaveCount(0);
+    await expect(menu.getByLabel('Rules')).toHaveValue('custom');
+    expect(await buy4()).toContain('4.76%');
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
@@ -111,6 +138,62 @@ test.describe('sandbox', () => {
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
     await guard.check('auto-roll-done');
+  });
+
+  test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
+    const noHScroll = async (label: string) => {
+      const m = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+        '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+      );
+      expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
+    };
+    for (const { width, height } of [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
+      // single-strategy auto-roll in the sandbox
+      await page.setViewportSize({ width, height });
+      await page.goto('/#/play?speed=fast');
+      const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+      if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+      const panel = page.locator('.sim-auto');
+      await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+      await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`auto-roll @${width}`);
+
+      // strategy compare run on a lesson scene (the 4-column summary table)
+      await page.goto('/#/learn/strategy-fun-per-dollar');
+      const scene = page.locator('section.scene').nth(0);
+      await scene.scrollIntoViewIfNeeded();
+      await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
+      await expect(scene.getByTestId('auto-roll-summary')).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`compare @${width}`);
+    }
+  });
+
+  test('auto-roll starting bankroll picker sets the run bankroll without page overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/play?speed=fast');
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const panel = page.locator('.sim-auto');
+    await panel
+      .getByRole('group', { name: 'Starting bankroll' })
+      .getByRole('button', { name: '$5,000' })
+      .click();
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('region', { name: 'Strategy summary' })).toContainText(
+      '$5,000.00',
+    );
+    const scroll = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+      '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+    );
+    expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
   test('sandbox state persists across reload', async ({ page, guard }) => {
@@ -412,5 +495,32 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
+  });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    // the heading must be fully visible and hit-testable at its centre (not under the bottom nav)
+    const clear = async (selector: string) => {
+      await expect(page.locator(selector).first()).toBeInViewport({ ratio: 1 });
+      const hit = await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return el.contains(top);
+      })()`);
+      expect(hit).toBe(true);
+    };
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await clear('.sim-session-panel h3');
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    await expect(auto).toBeInViewport({ ratio: 0.5 });
+    await expect(auto).toBeFocused();
   });
 });

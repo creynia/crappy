@@ -609,23 +609,34 @@
   min-height: 1.2em;
 }
 
-/* expected-cost toggle on the status line above the felt; 44px tall, compact */
-.sim-cost-toggle {
+/* expected-cost toggle: a compact 44x44 control over the status line's top-right corner.
+   The status text reserves that width, so nothing is covered or clipped and the line keeps its height. */
+.sim-status-wrap > .sim-status {
+  padding-right: 48px;
+}
+.sim-status-wrap > .sim-cost-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
   border-radius: 10px;
   border: 1px solid var(--sim-border);
   background: var(--sim-surface);
   color: inherit;
   font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  white-space: nowrap;
 }
-
-/* the cost toggle is placed over the top-right corner of the status line: no extra height, so Roll does not move */
-.sim-status-wrap > .sim-cost-toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
+.sim-status-wrap .sim-cost-value {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.sim-status-wrap .sim-cost-unit {
+  font-size: 0.6rem;
 }

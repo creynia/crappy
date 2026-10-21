@@ -55,8 +55,8 @@ export function CostToggle({
         writeCostUnit(next);
       }}
     >
-      {short.value}
-      {short.unit}
+      <span class="sim-cost-value">{short.value}</span>
+      <span class="sim-cost-unit">{short.unit}</span>
     </button>
   );
 }

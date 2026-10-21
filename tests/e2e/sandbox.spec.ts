@@ -248,17 +248,20 @@ test.describe('sandbox', () => {
       ).toBeLessThanOrEqual(status!.x + status!.width + 1);
       expect(cost!.height, `${width}x${height} toggle hit area`).toBeGreaterThanOrEqual(44);
       // (b) the toggle does not cover the status text
-      const texts = await page.evaluate<Box[]>(`(() => {
-        const out = [];
+      const texts = await page.evaluate<{ boxes: Box[]; clipped: string[] }>(`(() => {
+        const boxes = [];
+        const clipped = [];
         for (const sel of ['.sim-status-money > *', '.sim-point', '.sim-last']) {
           for (const e of document.querySelectorAll(sel)) {
             const r = e.getBoundingClientRect();
-            out.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+            boxes.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+            if (e.scrollWidth > e.clientWidth + 1) clipped.push(sel);
           }
         }
-        return out;
+        return { boxes, clipped };
       })()`);
-      for (const box of texts) {
+      expect(texts.clipped, `${width}x${height} status text clipped`).toEqual([]);
+      for (const box of texts.boxes) {
         expect(overlaps(cost!, box), `${width}x${height} toggle over status text`).toBe(false);
       }
       // Roll grows once a bet shows its cost inside the button, on main too; rev-i compares Roll with main

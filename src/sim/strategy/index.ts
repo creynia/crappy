@@ -16,6 +16,7 @@ export { getStrategy, listStrategies } from './presets';
 export { edgeFunnelSigma, peekEdgeFunnelSigma } from './funnel';
 export {
   simulateSession,
+  strategyAvailable,
   simulateMany,
   simulateCompare,
   simulateManyCompare,

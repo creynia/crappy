@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, betTypeAvailable } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
 import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import {
@@ -47,7 +47,7 @@ import {
   type WinPromptTarget,
 } from './winPrompt';
 import { toastDurationMs } from './animation';
-import { landscapeLayout, portraitLayout } from './layouts';
+import { feltLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
 import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
@@ -262,12 +262,20 @@ export function Simulator(props: SimulatorInternalProps) {
     () => new Set(game.bets.filter((b) => !isWorking(b, game)).map((b) => b.id)),
     [game],
   );
+  const rules = liveGame.rules;
   const disabledRegions = useMemo(() => {
     const set = new Set<RegionId>();
     for (const r of ALL_REGIONS)
-      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t))) set.add(r.id);
+      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t) && betTypeAvailable(t, rules)))
+        set.add(r.id);
     return set;
-  }, [scene, rt]);
+  }, [scene, rt, rules]);
+  const unofferedRegions = useMemo(() => {
+    const set = new Set<RegionId>();
+    for (const r of ALL_REGIONS)
+      if (!r.betTypes.some((t) => betTypeAvailable(t, rules))) set.add(r.id);
+    return set;
+  }, [rules]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
   const lock = watching ? 'Watching a replay: exit to play.' : rollLock(scene, rt, liveGame);
@@ -285,6 +293,10 @@ export function Simulator(props: SimulatorInternalProps) {
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
     if (opts?.rules) setScene(sc);
     const init = initScene(sc, { seed: guided ? 1 : randomSeed() });
+    // bets the new rules don't offer (a Don't Pass when switching to crapless), read before the reset
+    const dropped = coreRef.current.game.bets.filter(
+      (b) => !betTypeAvailable(b.type, init.game.rules),
+    );
     startedRef.current = -1;
     demo.reset();
     startEquity.current = equity(init.game);
@@ -295,6 +307,12 @@ export function Simulator(props: SimulatorInternalProps) {
     setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
+    if (opts?.rules && dropped.length) {
+      const names = [...new Set(dropped.map((b) => BET_TYPES[b.type].label))].join(' and ');
+      const msg = `Crapless craps has no don't side, so the new table starts without your ${names}.`;
+      pushToast(msg, 'info');
+      announce(msg);
+    }
   };
   const rebet = () => {
     for (const r of lastOneRoll.current) {
@@ -408,6 +426,7 @@ export function Simulator(props: SimulatorInternalProps) {
     point: game.point,
     offBetIds: offIds,
     disabledRegions,
+    unofferedRegions,
     highlightedBets: highlighted,
     callouts: calloutsFor(scene, step),
     fieldPays: game.rules.fieldPays,
@@ -556,7 +575,7 @@ export function Simulator(props: SimulatorInternalProps) {
             {view === 'center' ? (
               <CenterPanel {...tableProps} />
             ) : (
-              <Table {...tableProps} layout={landscape ? landscapeLayout : portraitLayout} />
+              <Table {...tableProps} layout={feltLayout(landscape, rules.variant)} />
             )}
             {view === 'table' && centerTotal > 0 ? (
               <button type="button" class="sim-center-ind" onClick={() => setView('center')}>

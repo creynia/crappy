@@ -1,5 +1,13 @@
-import { applyAction, createGame, equity, isBonusType, resolveRules } from '../engine';
-import type { Action, GameState } from '../engine';
+import {
+  CRAPLESS_POINTS,
+  applyAction,
+  createGame,
+  equity,
+  isBonusType,
+  pointsFor,
+  resolveRules,
+} from '../engine';
+import type { Action, GameState, PointTable } from '../engine';
 import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
@@ -8,6 +16,7 @@ import type {
   ManyResult,
   SessionConfig,
   SessionResult,
+  StrategySpec,
   SweepConfig,
   SweepRow,
 } from './types';
@@ -25,6 +34,15 @@ function makeExpectedLossFn(): (s: GameState) => number {
     }
     return v;
   };
+}
+
+/**
+ * Whether a strategy can be played under these rules: false when it bets something the rules do not
+ * offer (crapless craps has no don't side). Probes a short seeded session.
+ */
+export function strategyAvailable(spec: StrategySpec, rules: SessionConfig['rules']): boolean {
+  const r = simulateSession({ strategy: spec, rolls: 300, seed: 1, bankroll: 10_000_000, rules });
+  return r.endedBy !== 'unavailable';
 }
 
 /** Run one session. Pure and deterministic per `cfg.seed`. */
@@ -58,17 +76,26 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
+    let unavailable = false;
     const applied: Action[] = [];
     for (const a of plan.actions) {
       const r = applyAction(state, a);
       if (r.ok) {
         state = r.state;
         if (log) applied.push(a);
+      } else if (r.error.code === 'unknown-bet') {
+        // the rules do not offer this bet (e.g. Don't Pass on a crapless table): not a bust
+        unavailable = true;
+        break;
       } else {
         // A strategy must only emit legal actions; treat an unexpected rejection as unaffordable.
         if (stopAtBust) plan.blocked = true;
         break;
       }
+    }
+    if (unavailable) {
+      endedBy = 'unavailable';
+      break;
     }
     if (stopAtBust && plan.blocked && state.bets.length === 0) {
       busted = played;
@@ -301,11 +328,8 @@ export async function simulateSweep(
   for (let i = 0; i < n; i++) {
     const m = cfg.oddsMultiples[i]!;
     let rules = base;
-    if (
-      m !== 'max' &&
-      [...Object.values(base.maxOdds), ...Object.values(base.maxLayOdds)].some((cap) => cap < m)
-    ) {
-      const uniform = { 4: m, 5: m, 6: m, 8: m, 9: m, 10: m };
+    if (m !== 'max' && pointsFor(base).some((p) => base.maxOdds[p] < m || base.maxLayOdds[p] < m)) {
+      const uniform = Object.fromEntries(CRAPLESS_POINTS.map((p) => [p, m])) as PointTable;
       rules = resolveRules({ ...base, maxOdds: uniform, maxLayOdds: uniform });
     }
     const spec =

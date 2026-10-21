@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { BET_TYPES, isToggleable } from '../engine/bets';
+import { BET_TYPES, betTypeAvailable, isToggleable } from '../engine/bets';
 import type { Action, BetTypeId, Cents, Dice, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
@@ -7,7 +7,7 @@ import type { ActionPreview } from '../math/types';
 import { allowedActionsFor, betTypeAllowed, currentStep, gateAction } from '../scene';
 import type { SceneConfig, SceneRuntime } from '../scene/types';
 import type { QuickAction, TypeOption } from './BetSheet';
-import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
+import { centerLayout, craplessPortraitLayout, portraitLayout, regionIdForBet } from './layouts';
 import type { RegionDef, RegionId } from './layouts/types';
 import type { ResolvedSimSettings } from './settings';
 import { workingProp } from './workingProp';
@@ -25,7 +25,14 @@ import type { SimulatorEvent } from './types';
 import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
 
-export const ALL_REGIONS: RegionDef[] = [...portraitLayout.regions, ...centerLayout.regions];
+export const ALL_REGIONS: RegionDef[] = [
+  ...portraitLayout.regions,
+  ...centerLayout.regions,
+  // crapless-only number boxes (2, 3, 11, 12)
+  ...craplessPortraitLayout.regions.filter(
+    (r) => !portraitLayout.regions.some((p) => p.id === r.id),
+  ),
+];
 
 export interface SheetState {
   regionId: RegionId;
@@ -113,28 +120,30 @@ export function buildSheetModel(
     : undefined;
   const options: TypeOption[] = bet
     ? [{ id: type, label: betLabel(type), enabled: true }]
-    : region.betTypes.map((t) => {
-        const allowed = betTypeAllowed(scene, rt, t);
-        const odds = BET_TYPES[t].category === 'odds';
-        const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
-        // the amount tapping this type would actually place, so the label and the tap agree
-        // the selected type is priced at the sheet's own amount; others at the amount a tap would place
-        const tapAmount =
-          t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
-        const edge = typeEdgeLabel(t, tapAmount, game);
-        const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
-        return {
-          id: t,
-          label: betLabel(t),
-          ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
-          enabled: allowed && hasParent,
-          ...(!allowed
-            ? { reason: 'Not available in this lesson' }
-            : !hasParent
-              ? { reason: 'Needs a flat bet first' }
-              : {}),
-        };
-      });
+    : region.betTypes
+        .filter((t) => betTypeAvailable(t, game.rules))
+        .map((t) => {
+          const allowed = betTypeAllowed(scene, rt, t);
+          const odds = BET_TYPES[t].category === 'odds';
+          const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
+          // the amount tapping this type would actually place, so the label and the tap agree
+          // the selected type is priced at the sheet's own amount; others at the amount a tap would place
+          const tapAmount =
+            t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
+          const edge = typeEdgeLabel(t, tapAmount, game);
+          const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
+          return {
+            id: t,
+            label: betLabel(t),
+            ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
+            enabled: allowed && hasParent,
+            ...(!allowed
+              ? { reason: 'Not available in this lesson' }
+              : !hasParent
+                ? { reason: 'Needs a flat bet first' }
+                : {}),
+          };
+        });
   const quick: QuickAction[] = [];
   if (!bet) {
     quick.push({ id: 'min', label: 'Min', amount: minAmountFor(type, game) });
@@ -235,7 +244,16 @@ export function useSheetModel(d: SheetDeps) {
     const region = regionFor(id);
     if (!region) return;
     const { game: g, rt: r } = coreRef.current;
-    const allowedTypes = region.betTypes.filter((t) => betTypeAllowed(sceneRef.current, r, t));
+    const offered = region.betTypes.filter((t) => betTypeAvailable(t, g.rules));
+    if (!offered.length) {
+      // the rules don't offer it (crapless: no don't side): say so, in the engine's words
+      const v = validateAction(g, { type: 'place-bet', betType: region.betTypes[0]!, amount: 500 });
+      const msg = v.ok ? 'That bet is not offered at this table.' : v.message;
+      d.pushToast(msg, 'info');
+      d.announce(msg);
+      return;
+    }
+    const allowedTypes = offered.filter((t) => betTypeAllowed(sceneRef.current, r, t));
     if (!allowedTypes.length) {
       d.pushToast('That bet is not available in this lesson.', 'info');
       d.announce('That bet is not available in this lesson.');

@@ -72,12 +72,31 @@ export function RulesEditor(p: RulesEditorProps) {
       <h3 id={`${id}-h`}>Custom table rules</h3>
       <div class="sim-rules-grid">
         <label>
+          Game
+          <select
+            name="variant"
+            value={r.variant}
+            disabled={p.disabled}
+            onChange={(e) => {
+              const variant = e.currentTarget.value as TableRules['variant'];
+              // odds tables already list every point, so crapless 2/3/11/12 are covered
+              set({ variant });
+            }}
+          >
+            <option value="standard">Standard craps</option>
+            <option value="crapless">Crapless craps</option>
+          </select>
+        </label>
+        <label>
           Max odds
           <select
             name="odds"
             value={odds ?? ''}
             disabled={p.disabled}
-            onChange={(e) => set(oddsLimits(e.currentTarget.value as OddsChoice))}
+            onChange={(e) => {
+              const c = e.currentTarget.value as OddsChoice;
+              set(oddsLimits(c));
+            }}
           >
             {odds === null ? <option value="">As set by the lesson</option> : null}
             {ODDS_CHOICES.map((c) => (

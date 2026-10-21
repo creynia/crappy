@@ -1,5 +1,7 @@
 import {
   BET_TYPES,
+  betTypeAvailable,
+  isDontSide,
   isBetTypeId,
   isDicePair,
   isToggleable,
@@ -256,6 +258,15 @@ function validatePlace(
   const { betType, amount, parentId } = action;
   if (!isBetTypeId(betType)) return fail('unknown-bet', `Unknown bet "${String(betType)}".`);
   const def = BET_TYPES[betType];
+  if (!betTypeAvailable(betType, state.rules))
+    return fail(
+      'unknown-bet',
+      state.rules.variant !== 'crapless'
+        ? `${def.label} is only offered on a crapless craps table.`
+        : isDontSide(betType)
+          ? `Crapless craps has no don't side, so ${def.label} is not offered.`
+          : `${def.label} is not offered on a crapless craps table.`,
+    );
   if (betType === 'hop') {
     if (!isDicePair(action.hop))
       return fail('bad-dice', 'A hop bet needs a pair of dice, each showing 1 to 6, such as 2-4.');

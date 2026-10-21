@@ -44,19 +44,23 @@ export function buildStrategyRows(
 ): StrategyRow[] {
   return listStrategies()
     .filter((s) => s.id !== 'my-layout' && (!allowed || allowed.includes(s.id)))
-    .map((s) => {
+    .flatMap((s) => {
       const m = strategyMetrics({ id: s.id, unit }, rules);
-      return {
-        id: s.id,
-        name: s.name,
-        lens: s.lens,
-        edge: m.edgeOnAction,
-        lossPerRoll: m.expectedLossPerRoll,
-        lossPerHour: m.expectedLossPerRoll * rollsPerHour,
-        rollsPerDollar: m.rollsPerDollar,
-        avgAction: m.avgAction,
-        approximate: m.approximate === true,
-      };
+      // a strategy these rules don't offer (crapless: no don't side) has no row to rank or run
+      if (m.unavailable) return [];
+      return [
+        {
+          id: s.id,
+          name: s.name,
+          lens: s.lens,
+          edge: m.edgeOnAction,
+          lossPerRoll: m.expectedLossPerRoll,
+          lossPerHour: m.expectedLossPerRoll * rollsPerHour,
+          rollsPerDollar: m.rollsPerDollar,
+          avgAction: m.avgAction,
+          approximate: m.approximate === true,
+        },
+      ];
     });
 }
 
@@ -128,6 +132,9 @@ export function StrategyTable(props: StrategyTableProps) {
       <p class="sim-ar-desc">
         Every preset at a {fmtMoney(unit)} unit, steady layout, {rollsPerHour} rolls an hour. Tap a
         heading to sort.
+        {rules.variant === 'crapless'
+          ? " Don't-side strategies are left out: crapless craps has no don't side."
+          : ''}
       </p>
       <div class="sim-st-wrap">
         <table class="sim-st-table">

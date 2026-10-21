@@ -14,7 +14,7 @@
 import { BET_TYPES, isBetTypeId } from '../engine/bets';
 import { createGame, type BetInit } from '../engine/game';
 import { rollDice } from '../engine/rng';
-import { RULE_PRESETS } from '../engine/rules';
+import { RULE_PRESETS, pointsFor, resolveRules } from '../engine/rules';
 import { POINT_NUMBERS } from '../engine/types';
 import type {
   Bet,
@@ -97,7 +97,11 @@ export interface ParsedBets {
 const PART = /^([a-z0-9-]+)(?:@([0-9.-]+))?(?::(\d{1,7}(?:\.\d{1,2})?))?(?:!(on|off))?$/;
 
 /** Tolerant parser: unknown types, bad amounts or numbers are skipped, never thrown. */
-export function parseBets(s: string | null | undefined): ParsedBets {
+export function parseBets(
+  s: string | null | undefined,
+  /** the points the table can have (crapless: 2, 3, 11 and 12 too) */
+  points: readonly PointNumber[] = POINT_NUMBERS,
+): ParsedBets {
   const out: ParsedBets = { bets: [], skipped: [] };
   if (!s) return out;
   const comeRefs = new Set<string>();
@@ -129,7 +133,7 @@ export function parseBets(s: string | null | undefined): ParsedBets {
     } else if (at !== undefined) {
       if (COMES.has(type) || type in COME_ODDS) {
         const point = /^\d+$/.test(at) ? Number(at) : NaN;
-        if (!POINT_NUMBERS.includes(point as PointNumber)) {
+        if (!points.includes(point as PointNumber)) {
           out.skipped.push(part);
           continue;
         }
@@ -184,7 +188,7 @@ export function shareStateOf(game: GameState, pos: RngPosition = FRESH_RNG): Sha
     // the bets are placed again on load, so share the rack plus what is on the table
     bankroll: game.bankroll + game.bets.reduce((t, b) => t + b.amount + b.vigPaid, 0),
     point: game.point,
-    bets: parseBets(serializeBets(game.bets)).bets,
+    bets: parseBets(serializeBets(game.bets), pointsFor(game.rules)).bets,
   };
 }
 
@@ -255,7 +259,7 @@ export function bootFromParams(
   let point: PointNumber | null = null;
   if (pointParam !== null) {
     const n = /^\d+$/.test(pointParam) ? Number(pointParam) : NaN;
-    if (POINT_NUMBERS.includes(n as PointNumber)) point = n as PointNumber;
+    if (pointsFor(resolveRules(rules)).includes(n as PointNumber)) point = n as PointNumber;
     else skipped.push(`point "${pointParam}"`);
   }
   const skipParam = url.get('skip');
@@ -264,7 +268,7 @@ export function bootFromParams(
     if (new RegExp(`^\\d{1,${MAX_SKIP_DIGITS}}$`).test(skipParam)) skip = Number(skipParam);
     else skipped.push(`skip "${skipParam}"`);
   }
-  const parsed = parseBets(url.get('bets'));
+  const parsed = parseBets(url.get('bets'), pointsFor(resolveRules(rules)));
   for (const s of parsed.skipped) skipped.push(`bet "${s}"`);
 
   const base = {

@@ -28,6 +28,7 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { usePanelReveal } from './usePanelReveal';
 import './sim.css';
 import './simulator.css';
 
@@ -64,6 +65,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
+  usePanelReveal(panels);
   const togglePanel = (name: keyof Panels) => setPanels((p) => ({ ...p, [name]: !p[name] }));
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);

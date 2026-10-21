@@ -358,4 +358,20 @@ test.describe('sandbox flows', () => {
     await expect.poll(() => bank(page)).toBe('$500'); // 7 on the come-out: the pass bet wins even money
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
   });
+
+  test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
+    page,
+  }) => {
+    await page.goto(url());
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const session = page.locator('.sim-session-panel h3').first();
+    await expect(session).toBeInViewport();
+    await expect(session).toBeFocused();
+
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const auto = page.locator('.sim-autoroll');
+    await expect(auto).toBeInViewport();
+    await expect(auto).toBeFocused();
+  });
 });

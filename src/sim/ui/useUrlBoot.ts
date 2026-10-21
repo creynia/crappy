@@ -94,7 +94,14 @@ export function buildCore(
         ...(saved.log ? { log: saved.log } : {}),
         ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
         // forced rolls never drew from the RNG (the history keeps the last 200, plenty for a sandbox)
-        rng: { bootSkip: 0, bootForced: saved.game.history.filter((r) => r.forced).length },
+        // the saved draw count (or, for older saves, the unforced rolls in the history); every roll
+        // already in the saved game is accounted for, so later rolls add to it from here
+        rng: {
+          bootSkip:
+            saved.rngSkip ??
+            saved.game.rollCount - saved.game.history.filter((r) => r.forced).length,
+          bootForced: saved.game.rollCount,
+        },
       };
     }
   }

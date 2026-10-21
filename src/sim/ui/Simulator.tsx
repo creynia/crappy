@@ -11,7 +11,15 @@ import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
-import { buildShareUrl, describeSkipped, FRESH_RNG, toSceneYaml } from './shareLink';
+import {
+  buildShareUrl,
+  describeSkipped,
+  FRESH_RNG,
+  presetOf,
+  rngDraws,
+  toSceneYaml,
+  type RngPosition,
+} from './shareLink';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
 import { resolverFor } from './stepTokens';
@@ -84,6 +92,9 @@ export function Simulator(props: SimulatorInternalProps) {
   });
   const [log, setLog] = useState<RollLogEntry[]>(() => boot.log ?? []);
   const [logFocus, setLogFocus] = useState<RollLogFocus | null>(null);
+  // Where this table stands in its dice sequence: the link's skip (if any) plus rolls since;
+  // reset with the table and saved with the sandbox so sharing survives Reset and a reload.
+  const [rngPos, setRngPos] = useState<RngPosition>(boot.rng ?? FRESH_RNG);
   const focusNonce = useRef(0);
   const autoSeq = useRef(boot.log?.length ?? 0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -146,6 +157,7 @@ export function Simulator(props: SimulatorInternalProps) {
     liveGame,
     chip,
     log,
+    rngDraws(liveGame, rngPos),
   );
 
   // ---------- sheet ----------
@@ -199,6 +211,7 @@ export function Simulator(props: SimulatorInternalProps) {
     setToasts([]);
     setLog([]);
     setLogFocus(null);
+    setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
   };
@@ -217,17 +230,24 @@ export function Simulator(props: SimulatorInternalProps) {
       return '';
     }
   };
-  // Where this table stands in its dice sequence: the link's skip (if any) plus rolls since.
-  const rngPos = boot.rng ?? FRESH_RNG;
   const copyText = async (text: string, what: string) => {
+    let msg: string;
     try {
       await navigator.clipboard.writeText(text);
-      pushToast(`${what} copied to the clipboard.`, 'info');
+      msg = `${what} copied to the clipboard.`;
     } catch {
-      pushToast(`Could not copy the ${what.toLowerCase()}.`, 'info');
+      msg = `Could not copy the ${what.toLowerCase()}.`;
     }
+    pushToast(msg, 'info');
+    announce(msg);
   };
   const shareTable = async () => {
+    if (presetOf(coreRef.current.game.rules) === null) {
+      const msg =
+        "Custom table rules aren't included in shared links yet; the link uses Standard Vegas.";
+      pushToast(msg, 'info');
+      announce(msg);
+    }
     const url = buildShareUrl(shareBase(), coreRef.current.game, rngPos);
     const nav = typeof navigator === 'undefined' ? undefined : navigator;
     if (nav?.share) {

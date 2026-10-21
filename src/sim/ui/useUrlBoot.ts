@@ -4,6 +4,7 @@ import type { Cents, Dice as DicePair, RulePresetId, TableRules } from '../engin
 import { initScene } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { loadSandbox } from './persist';
+import type { RollLogEntry } from './rollLog';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
 import { bootFromParams, type RngPosition } from './shareLink';
 import { randomSeed, type Core } from './simCore';
@@ -58,6 +59,7 @@ export function buildCore(
   core: Core;
   startEquity: Cents;
   chip?: Cents;
+  log?: RollLogEntry[];
   customRules?: Partial<TableRules>;
   /** parts of a shared link the table could not use */
   skipped?: string[];
@@ -89,6 +91,7 @@ export function buildCore(
         },
         startEquity: saved.startBankroll,
         ...(saved.chip ? { chip: saved.chip } : {}),
+        ...(saved.log ? { log: saved.log } : {}),
         ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
         // forced rolls never drew from the RNG (the history keeps the last 200, plenty for a sandbox)
         rng: { bootSkip: 0, bootForced: saved.game.history.filter((r) => r.forced).length },

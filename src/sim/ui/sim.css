@@ -908,10 +908,12 @@
 }
 
 .sim-odds-hint {
-  margin: 8px 16px;
+  margin: 8px 12px;
   padding: 10px 12px;
-  border: 1px solid currentColor;
+  border: 1px solid var(--sim-border);
   border-radius: 8px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
   font-size: 0.9rem;
 }
 .sim-odds-hint p {
@@ -925,9 +927,9 @@
 .sim-odds-hint-actions button {
   min-height: 44px;
   padding: 0 12px;
-  color: inherit;
+  color: var(--sim-text);
   background: transparent;
-  border: 1px solid currentColor;
+  border: 1px solid var(--sim-border);
   border-radius: 8px;
   font: inherit;
   cursor: pointer;

@@ -25,7 +25,8 @@ const POINTS: readonly PointNumber[] = [4, 5, 6, 8, 9, 10];
 const oddsMult = (o: OddsSetting): number => (o === 'max' ? Infinity : o);
 
 function numberType(kind: 'place' | 'buy' | 'lay', n: PointNumber): BetTypeId {
-  return `${kind}-${n}`;
+  // custom systems use the standard points (POINTS); crapless's 2/3/11/12 have no buy/lay ids
+  return `${kind}-${n}` as BetTypeId;
 }
 
 /** Amount for one number: `units` x the flat bet, in the bet's proper unit. */

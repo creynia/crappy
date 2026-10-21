@@ -11,7 +11,7 @@ import type {
   RollContext,
   TableRules,
 } from '../engine/types';
-import { POINT_NUMBERS } from '../engine/types';
+import { pointsFor } from '../engine/rules';
 import { ALL_DICE, ways } from './dice';
 import { add, frac, mul, ONE, ZERO, type Fraction } from './fraction';
 import type { BetCtx, BetLike, Outcome } from './types';
@@ -180,7 +180,7 @@ function distribution(
 
   // A line bet on its come-out: rolls that leave it alone establish a point and continue.
   if (phase === 'come-out' && LINES.has(bet.type)) {
-    for (const n of POINT_NUMBERS) {
+    for (const n of pointsFor(rules)) {
       const w = none.filter((d) => d[0] + d[1] === n).length;
       if (w === 0) continue;
       const sub = distribution(
@@ -232,7 +232,7 @@ const rulesKeys = new WeakMap<object, string>();
 function rulesKey(rules: TableRules): string {
   let k = rulesKeys.get(rules);
   if (!k) {
-    k = JSON.stringify({ f: rules.fieldPays, v: rules.vig, u: rules.payoutUnit });
+    k = JSON.stringify({ f: rules.fieldPays, v: rules.vig, u: rules.payoutUnit, c: rules.variant });
     rulesKeys.set(rules, k);
   }
   return k;
@@ -333,7 +333,7 @@ export function rollEffectGrid(bet: BetLike, ctx: BetCtx): RollEffect[] {
         return working &&
           LINES.has(bet.type) &&
           ctx.phase === 'come-out' &&
-          (POINT_NUMBERS as readonly number[]).includes(dice[0] + dice[1])
+          (pointsFor(ctx.rules) as readonly number[]).includes(dice[0] + dice[1])
           ? 'travel'
           : 'none';
     }

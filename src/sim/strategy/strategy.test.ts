@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createGame, DEFAULT_RULES, resolveRules, validateAction } from '../engine';
+import {
+  applyAction,
+  createGame,
+  DEFAULT_RULES,
+  equity,
+  resolveRules,
+  validateAction,
+} from '../engine';
 import type { GameState } from '../engine';
 import { tableExpectedLossPerRoll, toNumber } from '../math';
 import {
   getStrategy,
   listStrategies,
+  replayTo,
   edgeFunnelSigma,
   peekEdgeFunnelSigma,
   simulateCompare,
@@ -649,5 +657,48 @@ describe('simulateSweep', () => {
     const t = performance.now();
     await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
     expect(performance.now() - t).toBeLessThan(20_000);
+  });
+});
+
+describe('recorded sessions and replay (watch mode)', () => {
+  const cfg = (id: StrategyId, seed: number, rolls = 60) => ({
+    strategy: spec(id),
+    rolls,
+    seed,
+    bankroll: 50_000,
+    record: true,
+  });
+  it('records one entry per roll only when asked', () => {
+    const on = simulateSession(cfg('pass-max-odds', 3));
+    expect(on.log).toHaveLength(on.rollsPlayed);
+    expect(on.log![0]!.dice).toHaveLength(2);
+    const off = simulateSession({ ...cfg('pass-max-odds', 3), record: false });
+    expect(off.log).toBeUndefined();
+  });
+  it('the same seed records the same log; recording does not change the result', () => {
+    const a = simulateSession(cfg('place-6-8', 11));
+    const b = simulateSession(cfg('place-6-8', 11));
+    expect(b.log).toEqual(a.log);
+    const plain = simulateSession({ ...cfg('place-6-8', 11), record: false });
+    expect(plain.finalEquity).toBe(a.finalEquity);
+  });
+  it('replaying the log ends at the run result, for several strategies and seeds', () => {
+    const ids: StrategyId[] = [
+      'pass-max-odds',
+      'place-6-8',
+      'iron-cross',
+      'three-point-molly',
+      'field-every-roll',
+    ];
+    for (const id of ids)
+      for (const seed of [1, 2, 7]) {
+        const c = cfg(id, seed);
+        const r = simulateSession(c);
+        const end = replayTo(c, r.log!, r.log!.length);
+        expect(equity(end), `${id} seed ${seed}`).toBe(r.finalEquity);
+        // scrubbing to the middle matches the equity curve the run recorded
+        const mid = Math.floor(r.log!.length / 2);
+        expect(equity(replayTo(c, r.log!, mid))).toBe(r.equity[mid]);
+      }
   });
 });

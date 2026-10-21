@@ -8,7 +8,8 @@ import {
   isHardHop,
 } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, Dice, GameEvent, GameState } from '../engine/types';
-import { betEdge, betStdDev, edgeTier as tierOf } from '../math';
+import { maxOddsAmount } from '../engine/validate';
+import { betEdge, betEV, betStdDev, edgeTier as tierOf, pointWinProb, toNumber } from '../math';
 import { edgeOfBet } from '../math/ev';
 import { equity } from '../engine/game';
 import { oddsMultiplePerDecision } from '../strategy';
@@ -127,6 +128,15 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** Pass/Come (or Don't/Don't Come) bet already on a point: its current value (cents) and chance to win. */
+  holdValue?: {
+    cents: number;
+    winChance: string;
+    point: number;
+    label: string;
+    /** odds room is left behind this bet (so the nudge to add odds makes sense) */
+    canAddOdds: boolean;
+  } | null;
   /** Buy/lay only: edge per dollar at amounts around this one (the "vig cliff"); the current amount is marked. */
   vigCliff?: Array<{ amount: Cents; edge: number; current: boolean }> | null;
   /** Buy/lay with upfront vig: the flat edge applies at every amount, so one line instead of a strip. */
@@ -295,6 +305,7 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    holdValue: holdValueOf(bet, type, state),
     ...vigFacts(type, amount, state.rules),
     swingCents: swingOf(
       type,
@@ -334,6 +345,48 @@ export function swingCopy(
   if (edge === 0) return `No edge, but it adds ±${swing} of swing.`;
   if (edge < 0) return `Typical swing per decision: ±${swing}.`;
   return `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`;
+}
+
+const HOLD_LABEL: Partial<Record<BetTypeId, string>> = {
+  'pass-line': 'Pass line',
+  'dont-pass': "Don't pass",
+  come: 'Come',
+  'dont-come': "Don't come",
+};
+
+/** A flat line/come bet already on a point: its current expected value (contract bets). */
+function holdValueOf(
+  bet: Bet | undefined,
+  type: BetTypeId,
+  state: Pick<GameState, 'rules' | 'phase' | 'point' | 'bets'>,
+): EvFacts['holdValue'] {
+  const label = HOLD_LABEL[type];
+  if (!bet || !label || bet.amount <= 0) return null;
+  // pass lines are on a point only in the point phase; come bets once they have a number
+  const point = type === 'pass-line' || type === 'dont-pass' ? state.point : bet.point;
+  if (type === 'pass-line' || type === 'dont-pass' ? state.phase !== 'point' : bet.point === null)
+    return null;
+  if (point !== 4 && point !== 5 && point !== 6 && point !== 8 && point !== 9 && point !== 10)
+    return null;
+  const ctx = { phase: 'point' as const, point, rules: state.rules };
+  const cents = toNumber(betEV({ type, amount: bet.amount, point }, ctx));
+  const w = pointWinProb(point);
+  const hasOdds = state.bets.some((b) => b.parentId === bet.id);
+  const canAddOdds = !hasOdds && maxOddsAmount(state as GameState, bet.id) > 0;
+  return { cents, winChance: `${w.n} in ${w.d}`, point, label, canAddOdds };
+}
+
+/** Plain sentence for a flat line or come bet already on a point: its current value. */
+export function holdValueText(h: NonNullable<EvFacts['holdValue']>): string {
+  const worth = `worth ${fmtMoney(h.cents, { sign: true, exact: true })} right now`;
+  const line = h.label === 'Pass line' || h.label === 'Come';
+  if (line) {
+    const tail = h.canAddOdds
+      ? " It can't come down, so the best move is to add odds (0% edge)."
+      : " It can't come down.";
+    return `${h.label} on ${h.point}: ${worth} (wins ${h.winChance}).${tail}`;
+  }
+  return `${h.label} on ${h.point}: ${worth}. Taking it down gives this up.`;
 }
 
 /** The buy/lay vig strip: edges at nearby amounts, or one flat figure when vig is paid upfront. */
@@ -518,11 +571,15 @@ export interface RegionLabelOpts {
   /** ids of bets that are not working */
   offIds?: ReadonlySet<string>;
   disabled?: boolean;
+  /** dimmed because the rules don't offer it (crapless: no don't side), not because of the lesson */
+  notOffered?: boolean;
 }
 
 export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): string {
   const parts = [region.label + '.'];
-  if (region.sublabel) parts.push(region.sublabel.replace(/\.?$/, '') + '.');
+  // a "not offered" sublabel would repeat the reason given at the end
+  if (region.sublabel && !(opts.notOffered && /not offered/i.test(region.sublabel)))
+    parts.push(region.sublabel.replace(/\.?$/, '') + '.');
   const bets = opts.bets ?? [];
   if (bets.length) {
     const desc = bets.map((b) => {
@@ -541,7 +598,8 @@ export function regionAriaLabel(region: RegionDef, opts: RegionLabelOpts = {}): 
   } else {
     parts.push('No bet.');
   }
-  if (opts.disabled) parts.push('Not available in this lesson.');
+  if (opts.notOffered) parts.push('Not offered on crapless craps.');
+  else if (opts.disabled) parts.push('Not available in this lesson.');
   return parts.join(' ');
 }
 

@@ -246,3 +246,46 @@ describe('exact variance (cents^2; $1 = 10000)', () => {
     ).toThrow(/several rolls/);
   });
 });
+
+describe('crapless craps (rules.variant crapless)', () => {
+  const cr = rules(RULE_PRESETS.crapless);
+  const crComeOut = comeOut(cr);
+  const crOn = (p: 2 | 3 | 4 | 5 | 6 | 8 | 9 | 10 | 11 | 12): BetCtx => ({
+    phase: 'point',
+    point: p,
+    rules: cr,
+  });
+
+  it('pass and come edge is exactly 373/6930 (5.382%), P(win) 6557/13860', () => {
+    for (const t of ['pass-line', 'come'] as BetTypeId[]) {
+      const e = edge(t, 10, crComeOut);
+      same(e.perResolved, frac(373, 6930));
+      same(e.expectedRolls, frac(9613, 2310));
+      same(e.perRoll, frac(373, 28839));
+    }
+    expect(Number(frac(373, 6930).n) / Number(frac(373, 6930).d)).toBeCloseTo(0.05382, 5);
+    const rows = betOutcomes({ type: 'pass-line', amount: 1000, point: null }, crComeOut);
+    const win = rows
+      .filter((r) => r.net.n > 0n)
+      .reduce((a, r) => a + Number(r.probability.n) / Number(r.probability.d), 0);
+    expect(win).toBeCloseTo(6557 / 13860, 12);
+  });
+
+  it('place 2/12 (11 to 2) is 1/14 = 7.14%, place 3/11 (11 to 4) is 1/16 = 6.25%', () => {
+    same(edge('place-2', 10, crComeOut).perResolved, frac(1, 14));
+    same(edge('place-12', 10, crComeOut).perResolved, frac(1, 14));
+    same(edge('place-3', 20, crComeOut).perResolved, frac(1, 16));
+    same(edge('place-11', 20, crComeOut).perResolved, frac(1, 16));
+  });
+
+  it('odds have no edge on every crapless point (6 to 1 on 2/12, 3 to 1 on 3/11)', () => {
+    for (const p of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const) {
+      same(betEV({ type: 'pass-odds', amount: 3000, point: p }, crOn(p)), frac(0));
+      same(betEV({ type: 'come-odds', amount: 3000, point: p }, crOn(p)), frac(0));
+    }
+  });
+
+  it('standard-rules numbers are untouched by the variant', () => {
+    same(edge('pass-line', 10).perResolved, frac(7, 495));
+  });
+});

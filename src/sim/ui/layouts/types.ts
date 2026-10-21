@@ -1,4 +1,4 @@
-import type { BetTypeId, PointNumber } from '../../engine/types';
+import type { BetTypeId, PointNumber, StandardPoint } from '../../engine/types';
 
 export interface Rect {
   x: number;
@@ -51,6 +51,11 @@ export const REGION_IDS: readonly RegionId[] = [
   'box-8',
   'box-9',
   'box-10',
+  // crapless felts only (I036)
+  'box-2',
+  'box-3',
+  'box-11',
+  'box-12',
   'any-7',
   'any-craps',
   'yo-11',
@@ -93,7 +98,8 @@ export interface TableLayout {
   id: 'portrait' | 'landscape' | 'center';
   viewBox: { w: number; h: number };
   regions: RegionDef[];
-  puck: Record<PointNumber | 'off', Point2>;
+  /** Puck spot per point; crapless layouts add 2, 3, 11 and 12. */
+  puck: Record<StandardPoint | 'off', Point2> & Partial<Record<PointNumber, Point2>>;
   puckRadius: number;
   chipRadius: number;
   /** Minimum region short side, in viewBox units, so that it is >= 44 CSS px at the reference viewport. */

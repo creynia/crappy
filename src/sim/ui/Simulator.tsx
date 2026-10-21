@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
+import { BET_TYPES, betTypeAvailable } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
 import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import {
@@ -48,7 +48,7 @@ import {
   type WinPromptTarget,
 } from './winPrompt';
 import { toastDurationMs } from './animation';
-import { landscapeLayout, portraitLayout } from './layouts';
+import { feltLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
 import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
@@ -62,6 +62,9 @@ import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
 import { useSandboxPersist } from './useSandboxPersist';
 import { useUrlBoot } from './useUrlBoot';
+import { useWatchReplay } from './useWatchReplay';
+import { WatchControls } from './WatchControls';
+import type { Speed } from './animation';
 import { usePanelReveal } from './usePanelReveal';
 import './sim.css';
 import './simulator.css';
@@ -146,12 +149,18 @@ export function Simulator(props: SimulatorInternalProps) {
     setLive((l) => ({ text, n: l.n + 1 }));
   }, []);
 
+  const watchSpeed = useRef<Speed | null>(null);
   const demoActive = useRef<() => boolean>(() => false);
   const anim = useAnimationPlayer(
-    () => settingsRef.current.speed,
+    () => watchSpeed.current ?? settingsRef.current.speed,
     pushToast,
-    announce,
+    // a replay would flood the live region (one message per roll): it announces only its end
+    (text) => {
+      if (watchSpeed.current === null) announce(text);
+    },
     (pre, post, events) => {
+      // a replayed run is not the player's own history: keep it out of the roll log
+      if (watchSpeed.current !== null) return;
       if (demoActive.current()) return; // a demo's scripted rolls are not the learner's rolls
       const entry = summarizeRoll(pre, post, events);
       if (entry) setLog((l) => appendLog(l, entry));
@@ -171,6 +180,24 @@ export function Simulator(props: SimulatorInternalProps) {
       setWinTarget(winPromptTarget(post, events));
     },
   });
+
+  const watcher = useWatchReplay({
+    coreRef,
+    setCore,
+    startEquity,
+    anim,
+    speedRef: watchSpeed,
+    announce,
+    baseSpeed: () => settingsRef.current.speed,
+  });
+  const watching = watcher.watch !== null;
+  // leaving a replay removes the controls that had focus: hand it to Roll
+  const wasWatching = useRef(false);
+  useEffect(() => {
+    if (wasWatching.current && !watching)
+      rootRef.current?.querySelector<HTMLElement>('.sim-roll:not(:disabled)')?.focus();
+    wasWatching.current = watching;
+  }, [watching]);
 
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;
@@ -203,7 +230,7 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
   useSandboxPersist(
-    sandbox && !guided ? props.persistKey : undefined,
+    sandbox && !guided && !watching ? props.persistKey : undefined,
     scene,
     settings,
     liveGame,
@@ -236,15 +263,23 @@ export function Simulator(props: SimulatorInternalProps) {
     () => new Set(game.bets.filter((b) => !isWorking(b, game)).map((b) => b.id)),
     [game],
   );
+  const rules = liveGame.rules;
   const disabledRegions = useMemo(() => {
     const set = new Set<RegionId>();
     for (const r of ALL_REGIONS)
-      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t))) set.add(r.id);
+      if (!r.betTypes.some((t) => betTypeAllowed(scene, rt, t) && betTypeAvailable(t, rules)))
+        set.add(r.id);
     return set;
-  }, [scene, rt]);
+  }, [scene, rt, rules]);
+  const unofferedRegions = useMemo(() => {
+    const set = new Set<RegionId>();
+    for (const r of ALL_REGIONS)
+      if (!r.betTypes.some((t) => betTypeAvailable(t, rules))) set.add(r.id);
+    return set;
+  }, [rules]);
   const highlighted = highlightedFor(scene, step);
   const centerTotal = game.bets.filter(isCenterBet).reduce((t, b) => t + b.amount, 0);
-  const lock = rollLock(scene, rt, liveGame);
+  const lock = watching ? 'Watching a replay: exit to play.' : rollLock(scene, rt, liveGame);
 
   const roll = () => {
     if (anim.busy || sheet || lock || demo.playing) return;
@@ -259,6 +294,10 @@ export function Simulator(props: SimulatorInternalProps) {
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
     if (opts?.rules) setScene(sc);
     const init = initScene(sc, { seed: guided ? 1 : randomSeed() });
+    // bets the new rules don't offer (a Don't Pass when switching to crapless), read before the reset
+    const dropped = coreRef.current.game.bets.filter(
+      (b) => !betTypeAvailable(b.type, init.game.rules),
+    );
     startedRef.current = -1;
     demo.reset();
     startEquity.current = equity(init.game);
@@ -269,6 +308,12 @@ export function Simulator(props: SimulatorInternalProps) {
     setRngPos(FRESH_RNG); // a fresh seed: nothing drawn from it yet
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
+    if (opts?.rules && dropped.length) {
+      const names = [...new Set(dropped.map((b) => BET_TYPES[b.type].label))].join(' and ');
+      const msg = `Crapless craps has no don't side, so the new table starts without your ${names}.`;
+      pushToast(msg, 'info');
+      announce(msg);
+    }
   };
   const rebet = () => {
     for (const r of lastOneRoll.current) {
@@ -382,6 +427,7 @@ export function Simulator(props: SimulatorInternalProps) {
     point: game.point,
     offBetIds: offIds,
     disabledRegions,
+    unofferedRegions,
     highlightedBets: highlighted,
     callouts: calloutsFor(scene, step),
     fieldPays: game.rules.fieldPays,
@@ -479,6 +525,18 @@ export function Simulator(props: SimulatorInternalProps) {
     />
   );
 
+  const watchEl = watcher.watch ? (
+    <WatchControls
+      watch={watcher.watch}
+      busy={anim.busy}
+      onToggle={watcher.toggle}
+      onStep={watcher.step}
+      onScrub={watcher.scrub}
+      onSpeed={watcher.setSpeed}
+      onExit={watcher.exit}
+    />
+  ) : null;
+
   return (
     <div
       ref={rootRef}
@@ -490,14 +548,17 @@ export function Simulator(props: SimulatorInternalProps) {
           e.preventDefault();
           e.stopPropagation();
           demo.skip();
-        } else if (anim.playing()) {
+        } else if (anim.playing() && !(e.target as Element | null)?.closest?.('.sim-watch')) {
           e.preventDefault();
           e.stopPropagation();
           anim.skip();
         }
       }}
       onKeyDown={(e) => {
-        if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
+        if (e.key === 'Escape' && watching) {
+          e.preventDefault();
+          watcher.exit();
+        } else if ((e.key === 'Escape' || e.key === ' ') && demo.playing) {
           e.preventDefault();
           demo.skip();
         } else if ((e.key === 'Escape' || e.key === ' ') && anim.playing()) {
@@ -507,9 +568,10 @@ export function Simulator(props: SimulatorInternalProps) {
       }}
     >
       {landscape ? null : stepEl}
+      {landscape ? null : watchEl}
 
       <div class="sim-main">
-        <div class="sim-felt">
+        <div class="sim-felt" {...(watching ? { inert: true } : {})}>
           {!landscape ? (
             <div class="sim-status-wrap sim-status-wrap-cost">
               {status(false, <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />)}
@@ -519,7 +581,7 @@ export function Simulator(props: SimulatorInternalProps) {
             {view === 'center' ? (
               <CenterPanel {...tableProps} />
             ) : (
-              <Table {...tableProps} layout={landscape ? landscapeLayout : portraitLayout} />
+              <Table {...tableProps} layout={feltLayout(landscape, rules.variant)} />
             )}
             {view === 'table' && centerTotal > 0 ? (
               <button type="button" class="sim-center-ind" onClick={() => setView('center')}>
@@ -532,6 +594,7 @@ export function Simulator(props: SimulatorInternalProps) {
         </div>
         {landscape ? (
           <div class="sim-rail">
+            {watchEl}
             {stepEl}
             <div class="sim-status-wrap">
               {status(true)}
@@ -587,6 +650,11 @@ export function Simulator(props: SimulatorInternalProps) {
                 rollsPerHour={settings.rollsPerHour}
                 emit={emit}
                 feedInput={feedInput}
+                onWatch={(cfg) => {
+                  sh.setSheet(null);
+                  setAutoOpen(false);
+                  watcher.start(cfg);
+                }}
                 onResult={(result) =>
                   setLog((l) =>
                     appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),

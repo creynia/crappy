@@ -30,4 +30,16 @@ describe('strategy table rows', () => {
     );
     expect(rows.find((r) => r.id === 'pass-max-odds')!.approximate).toBe(false);
   });
+
+  it("crapless: don't-side strategies are left out, not ranked as free (I036)", () => {
+    const ids = (r: Parameters<typeof buildStrategyRows>[1]) =>
+      buildStrategyRows(1000, r, 100).map((x) => x.id);
+    const crapless = ids(resolveRules('crapless'));
+    expect(crapless).not.toContain('dont-pass-max-lay');
+    expect(crapless).not.toContain('dont-come-molly');
+    expect(crapless).toContain('pass-max-odds');
+    const std = ids(resolveRules('standard-vegas'));
+    expect(std).toContain('dont-pass-max-lay');
+    expect(std).toContain('dont-come-molly');
+  });
 });

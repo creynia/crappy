@@ -88,7 +88,15 @@ export interface Strategy {
   decide(state: GameState, spec: StrategySpec): Action[];
 }
 
+/** One recorded roll: the actions the strategy took before it, and the dice that came up. */
+export interface SessionLogEntry {
+  actions: Action[];
+  dice: readonly [number, number];
+}
+
 export interface SessionConfig {
+  /** Record every roll's actions and dice in `SessionResult.log` (for watch/replay). Off by default. */
+  record?: boolean;
   strategy: StrategySpec;
   rolls: number;
   seed: number;
@@ -105,6 +113,8 @@ export interface SessionConfig {
   stopLoss?: Cents;
 }
 export interface SessionResult {
+  /** One entry per roll played, only when `SessionConfig.record` was set. */
+  log?: SessionLogEntry[];
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss
@@ -118,7 +128,8 @@ export interface SessionResult {
   actualLoss: Cents;
   /** Count of each dice total, index 2..12 (0 and 1 unused). Used by the totals histogram. */
   totals: Int32Array;
-  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss';
+  /** 'unavailable': the strategy bets something these rules do not offer (crapless: no don't side) */
+  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss' | 'unavailable';
   maxDrawdown: Cents;
   peakEquity: Cents;
   bustedAtRoll: number | null;
@@ -165,6 +176,8 @@ export interface StrategyMetrics {
   avgAction: number;
   /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
   approximate?: boolean;
+  /** True when the rules don't offer a bet the strategy makes (crapless: no don't side): no edge to show. */
+  unavailable?: boolean;
 }
 
 /** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */

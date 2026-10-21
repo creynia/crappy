@@ -12,6 +12,7 @@ import {
   simulateMany,
   simulateManyCompare,
   simulateSession,
+  strategyAvailable,
   strategyMetrics,
 } from '../strategy';
 import type {
@@ -117,6 +118,7 @@ const PRESET_LABEL: Record<RulePresetId, string> = {
   'field-3x-12': 'Field pays 3x on 12',
   'odds-10x': '10x odds',
   'odds-100x': '100x odds',
+  crapless: 'Crapless craps',
 };
 const COLORS = ['#2f6fed', '#d9480f', '#2b8a3e'];
 // Stop-rule chips: undefined means no stop.
@@ -159,10 +161,14 @@ function endedByText(r: SessionResult, cfg: SessionConfig): string {
       return `Stopped: up ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
     case 'stop-loss':
       return `Stopped: down ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    case 'unavailable':
+      return UNAVAILABLE_TEXT;
     default:
       return `All ${r.rollsPlayed} rolls`;
   }
 }
+
+const UNAVAILABLE_TEXT = "Not offered: crapless craps has no don't side";
 
 function randomSeed(): number {
   try {
@@ -283,6 +289,34 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   useEffect(() => {
     if (stopLoss !== undefined && stopLoss > bankroll) setStopLoss(undefined);
   }, [bankroll, stopLoss]);
+  // strategies that bet something these rules don't offer (crapless: no don't side)
+  const unavailable = useMemo(() => {
+    const out = new Set<StrategyId>();
+    if (rules.variant !== 'crapless') return out;
+    for (const s of all) {
+      if (s.id === 'custom') continue; // judged by its current system (customUnavailable)
+      try {
+        if (!strategyAvailable({ id: s.id, unit: 1000, ...(layout ? { layout } : {}) }, rules))
+          out.add(s.id);
+      } catch {
+        /* a strategy that cannot be probed (e.g. an empty layout) stays enabled */
+      }
+    }
+    return out;
+  }, [all, rules, layout]);
+  // a custom system that bets the don't side can't run on crapless (the option stays selectable so
+  // the learner can change the system)
+  const customUnavailable = useMemo(() => {
+    if (rules.variant !== 'crapless' || !strategyIds.includes('custom')) return false;
+    try {
+      return !strategyAvailable({ id: 'custom', unit: 1000, custom: system }, rules);
+    } catch {
+      return false;
+    }
+  }, [rules, strategyIds, system]);
+  const blocked = customUnavailable || strategyIds.some((id) => unavailable.has(id));
+  const unavailableLabel = (s: { id: StrategyId; name: string }) =>
+    unavailable.has(s.id) ? `${s.name} (not on crapless)` : s.name;
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -549,10 +583,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
                           <input
                             type="checkbox"
                             checked={strategyIds.includes(s.id)}
-                            disabled={running}
+                            disabled={running || unavailable.has(s.id)}
                             onChange={() => toggleStrategy(s.id)}
                           />
-                          {s.name}
+                          {unavailableLabel(s)}
                         </label>
                       ))}
                     </div>
@@ -571,8 +605,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
                   g.items.length > 0 && (
                     <optgroup key={g.lens} label={LENS_LABEL[g.lens]}>
                       {g.items.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
+                        <option key={s.id} value={s.id} disabled={unavailable.has(s.id)}>
+                          {unavailableLabel(s)}
                         </option>
                       ))}
                     </optgroup>
@@ -582,6 +616,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           )}
           {!compare && (
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
+          )}
+          {blocked && (
+            <p class="sim-ar-desc" role="status">
+              Crapless craps has no don't side, so this strategy can't be played here.
+            </p>
           )}
           {strategyIds.includes('custom') && !fixedSpecs ? (
             <StrategyBuilder value={system} onChange={setSystem} disabled={running} />
@@ -776,7 +815,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <button
             type="button"
             data-testid="auto-roll-run"
-            disabled={running || systemInvalid}
+            disabled={running || systemInvalid || blocked}
             onClick={() => void run()}
             class="sim-ar-run"
           >
@@ -947,6 +986,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     // a progression has no fixed layout: a single run reports its own expected loss over what it
     // actually wagered (I013 "simulated"); otherwise the analytic edge of the starting layout
     const edge = metrics.map((m, i) => {
+      if (m.unavailable) return 'Not offered';
       const r = o.kind === 'single' ? o.results[i] : undefined;
       if (m.approximate && r && r.totalWagered > 0)
         return `${pct(r.expectedLoss / r.totalWagered)} (simulated)`;

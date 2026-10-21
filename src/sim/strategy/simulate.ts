@@ -1,5 +1,13 @@
-import { applyAction, createGame, equity, isBonusType, resolveRules } from '../engine';
-import type { GameState } from '../engine';
+import {
+  CRAPLESS_POINTS,
+  applyAction,
+  createGame,
+  equity,
+  isBonusType,
+  pointsFor,
+  resolveRules,
+} from '../engine';
+import type { Action, GameState, PointTable } from '../engine';
 import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
@@ -8,6 +16,7 @@ import type {
   ManyResult,
   SessionConfig,
   SessionResult,
+  StrategySpec,
   SweepConfig,
   SweepRow,
 } from './types';
@@ -25,6 +34,15 @@ function makeExpectedLossFn(): (s: GameState) => number {
     }
     return v;
   };
+}
+
+/**
+ * Whether a strategy can be played under these rules: false when it bets something the rules do not
+ * offer (crapless craps has no don't side). Probes a short seeded session.
+ */
+export function strategyAvailable(spec: StrategySpec, rules: SessionConfig['rules']): boolean {
+  const r = simulateSession({ strategy: spec, rolls: 300, seed: 1, bankroll: 10_000_000, rules });
+  return r.endedBy !== 'unavailable';
 }
 
 /** Run one session. Pure and deterministic per `cfg.seed`. */
@@ -53,18 +71,31 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   let sevenOuts = 0;
   let longest = 0;
   let hand = 0;
+  const log: NonNullable<SessionResult['log']> | undefined = cfg.record ? [] : undefined;
   const bonusHits = new Map<string, NonNullable<SessionResult['bonusHits']>[number]>();
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
+    let unavailable = false;
+    const applied: Action[] = [];
     for (const a of plan.actions) {
       const r = applyAction(state, a);
-      if (r.ok) state = r.state;
-      else {
+      if (r.ok) {
+        state = r.state;
+        if (log) applied.push(a);
+      } else if (r.error.code === 'unknown-bet') {
+        // the rules do not offer this bet (e.g. Don't Pass on a crapless table): not a bust
+        unavailable = true;
+        break;
+      } else {
         // A strategy must only emit legal actions; treat an unexpected rejection as unaffordable.
         if (stopAtBust) plan.blocked = true;
         break;
       }
+    }
+    if (unavailable) {
+      endedBy = 'unavailable';
+      break;
     }
     if (stopAtBust && plan.blocked && state.bets.length === 0) {
       busted = played;
@@ -77,6 +108,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     played = i;
     const rec = state.history[state.history.length - 1];
     if (rec) totals[rec.total]!++;
+    if (log && rec) log.push({ actions: applied, dice: [rec.dice[0], rec.dice[1]] });
     hand++;
     for (const e of r.events) {
       if (e.type === 'bet-won' && isBonusType(e.betType)) {
@@ -111,6 +143,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   if (hand > longest) longest = hand;
   const finalEquity = equity(state);
   return {
+    ...(log ? { log } : {}),
     rollsPlayed: played,
     equity: played === cfg.rolls ? eq : eq.slice(0, played + 1),
     expected: played === cfg.rolls ? exp : exp.slice(0, played + 1),
@@ -295,11 +328,8 @@ export async function simulateSweep(
   for (let i = 0; i < n; i++) {
     const m = cfg.oddsMultiples[i]!;
     let rules = base;
-    if (
-      m !== 'max' &&
-      [...Object.values(base.maxOdds), ...Object.values(base.maxLayOdds)].some((cap) => cap < m)
-    ) {
-      const uniform = { 4: m, 5: m, 6: m, 8: m, 9: m, 10: m };
+    if (m !== 'max' && pointsFor(base).some((p) => base.maxOdds[p] < m || base.maxLayOdds[p] < m)) {
+      const uniform = Object.fromEntries(CRAPLESS_POINTS.map((p) => [p, m])) as PointTable;
       rules = resolveRules({ ...base, maxOdds: uniform, maxLayOdds: uniform });
     }
     const spec =

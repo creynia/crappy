@@ -2,23 +2,36 @@ import type { BetTypeId, PointNumber } from '../../engine/types';
 import type { ChipSpotKey, Point2, Rect, RegionDef, RegionId } from './types';
 
 export const PLACE_PAYS: Record<PointNumber, string> = {
+  2: '11 to 2',
+  3: '11 to 4',
   4: '9 to 5',
   5: '7 to 5',
   6: '7 to 6',
   8: '7 to 6',
   9: '7 to 5',
   10: '9 to 5',
+  11: '11 to 4',
+  12: '11 to 2',
 };
 export const NUMBER_WORD: Record<PointNumber, string> = {
+  2: '2',
+  3: '3',
   4: '4',
   5: 'FIVE',
   6: 'SIX',
   8: '8',
   9: 'NINE',
   10: '10',
+  11: '11',
+  12: '12',
 };
 
+/** Sublabel of a region whose bets these rules don't offer (crapless don't side). */
+export const NOT_OFFERED = 'Not offered on a crapless table';
+
 function boxBetTypes(n: PointNumber): BetTypeId[] {
+  // crapless-only numbers: place and come odds (no buy/lay; the don't side is not offered)
+  if (n === 2 || n === 3 || n === 11 || n === 12) return [`place-${n}`, 'come-odds'];
   const t: BetTypeId[] = [
     `place-${n}`,
     `buy-${n}`,

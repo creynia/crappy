@@ -49,8 +49,9 @@ describe('RulesEditor: each field maps to TableRules', () => {
     expect(e.apply()).toEqual({ ...resolveRules('odds-10x'), presetId: 'standard-vegas' });
     e.pick('odds', '2x');
     const r = e.apply();
-    expect(r.maxOdds).toEqual({ 4: 2, 5: 2, 6: 2, 8: 2, 9: 2, 10: 2 });
-    expect(r.maxLayOdds).toEqual({ 4: 4, 5: 3, 6: 2.4, 8: 2.4, 9: 3, 10: 4 });
+    // (the tables also list the crapless points 2/3/11/12; I036)
+    expect(r.maxOdds).toMatchObject({ 4: 2, 5: 2, 6: 2, 8: 2, 9: 2, 10: 2 });
+    expect(r.maxLayOdds).toMatchObject({ 4: 4, 5: 3, 6: 2.4, 8: 2.4, 9: 3, 10: 4 });
   });
   it('field 12, vig timing and rounding, payout unit, table min and max', () => {
     const e = editor();
@@ -98,6 +99,22 @@ describe('RulesEditor: each field maps to TableRules', () => {
     expect(e.el('odds').value).toBe('');
     expect(e.el('tableMin').value).toBe('300');
     expect(e.apply().maxOdds[6]).toBe(7);
+  });
+});
+
+describe('rules editor: game variant', () => {
+  it('shows and keeps crapless; switching the game is explicit', () => {
+    const e = editor(resolveRules('crapless'));
+    expect(e.el('variant').value).toBe('crapless');
+    expect(e.apply().variant).toBe('crapless');
+    e.pick('odds', '10x');
+    expect(e.apply().maxOdds[2]).toBe(10);
+    e.pick('variant', 'standard');
+    expect(e.apply().variant).toBe('standard');
+    e.pick('variant', 'crapless');
+    expect(e.apply().maxOdds[12]).toBe(10);
+    const s = editor();
+    expect(s.el('variant').value).toBe('standard');
   });
 });
 

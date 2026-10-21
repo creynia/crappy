@@ -175,9 +175,12 @@ export function resolveRoll(
   // Phase transition
   let phase: Phase = state.phase;
   let point: PointNumber | null = state.point;
+  const crapless = rules.variant === 'crapless';
   if (state.phase === 'come-out') {
-    if (total === 7 || total === 11) events.push({ type: 'natural', total });
-    else if (total === 2 || total === 3 || total === 12) events.push({ type: 'craps', total });
+    // crapless: 7 is the only natural and nothing is craps; every other total is a point
+    if (total === 7 || (total === 11 && !crapless)) events.push({ type: 'natural', total });
+    else if (!crapless && (total === 2 || total === 3 || total === 12))
+      events.push({ type: 'craps', total });
     else {
       phase = 'point';
       point = total as PointNumber;

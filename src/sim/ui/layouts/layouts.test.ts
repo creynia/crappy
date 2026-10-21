@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BET_TYPES } from '../../engine';
+import { BET_TYPES, CRAPLESS_BET_TYPE_IDS } from '../../engine';
 import { BOX_BAR, STACK_RISE } from './shared';
 import {
   centerLayout,
+  craplessLandscapeLayout,
+  craplessPortraitLayout,
+  feltLayout,
   findRegion,
   landscapeLayout,
   portraitLayout,
@@ -87,6 +90,46 @@ describe('main layouts', () => {
   });
 });
 
+describe.each([craplessPortraitLayout, craplessLandscapeLayout])(
+  'crapless layout $id',
+  (layout) => {
+    it('keeps 44px tap targets, no overlaps, unique ids', () => {
+      const rs = layout.regions;
+      for (const r of rs) {
+        const short = Math.min(r.rect.w, r.rect.h);
+        expect(short, r.id).toBeGreaterThanOrEqual(layout.minTapUnits);
+        expect(short * VIEWPORT[layout.id], r.id).toBeGreaterThanOrEqual(44);
+        expect(r.rect.x + r.rect.w).toBeLessThanOrEqual(layout.viewBox.w);
+        expect(r.rect.y + r.rect.h).toBeLessThanOrEqual(layout.viewBox.h);
+      }
+      for (let i = 0; i < rs.length; i++)
+        for (let j = i + 1; j < rs.length; j++)
+          expect(overlap(rs[i]!.rect, rs[j]!.rect), `${rs[i]!.id} vs ${rs[j]!.id}`).toBe(false);
+      expect(new Set(rs.map((r) => r.id)).size).toBe(rs.length);
+    });
+    it('has the ten boxes in 2 3 | 4 5 6 8 9 10 | 11 12 order and a puck for each', () => {
+      const boxes = layout.regions.filter((r) => r.id.startsWith('box-'));
+      expect(boxes.map((r) => r.id)).toEqual(
+        [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map((n) => `box-${n}`),
+      );
+      for (const n of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const)
+        expect(layout.puck[n]).toBeDefined();
+      for (const n of [2, 3, 11, 12] as const)
+        expect(boxes.find((r) => r.id === `box-${n}`)!.betTypes, `box-${n}`).toEqual([
+          `place-${n}`,
+          'come-odds',
+        ]);
+      expect(boxes.find((r) => r.id === 'box-12')!.sublabel).toBe('Place pays 11 to 2');
+      expect(boxes.find((r) => r.id === 'box-3')!.sublabel).toBe('Place pays 11 to 4');
+    });
+    it('is chosen by feltLayout for the crapless variant only', () => {
+      const land = layout.id === 'landscape';
+      expect(feltLayout(land, 'crapless')).toBe(layout);
+      expect(feltLayout(land, 'standard')).toBe(land ? landscapeLayout : portraitLayout);
+    });
+  },
+);
+
 describe('chip spots: every bet type renders at its documented spot (simulator.md 3.2)', () => {
   // The chip spot each bet type uses on the main felt; props use `main` on the center panel.
   const SPOT: Record<string, ChipSpotKey> = {
@@ -113,7 +156,10 @@ describe('chip spots: every bet type renders at its documented spot (simulator.m
   const dist = (a: Point2, b: Point2) => Math.hypot(a.x - b.x, a.y - b.y);
 
   it.each([portraitLayout, landscapeLayout])('$id: all bet types have a spot', (layout) => {
-    for (const type of Object.keys(BET_TYPES)) {
+    // (place 2/3/11/12 exist only on the crapless felt: see the crapless layout tests)
+    for (const type of Object.keys(BET_TYPES).filter(
+      (t) => !(CRAPLESS_BET_TYPE_IDS as readonly string[]).includes(t),
+    )) {
       const needsPoint = /^(come|dont-come)(-odds)?$/.test(type);
       const box = needsPoint ? 6 : /-(\d+)$/.exec(type)?.[1];
       const rid = regionIdForBet(type, needsPoint ? 6 : null);
@@ -251,3 +297,41 @@ describe('center layout: hop region (I035)', () => {
     expect(hop.rect.y + hop.rect.h).toBeLessThanOrEqual(centerLayout.viewBox.h);
   });
 });
+
+describe.each([craplessPortraitLayout, craplessLandscapeLayout])(
+  'crapless number boxes: chips $id',
+  (layout) => {
+    const dist = (a: Point2, b: Point2) => Math.hypot(a.x - b.x, a.y - b.y);
+    const r = layout.chipRadius;
+    it('the spots a box uses are 2r apart (buy and lay share one: a box holds one or the other)', () => {
+      for (const n of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const) {
+        const s = findRegion(layout, `box-${n}`)!.chipSpots;
+        const used: [string, Point2][] = [
+          ['come-point', s['come-point']!],
+          ['odds', s.odds!],
+          ['main', s.main!],
+          ['buy', s.buy!],
+        ];
+        for (let i = 0; i < used.length; i++)
+          for (let j = i + 1; j < used.length; j++)
+            expect(
+              dist(used[i]![1], used[j]![1]),
+              `${layout.id} box ${n}: ${used[i]![0]} vs ${used[j]![0]}`,
+            ).toBeGreaterThanOrEqual(2 * r);
+        expect(s.lay).toEqual(s.buy);
+      }
+    });
+    it('every stack, a full one included, stays inside its box', () => {
+      for (const n of [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] as const) {
+        const box = findRegion(layout, `box-${n}`)!;
+        for (const [k, p] of Object.entries(box.chipSpots)) {
+          const why = `${layout.id} box ${n} ${k}`;
+          expect(p.y - r - STACK_RISE, `${why} top`).toBeGreaterThanOrEqual(box.rect.y);
+          expect(p.y + r, `${why} bottom`).toBeLessThanOrEqual(box.rect.y + box.rect.h);
+          expect(p.x - r, `${why} left`).toBeGreaterThanOrEqual(box.rect.x);
+          expect(p.x + r, `${why} right`).toBeLessThanOrEqual(box.rect.x + box.rect.w);
+        }
+      }
+    });
+  },
+);

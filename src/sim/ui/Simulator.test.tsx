@@ -153,3 +153,35 @@ describe('auto-roll sweep scene', () => {
     expect(container.querySelectorAll('[data-testid="sweep-row"]')).toHaveLength(2);
   });
 });
+
+describe('Simulator roll announcements', () => {
+  const scene: SceneConfig = {
+    id: 'r',
+    version: 1,
+    bankroll: 50000,
+    forcedDice: [
+      [5, 6],
+      [5, 6],
+    ],
+  };
+  const live = (c: Element) =>
+    c.querySelector('[data-testid="roll-announcer"]')!.textContent.trim();
+
+  it('announces the roll in one sentence, again for an identical roll, from one live region', async () => {
+    const { container } = render(
+      <Simulator scene={scene} initialSettings={instant} onEvent={() => {}} />,
+    );
+    expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() =>
+      expect(live(container)).toBe('Rolled 5 and 6, 11, yo. Bankroll $500. Point is off.'),
+    );
+    const first = container.querySelector('[data-testid="roll-announcer"] span');
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="roll-announcer"] span')).not.toBe(first),
+    );
+    expect(live(container)).toBe('Rolled 5 and 6, 11, yo. Bankroll $500. Point is off.');
+    expect(container.querySelectorAll('[aria-live],[role=status],[role=alert]').length).toBe(1);
+  });
+});

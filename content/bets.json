@@ -410,6 +410,15 @@
     "lessonId": "sucker-bets"
   },
   {
+    "id": "hop",
+    "name": "Hop",
+    "shortName": "Hop",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is one exact pair of dice, such as 2-4.",
+    "howItWorks": "Pick a pair. An easy hop (two different dice, such as 2-4) wins on 2-4 or 4-2, 2 of 36 rolls, and pays 15:1: house edge 11.11%. A hard hop (a pair, such as 3-3) wins on 1 of 36 rolls and pays 30:1: house edge 13.89%. Everything else loses.",
+    "lessonId": "sucker-bets"
+  },
+  {
     "id": "fire",
     "name": "Fire Bet",
     "shortName": "Fire",

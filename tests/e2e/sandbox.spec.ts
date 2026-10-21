@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers';
 
 const url = (q = '') => `/#/play?speed=instant${q ? '&' + q : ''}`;
 
@@ -8,11 +8,12 @@ async function bankroll(page: Page): Promise<number> {
 }
 
 test.describe('sandbox', () => {
-  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page }) => {
+  test('pass line: EV sheet, confirm, roll changes the bankroll', async ({ page, guard }) => {
     await page.goto(url('seed=1&dice=3-4'));
     await page.locator('[data-region="pass"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('house edge 1.41%');
+    await guard.check('sheet-open');
     await expect(sheet).toContainText('Good bet');
     await sheet.getByRole('button', { name: 'Confirm' }).click();
     await expect(sheet).toHaveCount(0);
@@ -37,18 +38,42 @@ test.describe('sandbox', () => {
     await expect(sheet.locator('.sim-oneroll')).toHaveCount(0);
   });
 
-  test('center prop needs Place anyway', async ({ page }) => {
+  test('center prop needs Place anyway', async ({ page, guard }) => {
     await page.goto(url());
     await page.getByRole('button', { name: 'Center' }).click();
     await page.locator('[data-region="any-7"]').click();
     const sheet = page.getByRole('dialog');
     await expect(sheet).toContainText('Sucker bet');
+    await guard.check('center');
     await sheet.getByRole('button', { name: 'Place anyway' }).click();
     await expect(sheet.getByRole('button', { name: /again to place anyway/i })).toBeVisible();
     await sheet.getByRole('button', { name: /again to place anyway/i }).click();
     await expect(sheet).toHaveCount(0);
     await page.getByRole('button', { name: 'Table' }).click();
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
+  });
+
+  test('hop bet: pick a hard hop in the 21-pair picker, win 30 to 1', async ({ page }) => {
+    await page.goto(url('seed=1&dice=3-3'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="hop"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.locator('.sim-hop-cell')).toHaveCount(21);
+    await expect(sheet).toContainText('11.11%'); // starts on the 2-4 easy hop
+    await sheet.locator('[data-hop="3-3"]').click();
+    await expect(sheet.locator('[data-hop="3-3"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(sheet).toContainText('13.89%');
+    await expect(sheet.locator('.sim-hop-note')).toContainText('pays 30 to 1 · edge 13.89%');
+    const amount = Number(
+      (await sheet.getByLabel('Bet amount').innerText()).replace(/[^0-9.]/g, ''),
+    );
+    await sheet.getByRole('button', { name: 'Place anyway' }).click();
+    await sheet.getByRole('button', { name: /again to place anyway/i }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Edit Hop 3-3 bet/ })).toBeVisible();
+    const before = await bankroll(page);
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    await expect.poll(() => bankroll(page)).toBe(before + amount * 31);
   });
 
   test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
@@ -78,13 +103,14 @@ test.describe('sandbox', () => {
     await expect(page.locator('[data-stack]')).toHaveCount(0);
   });
 
-  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
+  test('auto-roll 100 rolls in fast mode renders the chart', async ({ page, guard }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
     const panel = page.locator('.sim-auto');
     await expect(panel).toBeVisible();
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await guard.check('auto-roll-done');
   });
 
   test('strategy table: sort, run it, no horizontal overflow', async ({ page }) => {
@@ -139,13 +165,14 @@ test.describe('sandbox', () => {
     }
   });
 
-  test('sandbox state persists across reload', async ({ page }) => {
+  test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     await page.goto('/');
     await page.goto(url());
     await expect(page.locator('.sim-status-money')).toContainText('On table $5');
+    await guard.check('sandbox-reloaded');
   });
 });
 

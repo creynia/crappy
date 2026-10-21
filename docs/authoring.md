@@ -80,6 +80,11 @@ Rules:
 - A condition that is already true when a step starts completes that step at once. Equity does not
   change when a bet is placed, so wait for a roll (for example `forcedDice` that loses) before
   testing equity.
+- Step `text`, `hint` and `math` can hold live values, shown from the table as the learner plays.
+  Unknown tokens fail validation. Tokens: `{{bankroll}}` cash on hand, `{{point}}` the point or
+  "off", `{{onTable}}` chips on the table, `{{session}}` won minus lost this session, `{{ev:<bet>}}`
+  EV of your working bets of that type ("no bet" if none), `{{edge:<bet>}}` house edge of your
+  bet ("no bet" if none). Example: `Your Don't Pass is now worth {{ev:dont-pass}}.`
 - Quiz `q`, `options` and `explain` are plain text (not Markdown); HTML is escaped, not rendered.
 - Headings: write `##` (or any level); the compiler shifts the lesson's headings so the shallowest becomes an `<h2>` under the page's `<h1>`.
 - `quiz` blocks are a YAML list of `{ id?, q, options, answer, explain }`. The id defaults to

@@ -393,7 +393,7 @@ describe('RollButton, StatusBar, history, toasts', () => {
     const toasts = document.querySelector('.sim-toasts')!;
     expect(toasts.getAttribute('aria-hidden')).toBeNull();
     expect(toasts.getAttribute('aria-live')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Dismiss'));
+    fireEvent.click(screen.getByLabelText(/^Dismiss/));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });
   it('Toasts auto-dismiss', () => {
@@ -464,6 +464,18 @@ describe('BetSheet', () => {
     });
     expect(screen.getByRole('alert').textContent).toContain('No come bets on the come-out.');
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Confirm' }).disabled).toBe(true);
+  });
+
+  it("type switcher shows each option's edge with a text tier", () => {
+    sheet({
+      typeOptions: [
+        { id: 'place-4', label: 'Place 4', enabled: true, edgeText: '6.67%', tier: 'poor' },
+        { id: 'buy-4', label: 'Buy 4', enabled: false, edgeText: '1.67%', tier: 'good' },
+      ],
+      selectedType: 'place-4',
+    });
+    expect(screen.getByRole('radio', { name: /^Place 4 6\.67% Costly$/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Buy 4 1\.67% Good bet$/ })).toBeTruthy();
   });
 
   it('segmented control reports type changes and disables illegal types', () => {

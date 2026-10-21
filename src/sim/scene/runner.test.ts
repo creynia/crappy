@@ -93,6 +93,15 @@ describe('scene runner', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('accepts autoRoll.chart edge and bankroll, rejects others', () => {
+    const base = { id: 'x', version: 1 as const };
+    for (const chart of ['edge', 'bankroll']) {
+      expect(validateScene({ ...base, autoRoll: { enabled: true, chart } }).ok).toBe(true);
+    }
+    const bad = validateScene({ ...base, autoRoll: { enabled: true, chart: 'pie' } });
+    expect(bad.ok).toBe(false);
+  });
+
   it('accepts autoRoll stopWin / stopLoss defaults in integer cents and rejects other values', () => {
     const ok = validateScene({
       id: 'x',

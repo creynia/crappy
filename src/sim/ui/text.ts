@@ -126,6 +126,12 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** Buy/lay only: edge per dollar at amounts around this one (the "vig cliff"); the current amount is marked. */
+  vigCliff?: Array<{ amount: Cents; edge: number; current: boolean }> | null;
+  /** Buy/lay with upfront vig: the flat edge applies at every amount, so one line instead of a strip. */
+  vigFlat?: number | null;
+  /** the strip is rounded to whole dollars, so say so */
+  vigFootnote?: boolean;
   /** one-standard-deviation swing of this bet's result, in cents (null when unknown) */
   swingCents?: number | null;
 }
@@ -288,6 +294,7 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    ...vigFacts(type, amount, state.rules),
     swingCents: swingOf(
       type,
       amount,
@@ -326,6 +333,49 @@ export function swingCopy(
   if (edge === 0) return `No edge, but it adds ±${swing} of swing.`;
   if (edge < 0) return `Typical swing per decision: ±${swing}.`;
   return `Typical swing per decision: ±${swing} (the edge is ${fmtMoney(expectedLossCents, { exact: true })}).`;
+}
+
+/** The buy/lay vig strip: edges at nearby amounts, or one flat figure when vig is paid upfront. */
+function vigFacts(
+  type: BetTypeId,
+  amount: Cents,
+  rules: GameState['rules'],
+): Pick<EvFacts, 'vigCliff' | 'vigFlat' | 'vigFootnote'> {
+  const cat = BET_TYPES[type].category;
+  if (cat !== 'buy' && cat !== 'lay') return {};
+  const ctx = { phase: 'come-out' as const, point: null, rules };
+  const edgeAt = (a: Cents): number => {
+    const e = betEdge(type, a, ctx).perResolved;
+    return Number(e.n) / Number(e.d);
+  };
+  const exact = rules.vig.rounding === 'exact-cents';
+  // scan the whole-dollar amounts within $100 of this one that the table allows
+  const lo = Math.max(rules.tableMin, amount - 10000);
+  const hi = Math.min(rules.tableMax, amount + 10000);
+  const grid: Cents[] = [];
+  for (let a = Math.ceil(lo / 100) * 100; a <= hi; a += 100) grid.push(a);
+  if (!grid.includes(amount)) grid.push(amount);
+  grid.sort((x, y) => x - y);
+  const edges = grid.map((a) => edgeAt(a));
+  const constant = edges.every((e) => e === edges[0]);
+  if (exact || constant) return { vigCliff: null, vigFlat: edgeAt(amount), vigFootnote: false };
+  // the cliffs: where the edge RISES by at least half a point between neighbouring dollars (the vig steps).
+  // Show the current amount, and the step either side of it (the amount before and after each jump).
+  const cliffAt: number[] = [];
+  for (let i = 1; i < edges.length; i++) if (edges[i]! - edges[i - 1]! >= 0.005) cliffAt.push(i);
+  const above = cliffAt.find((i) => grid[i]! > amount);
+  const below = [...cliffAt].reverse().find((i) => grid[i]! <= amount);
+  const pick = new Set<Cents>([amount]);
+  for (const i of [below, above]) {
+    if (i === undefined) continue;
+    pick.add(grid[i - 1]!);
+    pick.add(grid[i]!);
+  }
+  const rows = [...pick]
+    .sort((x, y) => x - y)
+    .slice(0, 5)
+    .map((a) => ({ amount: a, edge: edgeAt(a), current: a === amount }));
+  return { vigCliff: rows, vigFlat: null, vigFootnote: true };
 }
 
 // ---------- roll descriptions ----------

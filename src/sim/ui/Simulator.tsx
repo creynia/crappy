@@ -6,10 +6,12 @@ import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { SessionPanel } from './SessionPanel';
-import { SimControls } from './SimControls';
+import { SimAutoRoll } from './SimAutoRoll';
+import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
-import { SimAutoRoll, SimStep } from './SimPanels';
 import { SimSheet } from './SimSheet';
+import { SimStep } from './SimStep';
+import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
@@ -24,13 +26,8 @@ import { useGameCore } from './useGameCore';
 import { useGuidedSteps } from './useGuidedSteps';
 import { useLandscape } from './useLandscape';
 import { ALL_REGIONS, useSheetModel } from './useSheetModel';
-import {
-  SANDBOX_SCENE,
-  initialChip,
-  randomSeed,
-  useSandboxPersist,
-  useUrlBoot,
-} from './useUrlBoot';
+import { useSandboxPersist } from './useSandboxPersist';
+import { useUrlBoot } from './useUrlBoot';
 import './sim.css';
 import './simulator.css';
 
@@ -65,10 +62,10 @@ export function Simulator(props: SimulatorInternalProps) {
   const [view, setView] = useState<'table' | 'center'>(ui.view ?? 'table');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastN = useRef(0);
-  const [menuOpen, setMenuOpen] = useState(false);
   const guided = !!scene.steps?.length;
-  const [autoOpen, setAutoOpen] = useState(false);
-  const [sessionOpen, setSessionOpen] = useState(false);
+  const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
+  const togglePanel = (name: keyof Panels) => setPanels((p) => ({ ...p, [name]: !p[name] }));
+  const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
   const landscape = useLandscape(scene);
 
@@ -215,13 +212,9 @@ export function Simulator(props: SimulatorInternalProps) {
       view={view}
       setView={setView}
       autoAvailable={autoAvailable}
-      autoOpen={autoOpen}
-      setAutoOpen={setAutoOpen}
-      sessionOpen={sessionOpen}
-      setSessionOpen={setSessionOpen}
       showMenu={!!ui.showSettings || sandbox}
-      menuOpen={menuOpen}
-      setMenuOpen={setMenuOpen}
+      panels={panels}
+      onToggle={togglePanel}
     />
   );
 
@@ -301,7 +294,7 @@ export function Simulator(props: SimulatorInternalProps) {
         autoDismissMs={toastDurationMs(settings.speed)}
       />
 
-      {menuOpen ? (
+      {panels.menu ? (
         <SimMenu
           canRebet={canRebet}
           busy={anim.busy}
@@ -313,9 +306,11 @@ export function Simulator(props: SimulatorInternalProps) {
         />
       ) : null}
 
-      {sessionOpen ? <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} /> : null}
+      {panels.session ? (
+        <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
+      ) : null}
 
-      {autoAvailable && autoOpen ? (
+      {autoAvailable && panels.auto ? (
         <SimAutoRoll
           scene={scene}
           game={liveGame}

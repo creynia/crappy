@@ -4,7 +4,7 @@ import type { Action, BetTypeId, Cents, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
 import type { ActionPreview } from '../math/types';
-import { allowedActionsFor, betTypeAllowed, currentStep, gateAction, observe } from '../scene';
+import { allowedActionsFor, betTypeAllowed, currentStep, gateAction } from '../scene';
 import type { SceneConfig, SceneRuntime } from '../scene/types';
 import type { QuickAction, TypeOption } from './BetSheet';
 import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
@@ -20,7 +20,7 @@ import {
 } from './simHelpers';
 import { betLabel, buildEvFacts, fmtMoney } from './text';
 import type { SimulatorEvent } from './types';
-import type { Core } from './useUrlBoot';
+import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
 
 export const ALL_REGIONS: RegionDef[] = [...portraitLayout.regions, ...centerLayout.regions];
@@ -200,12 +200,7 @@ export function useSheetModel(d: SheetDeps) {
     emit({ type: 'previewed', preview: p });
     const sc = sceneRef.current;
     if (!sc.steps?.length) return;
-    const res = observe(sc, r, g, { kind: 'previewed', betType: s.type });
-    if (res.completedStep) {
-      const idx = sc.steps.findIndex((x) => x.id === res.completedStep);
-      emit({ type: 'step-completed', stepId: res.completedStep, index: idx });
-    }
-    if (res.sceneCompleted) emit({ type: 'scene-completed', sceneId: sc.id, state: res.game });
+    const res = emitObserve(sc, r, g, { kind: 'previewed', betType: s.type }, emit);
     d.setCore({ game: res.game, rt: res.runtime });
   };
   const openSheet = (s: SheetState) => {

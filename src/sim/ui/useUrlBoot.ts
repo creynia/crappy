@@ -1,35 +1,14 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { equity } from '../engine/game';
-import type { Cents, Dice as DicePair, GameState, RulePresetId } from '../engine/types';
+import type { Cents, Dice as DicePair, RulePresetId } from '../engine/types';
 import { initScene } from '../scene';
-import type { SceneConfig, SceneRuntime } from '../scene/types';
-import { loadSandbox, saveSandbox } from './persist';
+import type { SceneConfig } from '../scene/types';
+import { loadSandbox } from './persist';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
+import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
 
-export const SANDBOX_SCENE: SceneConfig = {
-  id: 'sandbox',
-  version: 1,
-  bankroll: 50_000,
-  allowedBets: 'all',
-  ui: { showSettings: true, showBankroll: true, showHistory: true },
-};
 const PRESETS: RulePresetId[] = ['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x'];
-
-export interface Core {
-  game: GameState;
-  rt: SceneRuntime;
-}
-
-export function randomSeed(): number {
-  try {
-    const a = new Uint32Array(1);
-    crypto.getRandomValues(a);
-    return a[0]! & 0x7fffffff;
-  } catch {
-    return Math.floor(Math.random() * 0x7fffffff);
-  }
-}
 
 /** Sandbox URL params (supported in production): seed, dice, rules, speed. Read from ?search and #/path?query. */
 export function readUrlParams(): URLSearchParams {
@@ -123,36 +102,4 @@ export function useUrlBoot(
     ),
   );
   return { settings, setSettings, boot };
-}
-
-/** The starting chip: the saved one, else the scene default, else $5, else the smallest. */
-export function initialChip(chips: Cents[], defaultChip?: Cents, saved?: Cents): Cents {
-  return saved && chips.includes(saved)
-    ? saved
-    : defaultChip && chips.includes(defaultChip)
-      ? defaultChip
-      : chips.includes(500)
-        ? 500
-        : chips[0]!;
-}
-
-/** Saves the sandbox table (game, bankroll, preset, chip) whenever it changes; no key = off. */
-export function useSandboxPersist(
-  persistKey: string | undefined,
-  scene: SceneConfig,
-  settings: ResolvedSimSettings,
-  game: GameState,
-  chip: Cents,
-) {
-  useEffect(() => {
-    if (!persistKey) return;
-    const rules = scene.rules ?? settings.rulesPreset;
-    saveSandbox(persistKey, {
-      v: 1,
-      game,
-      startBankroll: scene.bankroll ?? 50_000,
-      presetId: String(typeof rules === 'string' ? rules : 'custom'),
-      chip,
-    });
-  }, [game, chip, persistKey, scene.bankroll, scene.rules, settings.rulesPreset]);
 }

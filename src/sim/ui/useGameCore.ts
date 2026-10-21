@@ -12,10 +12,10 @@ import type {
 } from '../engine/types';
 import { tableExpectedLossPerRoll, expectedLossByTypePerRoll } from '../math/ev';
 import { toNumber } from '../math/fraction';
-import { gateAction, observe } from '../scene';
+import { gateAction } from '../scene';
 import type { SceneConfig, SceneInput } from '../scene/types';
 import type { SimulatorEvent } from './types';
-import type { Core } from './useUrlBoot';
+import { emitObserve, type Core } from './simCore';
 
 export type DoActionResult = ApplyResult | { ok: false; error: Extract<Validation, { ok: false }> };
 
@@ -43,14 +43,9 @@ export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: Game
   const feed = (input: SceneInput, g: GameState): Core => {
     const sc = sceneRef.current;
     if (!sc.steps?.length) return { game: g, rt: coreRef.current.rt };
-    const r = observe(sc, coreRef.current.rt, g, input);
+    const r = emitObserve(sc, coreRef.current.rt, g, input, emit);
     // a step `setup` that changes bankroll or bets must not show up as session profit or loss
     if (r.game !== g) startEquity.current += equity(r.game) - equity(g);
-    if (r.completedStep) {
-      const idx = sc.steps.findIndex((s) => s.id === r.completedStep);
-      emit({ type: 'step-completed', stepId: r.completedStep, index: idx });
-    }
-    if (r.sceneCompleted) emit({ type: 'scene-completed', sceneId: sc.id, state: r.game });
     return { game: r.game, rt: r.runtime };
   };
 
@@ -99,5 +94,5 @@ export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: Game
   /** Feeds a non-action scene input against the current game and commits it. */
   const feedInput = (input: SceneInput) => setCore(feed(input, coreRef.current.game));
 
-  return { core, coreRef, setCore, startEquity, lastOneRoll, feed, feedInput, doAction };
+  return { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction };
 }

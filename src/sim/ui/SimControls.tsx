@@ -6,6 +6,13 @@ import { ChipRack } from './ChipRack';
 import { RollButton } from './RollButton';
 import { fmtMoney } from './text';
 
+/** Open state of the panels the tab row toggles. */
+export interface Panels {
+  auto: boolean;
+  session: boolean;
+  menu: boolean;
+}
+
 export interface SimControlsProps {
   ui: NonNullable<SceneConfig['ui']>;
   chips: Cents[];
@@ -20,13 +27,10 @@ export interface SimControlsProps {
   view: 'table' | 'center';
   setView: (v: 'table' | 'center') => void;
   autoAvailable: boolean;
-  autoOpen: boolean;
-  setAutoOpen: (v: boolean) => void;
-  sessionOpen: boolean;
-  setSessionOpen: (v: boolean) => void;
   showMenu: boolean;
-  menuOpen: boolean;
-  setMenuOpen: (v: boolean) => void;
+  /** which side panels are open */
+  panels: Panels;
+  onToggle: (name: keyof Panels) => void;
 }
 
 /** Chip rack, roll button, roll lock note and the tab row (Center, Auto-roll, Session, Menu). */
@@ -70,8 +74,8 @@ export function SimControls(p: SimControlsProps) {
           <button
             type="button"
             class="sim-tab"
-            aria-expanded={p.autoOpen}
-            onClick={() => p.setAutoOpen(!p.autoOpen)}
+            aria-expanded={p.panels.auto}
+            onClick={() => p.onToggle('auto')}
           >
             Auto-roll
           </button>
@@ -79,8 +83,8 @@ export function SimControls(p: SimControlsProps) {
         <button
           type="button"
           class="sim-tab"
-          aria-expanded={p.sessionOpen}
-          onClick={() => p.setSessionOpen(!p.sessionOpen)}
+          aria-expanded={p.panels.session}
+          onClick={() => p.onToggle('session')}
         >
           Session
         </button>
@@ -88,8 +92,8 @@ export function SimControls(p: SimControlsProps) {
           <button
             type="button"
             class="sim-tab"
-            aria-expanded={p.menuOpen}
-            onClick={() => p.setMenuOpen(!p.menuOpen)}
+            aria-expanded={p.panels.menu}
+            onClick={() => p.onToggle('menu')}
           >
             Menu
           </button>

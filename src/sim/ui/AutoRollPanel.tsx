@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { bankrollNote } from './bankrollNote';
 import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
   edgeFunnelSigma,
   peekEdgeFunnelSigma,
   listStrategies,
+  exposureIsApproximate,
+  maxExposure,
   simulateCompare,
   simulateMany,
   simulateManyCompare,
@@ -283,6 +286,20 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     if (id === 'my-layout') spec.layout = layout ?? [];
     return spec;
   };
+
+  // I057: when the worst-case exposure of a selected strategy per decision is over a quarter of the
+  // bankroll (fewer than four decisions at full size), say so before the run.
+  const exposureNote = useMemo(() => {
+    const planned = fixedSpecs ?? strategyIds.map(specFor);
+    let worst: StrategySpec | null = null;
+    let worstCents = 0;
+    for (const sp of planned) {
+      const c = maxExposure(sp, rules);
+      if (c > worstCents) [worst, worstCents] = [sp, c];
+    }
+    return worst ? bankrollNote(worstCents, bankroll, exposureIsApproximate(worst)) : null;
+    // specFor reads the unit, odds and layout state; list those so the note follows them
+  }, [fixedSpecs, strategyIds, effUnit, oddsMultiple, layout, rules, bankroll]);
 
   const run = async (): Promise<void> => {
     setError(null);
@@ -602,6 +619,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           {tableTooSmall ? (
             <p class="sim-ar-desc">
               Table has {money(tableBankroll)}, so runs start at {money(50_000)}.
+            </p>
+          ) : null}
+          {exposureNote ? (
+            <p class="sim-ar-desc" role="note" data-testid="bankroll-warning">
+              {exposureNote}
             </p>
           ) : null}
           {bankrollError ? (

@@ -122,8 +122,9 @@ test.describe('sandbox', () => {
     await expect(form.getByTestId('rules-summary')).toContainText('Buy 4 $25: 3.85%');
     await guard.check('rules-editor-open');
     // every select in the editor is a 44px tap target, even inside the menu
+    // (43.5 allows for sub-pixel rounding: a 44px control can measure 43.999969)
     for (const sel of await form.locator('select').all())
-      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await sel.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
     await form.getByRole('button', { name: /^Apply/ }).click();
     await expect(form).toHaveCount(0);
     await expect(menu.getByLabel('Rules')).toHaveValue('custom');

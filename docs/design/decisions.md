@@ -27,6 +27,7 @@ this file wins.
 | Lesson tone | Friendly prose; collapsible "Show the math" blocks |
 | Perfect strategy | Three separate chapters: pure lowest edge, practical, fun-per-dollar |
 | Default rules | Standard Vegas: 3-4-5x odds, Field 2x on 2 and 12, buy/lay 5% vig on win only, lay odds 6x flat; presets: Field 3x-12, 10x, 100x |
+| Crapless craps | **Simulated** (I036, approved 2026-10-21): rules `variant: 'crapless'` via preset `crapless` (Rules menu, `?rules=crapless`). Come-out: 7 wins, nothing loses, 2/3/4/5/6/8/9/10/11/12 are points. Odds pay 6:1 on 2/12 and 3:1 on 3/11, capped at 1x on 2/12 and 2x on 3/11 (with 3-4-5x elsewhere a max-odds win is 6x the flat on every point). Place 2/12 pay 11:2, place 3/11 pay 11:4. No don't side and no Fire Bet (validation `unknown-bet`); All/Tall/Small stay. Bet ids `place-2`, `place-3`, `place-11`, `place-12` live in `CRAPLESS_BET_TYPE_IDS`, outside the 42-bet `BET_TYPE_IDS` catalogue. Pass/Come edge 373/6930 (5.38%) |
 | Vig rounding | Casino style: 5% rounded down to whole dollars, $1 minimum |
 | Bonus side bets (Fire, ATS) | **Simulated** (I037, approved 2026-10-21; supersedes "lesson text only"): bet ids `fire`, `all`, `tall`, `small`, category `bonus`, placeable only before a new shooter's first roll, never removable, prop minimum; Fire 24/249/999 to 1, All/Tall/Small 175/34/34 to 1; exact math in `src/sim/math/bonus.ts`. Taught in the sucker-bets lesson |
 | World/Whirl | Included as bet id `world` |

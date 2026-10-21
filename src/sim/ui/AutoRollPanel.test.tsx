@@ -136,4 +136,19 @@ describe('AutoRollPanel', () => {
       '% ended by stop-win',
     );
   });
+
+  it("crapless rules: don't-side strategies are disabled and labelled", () => {
+    const el = document.createElement('div');
+    render(<AutoRollPanel rules="crapless" initialSeed={1} />, el);
+    const opt = (id: string) =>
+      el.querySelector<HTMLOptionElement>(`select[aria-label="Strategy"] option[value="${id}"]`)!;
+    expect(opt('dont-pass-max-lay').disabled).toBe(true);
+    expect(opt('dont-pass-max-lay').textContent).toContain('(not on crapless)');
+    expect(opt('pass-max-odds').disabled).toBe(false);
+    const std = document.createElement('div');
+    render(<AutoRollPanel rules="standard-vegas" initialSeed={1} />, std);
+    expect(
+      std.querySelector<HTMLOptionElement>('option[value="dont-pass-max-lay"]')!.disabled,
+    ).toBe(false);
+  });
 });

@@ -7,6 +7,7 @@ import {
   simulateMany,
   simulateManyCompare,
   simulateSession,
+  strategyAvailable,
   strategyMetrics,
 } from '../strategy';
 import type {
@@ -134,10 +135,14 @@ function endedByText(r: SessionResult, cfg: SessionConfig): string {
       return `Stopped: up ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
     case 'stop-loss':
       return `Stopped: down ${money(Math.abs(r.finalEquity - cfg.bankroll))} at roll ${r.rollsPlayed}`;
+    case 'unavailable':
+      return UNAVAILABLE_TEXT;
     default:
       return `All ${r.rollsPlayed} rolls`;
   }
 }
+
+const UNAVAILABLE_TEXT = "Not offered: crapless craps has no don't side";
 
 function randomSeed(): number {
   try {
@@ -188,6 +193,22 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
+  // strategies that bet something these rules don't offer (crapless: no don't side)
+  const unavailable = useMemo(() => {
+    const out = new Set<StrategyId>();
+    if (rules.variant !== 'crapless') return out;
+    for (const s of all) {
+      try {
+        if (!strategyAvailable({ id: s.id, unit: 1000, ...(layout ? { layout } : {}) }, rules))
+          out.add(s.id);
+      } catch {
+        /* a strategy that cannot be probed (e.g. an empty layout) stays enabled */
+      }
+    }
+    return out;
+  }, [all, rules, layout]);
+  const unavailableLabel = (s: { id: StrategyId; name: string }) =>
+    unavailable.has(s.id) ? `${s.name} (not on crapless)` : s.name;
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
   // when the chosen unit isn't offered (higher table minimum), use the nearest one that is
@@ -328,10 +349,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
                           <input
                             type="checkbox"
                             checked={strategyIds.includes(s.id)}
-                            disabled={running}
+                            disabled={running || unavailable.has(s.id)}
                             onChange={() => toggleStrategy(s.id)}
                           />
-                          {s.name}
+                          {unavailableLabel(s)}
                         </label>
                       ))}
                     </div>
@@ -350,8 +371,8 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
                   g.items.length > 0 && (
                     <optgroup key={g.lens} label={LENS_LABEL[g.lens]}>
                       {g.items.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
+                        <option key={s.id} value={s.id} disabled={unavailable.has(s.id)}>
+                          {unavailableLabel(s)}
                         </option>
                       ))}
                     </optgroup>
@@ -361,6 +382,11 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           )}
           {!compare && (
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
+          )}
+          {strategyIds.some((id) => unavailable.has(id)) && (
+            <p class="sim-ar-desc" role="status">
+              Crapless craps has no don't side, so this strategy can't be played here.
+            </p>
           )}
           {needsLayout && (
             <p role="status" class="sim-ar-desc">

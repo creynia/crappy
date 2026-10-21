@@ -19,6 +19,9 @@ test.describe('crapless craps', () => {
       'true',
     );
     await page.getByRole('button', { name: 'Menu' }).click();
+    await page.locator('[data-region="dont-pass"]').click({ force: true }); // dimmed (aria-disabled) but tappable
+    await expect(page.locator('.sim-toast').first()).toContainText("no don't side");
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.locator('[data-region="pass"]').click();
     await expect(page.getByRole('dialog')).toContainText('5.38%');
   });

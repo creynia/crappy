@@ -26,6 +26,9 @@ export const NUMBER_WORD: Record<PointNumber, string> = {
   12: '12',
 };
 
+/** Sublabel of a region whose bets these rules don't offer (crapless don't side). */
+export const NOT_OFFERED = 'Not offered on a crapless table';
+
 function boxBetTypes(n: PointNumber): BetTypeId[] {
   // crapless-only numbers: place and come odds (no buy/lay; the don't side is not offered)
   if (n === 2 || n === 3 || n === 11 || n === 12) return [`place-${n}`, 'come-odds'];

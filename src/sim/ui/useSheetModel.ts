@@ -230,9 +230,14 @@ export function useSheetModel(d: SheetDeps) {
     const region = regionFor(id);
     if (!region) return;
     const { game: g, rt: r } = coreRef.current;
-    const allowedTypes = region.betTypes.filter(
-      (t) => betTypeAvailable(t, g.rules) && betTypeAllowed(sceneRef.current, r, t),
-    );
+    const offered = region.betTypes.filter((t) => betTypeAvailable(t, g.rules));
+    if (!offered.length) {
+      // the rules don't offer it (crapless: no don't side): say so, in the engine's words
+      const v = validateAction(g, { type: 'place-bet', betType: region.betTypes[0]!, amount: 500 });
+      d.pushToast(v.ok ? 'That bet is not offered at this table.' : v.message, 'info');
+      return;
+    }
+    const allowedTypes = offered.filter((t) => betTypeAllowed(sceneRef.current, r, t));
     if (!allowedTypes.length) {
       d.pushToast('That bet is not available in this lesson.', 'info');
       return;

@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { memo } from 'preact/compat';
 import type { PointNumber } from '../engine/types';
 import { DieFaceSvg } from './Dice';
-import { NUMBER_WORD } from './layouts/shared';
+import { NOT_OFFERED, NUMBER_WORD } from './layouts/shared';
 import type { RegionDef } from './layouts/types';
 
 export interface ArtCtx {
@@ -144,6 +144,11 @@ function BonusArt({ region, progress }: { region: RegionDef; progress: readonly 
   );
 }
 
+/** The don't-side "BAR 12" print, or NOT OFFERED on a table without a don't side (crapless). */
+function barText(region: RegionDef): string {
+  return region.sublabel === NOT_OFFERED ? 'NOT OFFERED' : 'BAR 12';
+}
+
 /** Visual content of a betting region: borders, numerals, printed labels. No interaction here. */
 function RegionArtImpl({
   region,
@@ -236,7 +241,7 @@ function RegionArtImpl({
             text-anchor="middle"
             fill={YELLOW}
           >
-            BAR 12
+            {barText(region)}
           </text>
         </g>
       );
@@ -306,7 +311,7 @@ function RegionArtImpl({
                 text-anchor="middle"
                 fill={YELLOW}
               >
-                BAR 12
+                {barText(region)}
               </text>
             </>
           ) : (
@@ -332,7 +337,7 @@ function RegionArtImpl({
                 text-anchor="middle"
                 fill={YELLOW}
               >
-                BAR 12
+                {barText(region)}
               </text>
             </>
           )}

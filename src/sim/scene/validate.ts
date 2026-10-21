@@ -300,8 +300,15 @@ export function validateScene(
     if (typeof s.rules === 'string') {
       if (!Object.prototype.hasOwnProperty.call(RULE_PRESETS, s.rules))
         c.err('rules', `unknown rules preset "${s.rules}"`);
-    } else if (isObj(s.rules)) c.keys('rules', s.rules, RULE_KEYS);
-    else c.err('rules', 'must be a preset id or an object');
+    } else if (isObj(s.rules)) {
+      c.keys('rules', s.rules, RULE_KEYS);
+      if (
+        s.rules.variant !== undefined &&
+        s.rules.variant !== 'standard' &&
+        s.rules.variant !== 'crapless'
+      )
+        c.err('rules.variant', 'must be "standard" or "crapless"');
+    } else c.err('rules', 'must be a preset id or an object');
     const variant =
       typeof s.rules === 'string'
         ? RULE_PRESETS[s.rules as RulePresetId]?.variant

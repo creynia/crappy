@@ -8,6 +8,7 @@ export { oddsMultiplePerDecision };
 export { getStrategy, listStrategies } from './presets';
 export {
   simulateSession,
+  strategyAvailable,
   simulateMany,
   simulateCompare,
   simulateManyCompare,

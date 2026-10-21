@@ -16,6 +16,7 @@ import type {
   ManyResult,
   SessionConfig,
   SessionResult,
+  StrategySpec,
   SweepConfig,
   SweepRow,
 } from './types';
@@ -33,6 +34,15 @@ function makeExpectedLossFn(): (s: GameState) => number {
     }
     return v;
   };
+}
+
+/**
+ * Whether a strategy can be played under these rules: false when it bets something the rules do not
+ * offer (crapless craps has no don't side). Probes a short seeded session.
+ */
+export function strategyAvailable(spec: StrategySpec, rules: SessionConfig['rules']): boolean {
+  const r = simulateSession({ strategy: spec, rolls: 300, seed: 1, bankroll: 10_000_000, rules });
+  return r.endedBy !== 'unavailable';
 }
 
 /** Run one session. Pure and deterministic per `cfg.seed`. */
@@ -60,14 +70,23 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
 
   for (let i = 1; i <= cfg.rolls; i++) {
     const plan = impl.plan(state, cfg.strategy);
+    let unavailable = false;
     for (const a of plan.actions) {
       const r = applyAction(state, a);
       if (r.ok) state = r.state;
-      else {
+      else if (r.error.code === 'unknown-bet') {
+        // the rules do not offer this bet (e.g. Don't Pass on a crapless table): not a bust
+        unavailable = true;
+        break;
+      } else {
         // A strategy must only emit legal actions; treat an unexpected rejection as unaffordable.
         if (stopAtBust) plan.blocked = true;
         break;
       }
+    }
+    if (unavailable) {
+      endedBy = 'unavailable';
+      break;
     }
     if (stopAtBust && plan.blocked && state.bets.length === 0) {
       busted = played;

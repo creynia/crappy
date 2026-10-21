@@ -312,3 +312,36 @@ describe('crapless Markov cross-check', () => {
     expect(Math.abs(wins / hands - 6557 / 13860)).toBeLessThan(0.01);
   });
 });
+
+describe('crapless in auto-roll and scenes', () => {
+  it("a don't-side strategy ends as 'unavailable' (not a bust); others play on", async () => {
+    const { simulateSession, strategyAvailable } = await import('../../strategy');
+    const r = simulateSession({
+      strategy: { id: 'dont-pass-max-lay', unit: 1000 },
+      rolls: 100,
+      seed: 3,
+      bankroll: $(500),
+      rules: 'crapless',
+    });
+    expect(r.endedBy).toBe('unavailable');
+    expect(r.bustedAtRoll).toBeNull();
+    expect(r.rollsPlayed).toBe(0);
+    expect(r.finalEquity).toBe($(500));
+    for (const id of ['dont-pass-max-lay', 'dont-come-molly'] as const) {
+      expect(strategyAvailable({ id, unit: 1000 }, 'crapless')).toBe(false);
+      expect(strategyAvailable({ id, unit: 1000 }, 'standard-vegas')).toBe(true);
+    }
+    for (const id of ['pass-max-odds', 'place-6-8', 'lay-4-10'] as const)
+      expect(strategyAvailable({ id, unit: 1000 }, 'crapless')).toBe(true);
+  });
+
+  it('scene rules: variant must be standard or crapless; crapless scenes may use point 2', async () => {
+    const { validateScene } = await import('../../scene');
+    const base = { id: 's', version: 1, bankroll: 50_000 };
+    expect(validateScene({ ...base, rules: { variant: 'crapless' } }).ok).toBe(true);
+    const bad = validateScene({ ...base, rules: { variant: 'mini' } });
+    expect(bad.ok ? [] : bad.errors).toEqual(['rules.variant: must be "standard" or "crapless"']);
+    expect(validateScene({ ...base, rules: 'crapless', phase: 'point', point: 2 }).ok).toBe(true);
+    expect(validateScene({ ...base, phase: 'point', point: 2 }).ok).toBe(false);
+  });
+});

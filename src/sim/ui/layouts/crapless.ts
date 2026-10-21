@@ -1,7 +1,7 @@
 import type { PointNumber } from '../../engine/types';
 import { landscapeLayout } from './landscape';
 import { portraitLayout } from './portrait';
-import { numberBox, puckForBox } from './shared';
+import { NOT_OFFERED, numberBox, puckForBox } from './shared';
 import type { Rect, TableLayout } from './types';
 
 /** Crapless box order: 2 3 | 4 5 6 8 9 10 | 11 12. */
@@ -11,8 +11,27 @@ const ORDER: PointNumber[] = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
 function withBoxes(base: TableLayout, boxes: [PointNumber, Rect][], inset: number): TableLayout {
   const puck = { off: base.puck.off } as TableLayout['puck'];
   for (const [n, r] of boxes) puck[n] = puckForBox(r, inset);
-  const rest = base.regions.filter((r) => !r.id.startsWith('box-'));
-  return { ...base, regions: [...boxes.map(([n, r]) => numberBox(n, r)), ...rest], puck };
+  // no don't side on a crapless table: the regions stay (greyed) but say so
+  const rest = base.regions
+    .filter((r) => !r.id.startsWith('box-'))
+    .map((r) =>
+      r.id === 'dont-pass' || r.id === 'dont-come' ? { ...r, sublabel: NOT_OFFERED } : r,
+    );
+  // narrow boxes: keep the place/buy chips clear of the "PAYS ..." line
+  const numbered = boxes.map(([n, rect]) => {
+    const b = numberBox(n, rect);
+    const y = rect.y + rect.h * 0.88;
+    const { main, buy } = b.chipSpots;
+    return {
+      ...b,
+      chipSpots: {
+        ...b.chipSpots,
+        ...(main ? { main: { x: main.x, y } } : {}),
+        ...(buy ? { buy: { x: buy.x, y } } : {}),
+      },
+    };
+  });
+  return { ...base, regions: [...numbered, ...rest], puck };
 }
 
 // Portrait: two rows of five in the space of the standard 2x3 grid (x 20..880, y 20..530).

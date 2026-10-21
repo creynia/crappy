@@ -80,7 +80,8 @@ export interface SessionResult {
   actualLoss: Cents;
   /** Count of each dice total, index 2..12 (0 and 1 unused). Used by the totals histogram. */
   totals: Int32Array;
-  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss';
+  /** 'unavailable': the strategy bets something these rules do not offer (crapless: no don't side) */
+  endedBy: 'rolls' | 'bust' | 'stop-win' | 'stop-loss' | 'unavailable';
   maxDrawdown: Cents;
   peakEquity: Cents;
   bustedAtRoll: number | null;

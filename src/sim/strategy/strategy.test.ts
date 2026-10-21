@@ -6,6 +6,7 @@ import {
   getStrategy,
   listStrategies,
   edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   simulateCompare,
   simulateMany,
   simulateSweep,
@@ -308,6 +309,13 @@ describe('edge convergence (I010)', () => {
     const r = simulateSession({ strategy: sp, rolls: n, seed: 11, bankroll: 1_000_000_000 });
     const ratio = (r.finalEquity - 1_000_000_000) / r.totalWagered;
     expect(Math.abs(ratio + edge)).toBeLessThanOrEqual((2 * sigma) / Math.sqrt(n));
+  });
+  it('the funnel estimate is cached per spec and rules', () => {
+    const sp = spec('pass-max-odds', { unit: 500 });
+    expect(peekEdgeFunnelSigma(sp, rules)).toBeUndefined();
+    const a = edgeFunnelSigma(sp, rules);
+    expect(peekEdgeFunnelSigma(sp, rules)).toBe(a);
+    expect(edgeFunnelSigma(sp, rules)).toBe(a);
   });
   it('about 95% of sessions end inside the funnel', () => {
     const sp = spec('place-6-8');

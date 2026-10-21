@@ -3,6 +3,7 @@ import { RULE_PRESETS, formatMoney, resolveRules } from '../engine';
 import type { Cents, RulePresetId, TableRules } from '../engine/types';
 import {
   edgeFunnelSigma,
+  peekEdgeFunnelSigma,
   listStrategies,
   simulateCompare,
   simulateMany,
@@ -191,6 +192,18 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
+  // paint, and never twice for the same strategy and rules (it is cached).
+  useEffect(() => {
+    if (chartKind !== 'edge' || outcome?.kind !== 'single' || outcome.sigma !== undefined) return;
+    if (outcome.specs.length !== 1) return;
+    const o = outcome;
+    const h = setTimeout(() => {
+      const sigma = edgeFunnelSigma(o.specs[0]!, rulesInput);
+      setOutcome((cur) => (cur === o ? { ...o, sigma } : cur));
+    }, 30);
+    return () => clearTimeout(h);
+  }, [chartKind, outcome]);
 
   const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
@@ -233,7 +246,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     try {
       if (sessions <= 1) {
         const results = specs.length > 1 ? simulateCompare(base, specs) : [simulateSession(cfg)];
-        const sigma = specs.length === 1 ? edgeFunnelSigma(specs[0]!, rulesInput) : undefined;
+        const sigma = specs.length === 1 ? peekEdgeFunnelSigma(specs[0]!, rulesInput) : undefined;
         setOutcome({
           kind: 'single',
           results,
@@ -573,7 +586,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       }));
     }
     const metrics = o.metrics;
-    const canEdge = o.kind === 'single' && o.sigma !== undefined && o.results[0]!.rollsPlayed >= 2;
+    const canEdge = o.kind === 'single' && o.specs.length === 1 && o.results[0]!.rollsPlayed >= 2;
     const edgeView = canEdge && chartKind === 'edge';
     return (
       <>
@@ -589,12 +602,19 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             {button(chartTab === 'survival', 'Survival', () => setChartTab('survival'))}
           </div>
         )}
-        {edgeView ? (
+        {edgeView && o.kind === 'single' && o.sigma === undefined ? (
+          <p class="sim-ar-note" role="status">
+            Working out the funnel…
+          </p>
+        ) : edgeView && o.kind === 'single' ? (
           <EdgeChart
             label={nameOf(o.specs[0]!.id)}
             ratio={edgeSeries(o.results[0]!.equity, o.results[0]!.wagered)}
             edge={o.metrics[0]!.edgeOnAction}
             sigma={o.sigma!}
+            // bet sizes that grow with losses break the funnel's assumptions
+            funnel={o.specs[0]!.id !== 'martingale-pass'}
+            approximate={o.metrics[0]!.approximate === true}
           />
         ) : (
           <BankrollChart

@@ -17,6 +17,13 @@ test.describe('edge chart', () => {
     await expect(chart).toContainText('House edge');
     await expect(chart.locator('[data-role="funnel"]')).toHaveCount(1);
     await expect(chart.getByRole('img')).toHaveAccessibleName(/House edge on this strategy/);
+    // the hidden summary table must not widen the page
+    const overflow = await page
+      .locator('html')
+      .evaluate(
+        (el: { scrollWidth: number; clientWidth: number }) => el.scrollWidth - el.clientWidth,
+      );
+    expect(overflow).toBeLessThanOrEqual(0);
     await chart.scrollIntoViewIfNeeded();
     await chart.screenshot({ path: `test-results/edge-chart-${info.project.name}.png` });
     await panel.getByRole('button', { name: 'Bankroll', exact: true }).click();

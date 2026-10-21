@@ -31,6 +31,13 @@ async function waitUntil<T>(check: () => T | null | undefined | false): Promise<
   return found;
 }
 
+async function waitFor(el: HTMLElement, selector: string) {
+  for (let i = 0; i < 100 && !el.querySelector(selector); i++)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+}
+
 describe('AutoRollPanel', () => {
   it('runs one session and shows the chart and summary', async () => {
     const el = document.createElement('div');
@@ -148,6 +155,9 @@ describe('AutoRollPanel', () => {
     await act(() => {
       toggle.click();
     });
+    // the funnel's spread is worked out after a paint: a placeholder first, then the chart
+    expect(el.textContent).toContain('Working out the funnel');
+    await waitFor(el, '[data-testid="edge-chart"]');
     const chart = el.querySelector('[data-testid="edge-chart"]')!;
     expect(chart).not.toBeNull();
     expect(el.querySelector('[data-testid="bankroll-chart"]')).toBeNull();
@@ -167,6 +177,27 @@ describe('AutoRollPanel', () => {
       el,
     );
     await click(el, '[data-testid="auto-roll-run"]');
+    await waitFor(el, '[data-testid="edge-chart"]');
     expect(el.querySelector('[data-testid="edge-chart"]')).not.toBeNull();
+  });
+
+  it('martingale-pass draws no funnel (bet size escalates)', async () => {
+    const el = document.createElement('div');
+    render(
+      <AutoRollPanel
+        initialSeed={7}
+        config={{
+          rollOptions: [100],
+          sessions: [1],
+          chart: 'edge',
+          defaultStrategy: { id: 'martingale-pass', unit: 500 },
+        }}
+      />,
+      el,
+    );
+    await click(el, '[data-testid="auto-roll-run"]');
+    await waitFor(el, '[data-testid="edge-chart"]');
+    expect(el.querySelector('[data-role="funnel"]')).toBeNull();
+    expect(el.textContent).toContain('No funnel');
   });
 });

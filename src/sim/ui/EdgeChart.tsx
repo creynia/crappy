@@ -8,6 +8,10 @@ export interface EdgeChartProps {
   edge: number;
   /** spread of the ratio: after n rolls its standard deviation is about sigma / sqrt(n) */
   sigma: number;
+  /** draw the funnel (off for strategies whose bet size changes with results) */
+  funnel?: boolean;
+  /** the edge describes the strategy's starting layout only */
+  approximate?: boolean;
 }
 
 const W = 640;
@@ -37,7 +41,14 @@ function niceStep(range: number, ticks: number): number {
  * flat line it settles toward; the funnel is the plus or minus two standard deviations range that
  * shrinks as 1/sqrt(rolls).
  */
-export function EdgeChart({ label, ratio, edge, sigma }: EdgeChartProps) {
+export function EdgeChart({
+  label,
+  ratio,
+  edge,
+  sigma,
+  funnel: showFunnel = true,
+  approximate = false,
+}: EdgeChartProps) {
   const ids = useId();
   const last = Math.max(1, ratio.length - 1);
   const center = -edge;
@@ -90,12 +101,15 @@ export function EdgeChart({ label, ratio, edge, sigma }: EdgeChartProps) {
 
   const endVal = Number.isFinite(lastVal ?? NaN) ? (lastVal as number) : 0;
   const inside = Math.abs(endVal - center) <= funnel(last);
+  const edgeText = approximate
+    ? `about ${pct(-center, 2)} (for its starting layout)`
+    : pct(-center, 2);
   const desc =
     `Result per dollar wagered after ${last} rolls: ${pct(endVal, 2)}. ` +
-    `House edge on this strategy: ${pct(-center, 2)} (a loss of that much per dollar bet). ` +
-    `The shaded funnel is the range two standard deviations either side of the house edge; ` +
-    `after ${last} rolls it is plus or minus ${pct(funnel(last), 2)}, and ` +
-    (inside ? 'this session ended inside it.' : 'this session ended outside it.');
+    `House edge on this strategy: ${edgeText}, a loss of that much per dollar bet. ` +
+    (showFunnel
+      ? `The shaded funnel shows where about 19 in 20 sessions land after this many rolls; after ${last} rolls that is plus or minus ${pct(funnel(last), 2)} around the house edge, and this session ended ${inside ? 'inside' : 'outside'} it. It narrows as you roll more, which is why the casino's result settles on the house edge.`
+      : `No funnel is drawn: this strategy changes its bet size as it wins and loses.`);
   const checkpoints = Array.from(new Set([1, 10, 100, 1000, last].filter((n) => n <= last)));
 
   return (
@@ -178,7 +192,9 @@ export function EdgeChart({ label, ratio, edge, sigma }: EdgeChartProps) {
             stroke-opacity="0.6"
             stroke-width="1.5"
           />
-          <path d={funnelPath} fill="#2f6fed" fill-opacity="0.15" data-role="funnel" />
+          {showFunnel && (
+            <path d={funnelPath} fill="#2f6fed" fill-opacity="0.15" data-role="funnel" />
+          )}
           <line
             data-role="house-edge"
             x1={M.l}
@@ -209,58 +225,48 @@ export function EdgeChart({ label, ratio, edge, sigma }: EdgeChartProps) {
           text-anchor="end"
           aria-hidden="true"
         >
-          House edge {pct(-center, 2)}
+          House edge {approximate ? `≈ ${pct(-center, 2)} (starting layout)` : pct(-center, 2)}
         </text>
       </svg>
-      <ul
-        class="sim-chart-legend"
-        style={{
-          listStyle: 'none',
-          margin: '4px 0 0',
-          padding: 0,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '4px 16px',
-          fontSize: '0.85em',
-        }}
-      >
+      <ul class="sim-chart-legend">
         <li>{label}: your result per dollar wagered</li>
         <li>Dashed: house edge</li>
-        <li>Shaded: plus or minus 2 standard deviations, shrinking with more rolls</li>
+        {showFunnel ? (
+          <li>
+            Shaded: where about 19 in 20 sessions land after this many rolls. It narrows as you roll
+            more, which is why the casino&apos;s result settles on the house edge.
+          </li>
+        ) : (
+          <li>No funnel: this strategy changes its bet size with results.</li>
+        )}
       </ul>
-      <table
-        style={{
-          position: 'absolute',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden',
-          clip: 'rect(0 0 0 0)',
-          whiteSpace: 'nowrap',
-        }}
-        data-testid="edge-chart-summary"
-      >
-        <caption>Result per dollar wagered, {label}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Rolls</th>
-            <th scope="col">Result per $1 wagered</th>
-            <th scope="col">Funnel (2 standard deviations)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {checkpoints.map((n) => (
-            <tr key={n}>
-              <th scope="row">{n}</th>
-              <td>
-                {Number.isFinite(ratio[n] ?? NaN) ? pct(ratio[n]!, 2) : 'nothing wagered yet'}
-              </td>
-              <td>
-                {pct(center - funnel(n), 2)} to {pct(center + funnel(n), 2)}
-              </td>
+      <div class="sim-sr">
+        <table data-testid="edge-chart-summary">
+          <caption>Result per dollar wagered, {label}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Rolls</th>
+              <th scope="col">Result per $1 wagered</th>
+              {showFunnel && <th scope="col">19 in 20 sessions land between</th>}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {checkpoints.map((n) => (
+              <tr key={n}>
+                <th scope="row">{n}</th>
+                <td>
+                  {Number.isFinite(ratio[n] ?? NaN) ? pct(ratio[n]!, 2) : 'nothing wagered yet'}
+                </td>
+                {showFunnel && (
+                  <td>
+                    {pct(center - funnel(n), 2)} to {pct(center + funnel(n), 2)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

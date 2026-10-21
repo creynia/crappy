@@ -55,7 +55,7 @@ describe('StreakLab', () => {
 
   it('clamps How many on blur, not while typing', () => {
     render(<StreakLab />);
-    const input = screen.getByLabelText('How many') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('How many');
     fireEvent.input(input, { target: { value: '60' } });
     expect(input.value).toBe('60');
     fireEvent.blur(input);

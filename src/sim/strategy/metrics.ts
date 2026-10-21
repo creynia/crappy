@@ -1,5 +1,6 @@
 import type { Action, Bet, BetTypeId, GameState, PointNumber, TableRules } from '../engine';
 import { betEdge, tableExpectedLossPerRoll, toNumber } from '../math';
+import { customIsProgressive } from './custom';
 import { getImpl } from './presets';
 import type { StrategyMetrics, StrategySpec } from './types';
 
@@ -164,7 +165,9 @@ export function strategyMetrics(spec: StrategySpec, rules: TableRules): Strategy
     edgeOnAction: action > 0 ? lossCents / action : 0,
     expectedLossPerRoll,
     rollsPerDollar: expectedLossPerRoll > 0 ? 1 / expectedLossPerRoll : Infinity,
-    ...(APPROXIMATE.has(spec.id) ? { approximate: true } : {}),
+    ...(APPROXIMATE.has(spec.id) || (spec.id === 'custom' && customIsProgressive(spec.custom))
+      ? { approximate: true }
+      : {}),
   };
 }
 

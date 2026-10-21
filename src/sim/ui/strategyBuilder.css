@@ -1,0 +1,82 @@
+/* "My system" builder (I013) inside the auto-roll panel. */
+.sim-sb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--sim-border);
+  border-radius: 10px;
+  background: var(--sim-surface-2);
+  color: var(--sim-text);
+}
+.sim-sb-title {
+  margin: 0;
+  font-weight: 700;
+}
+.sim-sb-block {
+  margin: 0;
+  padding: 4px 8px 8px;
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim-sb-block legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+.sim-sb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.sim-sb select,
+.sim-sb input[type='text'] {
+  min-height: 44px;
+  font: inherit;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  max-width: 100%;
+}
+.sim-sb-link input {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+.sim-sb-nums {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+.sim-sb-num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sim-sb-num label,
+.sim-sb-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.sim-sb input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+.sim-sb-errors {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--sim-loss);
+}
+.sim-sb :is(select, input):focus-visible {
+  outline: 3px solid var(--sim-focus);
+  outline-offset: 2px;
+}

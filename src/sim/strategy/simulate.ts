@@ -31,6 +31,9 @@ function makeExpectedLossFn(): (s: GameState) => number {
 export function simulateSession(cfg: SessionConfig): SessionResult {
   const impl = getImpl(cfg.strategy.id);
   const stopAtBust = cfg.stopAtBust ?? true;
+  // a custom system's own stops apply when the run sets none (I013)
+  const stopWin = cfg.stopWin ?? cfg.strategy.custom?.stopWin;
+  const stopLoss = cfg.stopLoss ?? cfg.strategy.custom?.stopLoss;
   const start = cfg.bankroll;
   const expectedLossFn = makeExpectedLossFn();
   let state = createGame({ rules: cfg.rules, bankroll: cfg.bankroll, seed: cfg.seed });
@@ -93,11 +96,11 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     exp[i] = start - state.stats.expectedLoss;
     if (e > peak) peak = e;
     else if (peak - e > maxDd) maxDd = peak - e;
-    if (cfg.stopWin !== undefined && e - start >= cfg.stopWin) {
+    if (stopWin !== undefined && e - start >= stopWin) {
       endedBy = 'stop-win';
       break;
     }
-    if (cfg.stopLoss !== undefined && start - e >= cfg.stopLoss) {
+    if (stopLoss !== undefined && start - e >= stopLoss) {
       endedBy = 'stop-loss';
       break;
     }

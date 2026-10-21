@@ -14,13 +14,16 @@ import type {
   ManyResult,
   SessionConfig,
   SessionResult,
+  CustomSystem,
   StrategyId,
   StrategySpec,
   SweepMultiple,
 } from '../strategy';
+import { validateCustom } from '../strategy/custom';
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { StrategyBuilder } from './StrategyBuilder';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
 import { betLabel, fmtMoney } from './text';
@@ -48,6 +51,7 @@ const NO_ODDS_STRATEGIES = new Set<string>([
   'hardways-all',
   'no-bet',
   'my-layout',
+  'custom',
 ]);
 
 export interface AutoRollPanelProps {
@@ -169,6 +173,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [oddsMultiple, setOddsMultiple] = useState<number | undefined>(
     config?.defaultStrategy?.oddsMultiple,
   );
+  // I013: the "My system" blocks (custom strategy)
+  const [system, setSystem] = useState<CustomSystem>(
+    config?.defaultStrategy?.custom ?? { line: { side: 'pass', odds: 'max' } },
+  );
   const [stopWin, setStopWin] = useState<Cents | undefined>(config?.stopWin);
   const [stopLoss, setStopLoss] = useState<Cents | undefined>(config?.stopLoss);
   const [rolls, setRolls] = useState<number>(rollOptions.includes(100) ? 100 : rollOptions[0]!);
@@ -203,6 +211,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     const spec: StrategySpec = { id, unit: effUnit };
     if (oddsMultiple !== undefined) spec.oddsMultiple = oddsMultiple;
     if (id === 'my-layout') spec.layout = layout ?? [];
+    if (id === 'custom') spec.custom = system;
     return spec;
   };
 
@@ -257,6 +266,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   };
 
   const needsLayout = strategyIds.includes('my-layout') && !(layout && layout.length > 0);
+  const systemInvalid = strategyIds.includes('custom') && validateCustom(system).length > 0;
   const nameOf = (id: StrategyId): string => all.find((s) => s.id === id)?.name ?? id;
   const button = (active: boolean, label: string, onClick: () => void, key?: string | number) => (
     <button
@@ -361,6 +371,9 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           {!compare && (
             <p class="sim-ar-desc">{all.find((s) => s.id === strategyIds[0])?.description}</p>
           )}
+          {strategyIds.includes('custom') && !fixedSpecs ? (
+            <StrategyBuilder value={system} onChange={setSystem} disabled={running} />
+          ) : null}
           {needsLayout && (
             <p class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
@@ -493,7 +506,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <button
             type="button"
             data-testid="auto-roll-run"
-            disabled={running}
+            disabled={running || systemInvalid}
             onClick={() => void run()}
             class="sim-ar-run"
           >

@@ -1,9 +1,8 @@
-import { isToggleable } from '../engine/bets';
-import { isWorking } from '../engine/game';
-import type { Action, Cents, GameState } from '../engine/types';
+import { hopLabel } from '../engine/bets';
+import type { Action, Cents, Dice, GameState } from '../engine/types';
 import { BetSheet } from './BetSheet';
 import { regionIdForBet } from './layouts';
-import { defaultAmount } from './simHelpers';
+import { defaultAmount, hopSheetFields } from './simHelpers';
 import { betLabel } from './text';
 import type { DoActionResult } from './useGameCore';
 import type { SheetModel, SheetState } from './useSheetModel';
@@ -31,7 +30,7 @@ export function SimSheet(p: SimSheetProps) {
   const { sheet, model: m, chip } = p;
   return (
     <BetSheet
-      title={betLabel(m.type)}
+      title={m.bet?.hop ? hopLabel(m.bet.hop) : betLabel(m.type)}
       mode={m.bet ? 'manage' : 'new'}
       placement={p.landscape ? 'panel' : 'sheet'}
       preview={m.preview}
@@ -60,22 +59,26 @@ export function SimSheet(p: SimSheetProps) {
       step={chip}
       quickActions={m.quick}
       confirmSucker={p.confirmSucker}
-      {...(m.bet && isToggleable(m.bet.type)
-        ? { working: { value: isWorking(m.bet, p.game), canToggle: true } }
-        : {})}
+      {...(m.working ? { working: m.working } : {})}
       onTypeChange={(t) => {
         const g = p.getLiveGame();
         p.openSheet({
           regionId: sheet.regionId,
           type: t,
           amount: defaultAmount(t, sheet.regionId, g, chip),
+          ...hopSheetFields(t, sheet.hop),
         });
       }}
       onAmountChange={(a) => p.setSheet({ ...sheet, amount: a })}
       onUseAlternative={(a) => {
         if (a.type !== 'place-bet') return;
         const rid = regionIdForBet(a.betType, null) ?? sheet.regionId;
-        p.openSheet({ regionId: rid, type: a.betType, amount: a.amount });
+        p.openSheet({
+          regionId: rid,
+          type: a.betType,
+          amount: a.amount,
+          ...hopSheetFields(a.betType, a.hop),
+        });
       }}
       onToggleWorking={(on) => {
         if (m.bet)
@@ -92,6 +95,9 @@ export function SimSheet(p: SimSheetProps) {
               if (r.ok) p.onClose();
             },
           }
+        : {})}
+      {...(sheet.hop && !m.bet
+        ? { hop: { value: sheet.hop, onChange: (d: Dice) => p.openSheet({ ...sheet, hop: d }) } }
         : {})}
       onConfirm={p.onConfirm}
       onCancel={p.onClose}

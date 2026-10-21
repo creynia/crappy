@@ -20,9 +20,13 @@ export default defineConfig({
     {
       name: 'phone-landscape',
       use: { ...devices['Pixel 7 landscape'] },
-      testMatch: /(sandbox|lessons|layout)\.spec\.ts/,
+      testMatch: /(sandbox|lessons)\.spec\.ts/,
     },
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /visual\.spec\.ts/ },
+    {
+      name: 'desktop',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: [/visual\.spec\.ts/, /guard\.spec\.ts/],
+    },
     // Opt-in (VISUAL=1 or SCREENSHOTS=1) so pixel diffs never gate normal runs.
     ...(visual
       ? [

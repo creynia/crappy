@@ -241,6 +241,41 @@ describe('step ask (in-sim question)', () => {
   });
 });
 
+describe('autoRoll.bankroll', () => {
+  it('accepts integer cents from $5 to $1,000,000 and rejects others', () => {
+    expect(
+      validateScene({ id: 'x', version: 1, autoRoll: { enabled: true, bankroll: 50_000 } }).ok,
+    ).toBe(true);
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      autoRoll: { enabled: true, bankroll: 499.5 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
+  it('uses the scene table minimum for the bankroll floor', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      rules: { tableMin: 1000 },
+      autoRoll: { enabled: true, bankroll: 500 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.bankroll');
+  });
+  it('checks stopLoss against the auto-roll bankroll, not only the scene bankroll', () => {
+    const bad = validateScene({
+      id: 'x',
+      version: 1,
+      bankroll: 100_000,
+      autoRoll: { enabled: true, bankroll: 20_000, stopLoss: 25_000 },
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join('\n')).toContain('autoRoll.stopLoss');
+  });
+});
+
 // ---- richer conditions (I018) ----
 
 type Act = Parameters<typeof applyAction>[1];

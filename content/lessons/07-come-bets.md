@@ -103,6 +103,32 @@ steps:
     completeWhen: { acknowledged: true }
 ```
 
+```scene
+id: l07-s3
+version: 1
+title: Watch the dealer
+bankroll: 50000
+phase: point
+point: 6
+bets:
+  - { ref: p, type: pass-line, amount: 1000 }
+  - { type: pass-odds, amount: 5000, parentRef: p }
+allowedBets: []
+showEV: false
+ui:
+  compact: true
+steps:
+  - id: watch
+    text: "Watch two Come bets at work: one travels while an older one wins. Tap the table to skip ahead, or **Replay** to watch it again."
+    play:
+      - { action: { type: place-bet, betType: come, amount: 1000 }, say: "A $10 Come bet goes in." }
+      - { action: { type: roll, dice: [5, 4] }, say: "Roll: 9. The Come bet moves to the 9 box." }
+      - { action: { type: place-bet, betType: come, amount: 1000 }, say: "A second $10 Come bet goes in." }
+      - { action: { type: roll, dice: [3, 6] }, say: "Another 9! The older Come bet wins, and the new one travels to the 9." }
+    completeWhen: { acknowledged: true }
+    advance: button
+```
+
 ```quiz
 - q: The point is 9. You put $10 in Come, and the next roll is 11. What happens?
   options: ["Your Come bet loses", "Your Come bet wins $10", "Your Come bet moves to 11", "Nothing"]

@@ -160,40 +160,50 @@ describe('crapless resolution matrix', () => {
         for (const bp of betPoints) {
           if (type === 'pass-odds' && (phase !== 'point' || bp !== point)) continue;
           const amount = 6000 * def.unitMultiple;
-          for (const working of [true, false]) {
-            for (let d1 = 1; d1 <= 6; d1++) {
-              for (let d2 = 1; d2 <= 6; d2++) {
-                const total = d1 + d2;
-                const b = { type, amount, point: bp, vigPaid: 0 } as Bet;
-                const got = def.resolve(
-                  b,
-                  { dice: [d1 as 1, d2 as 1], total, hard: d1 === d2, phase, point },
-                  CR,
-                  working,
-                );
-                // Bets the variant does not touch must resolve exactly as on a standard table.
-                const want =
-                  craplessOracle(type, amount, bp, phase, point, total, working) ??
-                  oracle({
-                    type,
-                    amount,
-                    betPoint: bp,
-                    phase,
-                    point,
-                    d1,
-                    d2,
+          const hops: Array<[number, number] | undefined> =
+            type === 'hop'
+              ? [
+                  [1, 1],
+                  [2, 4],
+                  [6, 5],
+                ]
+              : [undefined];
+          for (const hop of hops)
+            for (const working of [true, false]) {
+              for (let d1 = 1; d1 <= 6; d1++) {
+                for (let d2 = 1; d2 <= 6; d2++) {
+                  const total = d1 + d2;
+                  const b = { type, amount, point: bp, vigPaid: 0, ...(hop ? { hop } : {}) } as Bet;
+                  const got = def.resolve(
+                    b,
+                    { dice: [d1 as 1, d2 as 1], total, hard: d1 === d2, phase, point },
+                    CR,
                     working,
-                    upfrontPaid: false,
-                    rules: ORULES,
-                  });
-                checked++;
-                if (JSON.stringify(got) !== JSON.stringify(want))
-                  bad.push(
-                    `${phase}/${point} bp=${bp} w=${working} ${d1}-${d2}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`,
                   );
+                  // Bets the variant does not touch must resolve exactly as on a standard table.
+                  const want =
+                    craplessOracle(type, amount, bp, phase, point, total, working) ??
+                    oracle({
+                      type,
+                      amount,
+                      betPoint: bp,
+                      phase,
+                      point,
+                      d1,
+                      d2,
+                      working,
+                      upfrontPaid: false,
+                      rules: ORULES,
+                      ...(hop ? { hop } : {}),
+                    });
+                  checked++;
+                  if (JSON.stringify(got) !== JSON.stringify(want))
+                    bad.push(
+                      `${phase}/${point} bp=${bp} w=${working} ${d1}-${d2}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`,
+                    );
+                }
               }
             }
-          }
         }
       }
       expect(bad.slice(0, 5)).toEqual([]);

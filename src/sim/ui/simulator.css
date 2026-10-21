@@ -143,6 +143,7 @@
 }
 .sim-menu,
 .sim-session-panel,
+.sim-roll-log,
 .sim-auto {
   background: var(--sim-surface);
   border: 1px solid var(--sim-border);
@@ -445,6 +446,12 @@
 .sim-sweep-table th,
 .sim-sweep-table td {
   padding: 4px 3px;
+}
+
+/* Opened Auto-roll / Session panels scroll to the top edge, clear of the sticky header (I050). */
+.sim-autoroll,
+.sim-session-panel {
+  scroll-margin-top: 8px;
 }
 
 /* in-sim question (scene step `ask`) */

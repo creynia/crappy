@@ -9,6 +9,8 @@ export function useAnimationPlayer(
   getSpeed: () => Speed,
   pushToast: (text: string, tone?: ToastItem['tone']) => void,
   announce: (text: string) => void,
+  /** a roll has fully played (or was cut short by the next one): the moment its result is shown */
+  onFinished?: (pre: GameState, post: GameState, events: GameEvent[]) => void,
 ) {
   const [shown, setShown] = useState<GameState | null>(null);
   const [rolling, setRolling] = useState<{ dice: DicePair; durationMs: number } | null>(null);
@@ -20,12 +22,16 @@ export function useAnimationPlayer(
   const [phase, setPhase] = useState<'travel' | 'lose' | 'win' | null>(null);
   const [busy, setBusy] = useState(false);
   const player = useRef<Player | null>(null);
+  const pending = useRef<[GameState, GameState, GameEvent[]] | null>(null);
 
   const run = (pre: GameState, post: GameState, events: GameEvent[]) => {
     const roll = events.find(
       (e): e is Extract<GameEvent, { type: 'dice-rolled' }> => e.type === 'dice-rolled',
     );
-    const text = describeRoll(events);
+    // a roll that is cut off by the next one still has to reach the log
+    if (pending.current) onFinished?.(...pending.current);
+    pending.current = [pre, post, events];
+    const text = describeRoll(events, pre.bets);
     const tone = rollTone(events);
     const speed = getSpeed();
     player.current?.cancel();
@@ -40,9 +46,11 @@ export function useAnimationPlayer(
       setPhase(null);
       setBusy(false);
       player.current = null;
+      pending.current = null;
+      onFinished?.(pre, post, events);
       pushToast(text, tone);
       // the one live message per roll (the toast above is visual only)
-      announce(rollAnnouncement(events, post));
+      announce(rollAnnouncement(events, post, pre.bets));
     };
     if (!tl.steps.length || !roll) {
       finish();
@@ -91,6 +99,7 @@ export function useAnimationPlayer(
   /** Cancels any running timeline and clears every animation overlay (used by reset). */
   const clear = () => {
     player.current?.cancel();
+    pending.current = null;
     setShown(null);
     setBusy(false);
     setRolling(null);

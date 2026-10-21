@@ -463,6 +463,29 @@
   border-color: var(--sim-accent);
   font-weight: 700;
 }
+.sim-seg-edge {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.sim-seg-edge[data-tier='free'] {
+  color: var(--ev-free);
+}
+.sim-seg-edge[data-tier='good'] {
+  color: var(--ev-good);
+}
+.sim-seg-edge[data-tier='fair'] {
+  color: var(--ev-fair);
+}
+.sim-seg-edge[data-tier='poor'] {
+  color: var(--ev-poor);
+}
+.sim-seg-edge[data-tier='avoid'] {
+  color: var(--ev-avoid);
+}
+.sim-seg button.is-selected .sim-seg-edge {
+  color: inherit;
+}
 .sim-stepper {
   display: flex;
   align-items: center;
@@ -907,6 +930,81 @@
   margin-top: 0.375rem;
 }
 
+.sim-chart-legend {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.85em;
+}
+
+/* Roll log */
+.sim-roll-log h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.sim-log-filter {
+  min-height: 36px;
+}
+.sim-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.sim-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.sim-log-entry {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 4px 6px 8px;
+  border-bottom: 1px solid var(--sim-border);
+  border-left: 4px solid transparent;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.sim-log-entry.is-win {
+  border-left-color: #2b8a4b;
+}
+.sim-log-entry.is-loss {
+  border-left-color: #b3261e;
+}
+.sim-log-entry.is-focus {
+  background: rgb(255 214 64 / 0.25);
+}
+.sim-log-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sim-log-dice {
+  display: inline-flex;
+  gap: 2px;
+}
+.sim-log-bank {
+  grid-column: 1 / -1;
+  color: var(--sim-muted);
+  font-size: 0.8125rem;
+}
+.sim-log-more {
+  margin-top: 6px;
+}
+.sim-log-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.5rem;
+}
+
+/* Luck band */
 .sim-luck-text {
   margin: 0.5rem 0 0.25rem;
   font-size: 0.9rem;

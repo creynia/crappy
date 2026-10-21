@@ -1,9 +1,10 @@
 import { useState } from 'preact/hooks';
 import { equity } from '../engine/game';
-import type { Cents, Dice as DicePair, RulePresetId } from '../engine/types';
+import type { Cents, Dice as DicePair, RulePresetId, TableRules } from '../engine/types';
 import { initScene } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { loadSandbox } from './persist';
+import type { RollLogEntry } from './rollLog';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
 import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
@@ -38,13 +39,25 @@ function isPreset(s: string): s is RulePresetId {
   return (PRESETS as string[]).includes(s);
 }
 
+/** Custom rules carry no preset id (resolveRules fills in the default). */
+function withoutPreset(r: TableRules): Partial<TableRules> {
+  const { presetId: _preset, ...rest } = r;
+  return rest;
+}
+
 export function buildCore(
   scene: SceneConfig,
   settings: ResolvedSimSettings,
   mode: 'sandbox' | 'embedded',
   persistKey: string | undefined,
   url: URLSearchParams,
-): { core: Core; startEquity: Cents; chip?: Cents } {
+): {
+  core: Core;
+  startEquity: Cents;
+  chip?: Cents;
+  log?: RollLogEntry[];
+  customRules?: Partial<TableRules>;
+} {
   const sandbox = mode === 'sandbox';
   const hasUrl = sandbox && (url.has('seed') || url.has('dice') || url.has('rules'));
   const urlRules = url.get('rules');
@@ -54,10 +67,12 @@ export function buildCore(
   const withRules: SceneConfig = rules !== undefined ? { ...scene, rules } : scene;
   if (sandbox && persistKey && !hasUrl && !scene.steps?.length) {
     const saved = loadSandbox(persistKey);
+    // I033: a sandbox saved with custom rules comes back with them, unless a scene or URL picks rules
+    const custom = saved?.presetId === 'custom' && scene.rules === undefined && !url.has('rules');
     if (
       saved &&
       saved.startBankroll === (scene.bankroll ?? 50_000) &&
-      saved.presetId === String(typeof rules === 'string' ? rules : 'custom')
+      (custom || saved.presetId === String(typeof rules === 'string' ? rules : 'custom'))
     ) {
       return {
         core: {
@@ -66,6 +81,8 @@ export function buildCore(
         },
         startEquity: saved.startBankroll,
         ...(saved.chip ? { chip: saved.chip } : {}),
+        ...(saved.log ? { log: saved.log } : {}),
+        ...(custom ? { customRules: withoutPreset(saved.game.rules) } : {}),
       };
     }
   }

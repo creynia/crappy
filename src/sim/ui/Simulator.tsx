@@ -13,6 +13,7 @@ import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
+import { resolverFor } from './stepTokens';
 import { askFeedback } from './StepPanel';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
 import { StatusBar } from './StatusBar';
@@ -278,6 +279,7 @@ export function Simulator(props: SimulatorInternalProps) {
         feedInput({ kind: 'answered', correct });
       }}
       onRestart={() => resetGame()}
+      resolve={resolverFor(game)}
     />
   );
 

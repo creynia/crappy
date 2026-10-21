@@ -209,7 +209,7 @@ test.describe('sandbox', () => {
       await sheet.getByRole('button', { name: 'Confirm' }).click();
       const cost = page.locator('.sim-cost-cycle');
       await expect(cost).toBeVisible();
-      await cost.scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
       const box = await cost.boundingBox();
       expect(box, `${width}x${height}`).not.toBeNull();
       expect(box!.y + box!.height, `${width}x${height} in viewport`).toBeLessThanOrEqual(height);

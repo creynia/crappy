@@ -10,7 +10,7 @@ const TABS = [
     to: '/more',
     label: 'More',
     icon: '≡',
-    match: (p: string) => /^\/(more|glossary|settings)/.test(p),
+    match: (p: string) => /^\/(more|glossary|settings|practice)/.test(p),
   },
 ];
 

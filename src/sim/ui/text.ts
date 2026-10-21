@@ -145,29 +145,36 @@ function combinedEdge(
   let label: string;
   const flatLink = FLAT_ODDS[type];
   const parentType = ODDS_FLAT[type];
+  // The bet the action manages: the flat bet for set-amount on it, or the odds bet for set-amount on odds.
+  // Every lookup below goes through these, so a second Come bet never falls back to the first one.
+  const managed =
+    action.type === 'set-amount' ? state.bets.find((b) => b.id === action.betId) : undefined;
+  let flatBet: Bet | undefined;
   if (flatLink) {
-    const own =
-      action.type === 'set-amount' ? state.bets.find((b) => b.id === action.betId) : undefined;
     const odds = state.bets.filter(
       (b) =>
         b.type === flatLink.flat &&
-        (own ? b.parentId === own.id : type === 'pass-line' || type === 'dont-pass'),
+        (managed ? b.parentId === managed.id : type === 'pass-line' || type === 'dont-pass'),
     );
     flatType = type;
     flatAmount = amount;
     oddsAmount = odds.reduce((t, b) => t + b.amount, 0);
+    flatBet = managed;
     label = flatLink.label;
   } else if (parentType) {
-    const parent =
-      action.type === 'place-bet' && action.parentId
-        ? state.bets.find((b) => b.id === action.parentId)
-        : state.bets.find((b) => b.type === parentType);
+    const parentId = managed ? managed.parentId : a2(action);
+    const parent = parentId
+      ? state.bets.find((b) => b.id === parentId)
+      : state.bets.find((b) => b.type === parentType);
     if (!parent) return null;
     flatType = parentType;
     flatAmount = parent.amount;
-    const existing = state.bets.filter((b) => b.type === type && b.parentId === parent.id);
-    oddsAmount =
-      existing.reduce((t, b) => t + b.amount, 0) + (action.type === 'place-bet' ? amount : 0);
+    flatBet = parent;
+    // Other odds on this parent; set-amount replaces the managed bet's amount, place-bet adds to the total.
+    const existing = state.bets.filter(
+      (b) => b.type === type && b.parentId === parent.id && b.id !== managed?.id,
+    );
+    oddsAmount = existing.reduce((t, b) => t + b.amount, 0) + amount;
     label = FLAT_ODDS[parentType]!.label;
   } else return null;
   if (oddsAmount <= 0 || flatAmount <= 0) return null;
@@ -175,11 +182,7 @@ function combinedEdge(
   // of the table maximum at every point (max odds on 3-4-5x gives Pass + odds 0.374%, DP + 6x lay 0.273%).
   const flat = fracToNumber(betEdge(flatType, flatAmount, ctx).perResolved);
   const lay = flatType === 'dont-pass' || flatType === 'dont-come';
-  const parentBet =
-    flatType === 'pass-line' || flatType === 'dont-pass'
-      ? null
-      : (state.bets.find((b) => b.type === flatType && (a2(action) ? b.id === a2(action) : true)) ??
-        null);
+  const parentBet = flatType === 'pass-line' || flatType === 'dont-pass' ? null : (flatBet ?? null);
   const point = parentBet?.point ?? state.point ?? 6;
   const maxMult = (lay ? state.rules.maxLayOdds : state.rules.maxOdds)[point];
   const frac = Math.min(1, oddsAmount / (flatAmount * maxMult));

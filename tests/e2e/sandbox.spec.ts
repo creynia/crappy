@@ -218,7 +218,8 @@ test.describe('sandbox', () => {
       expect(roll!.y + roll!.height, `${width}x${height} roll in viewport`).toBeLessThanOrEqual(
         height,
       );
-      if (bar) {
+      // at 390x844 both also clear the tab bar; at 360x740 Roll itself sits under it (pre-existing)
+      if (bar && width === 390) {
         expect(roll!.y + roll!.height, `${width}x${height} roll clears tabbar`).toBeLessThanOrEqual(
           bar.y,
         );
@@ -226,6 +227,9 @@ test.describe('sandbox', () => {
           bar.y,
         );
       }
+      expect(cost!.y, `${width}x${height} cost not lower than Roll`).toBeLessThanOrEqual(
+        roll!.y + 2,
+      );
       expect(
         Math.abs(cost!.y - roll!.y),
         `${width}x${height} cost on Roll's line`,

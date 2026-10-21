@@ -553,6 +553,19 @@ describe('validate richer conditions: rejections (I018 review)', () => {
   });
 });
 
+describe('autoRoll.lab', () => {
+  it('accepts the streaks lab and rejects unknown labs', () => {
+    const scene = (lab: unknown): unknown => ({
+      id: 'lab',
+      version: 1,
+      autoRoll: { enabled: true, lab },
+      steps: [{ id: 'a', text: 'a', completeWhen: { autoRollCompleted: {} } }],
+    });
+    expect(validateScene(scene('streaks')).ok).toBe(true);
+    expect(validateScene(scene('tarot')).ok).toBe(false);
+  });
+});
+
 describe('demo scripts (SceneStep.play)', () => {
   const demo: SceneConfig = {
     id: 'demo',

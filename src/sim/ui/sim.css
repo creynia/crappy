@@ -367,9 +367,8 @@
   top: 0;
   bottom: auto;
   gap: 2px;
-  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
-  max-height: 100%;
-  overflow: hidden;
+  /* stacked toasts stay in front of the Roll row instead of tucking behind it */
+  z-index: 25;
 }
 .sim-land .sim-toast > span {
   display: -webkit-box;
@@ -969,19 +968,16 @@
 }
 
 .sim-odds-hint {
-  /* one row in the toast layer on phones (text clamped, two 44px buttons); the rail wraps it */
+  /* one row in every orientation: short text plus two 44px icon buttons */
   display: flex;
   align-items: center;
-  gap: 6px 8px;
-  padding: 4px 8px;
+  gap: 4px;
+  padding: 2px 2px 2px 8px;
   border: 1px solid var(--sim-border);
   border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
-  font-size: 0.85rem;
-  pointer-events: auto;
-}
-.sim-odds-hint-actions button {
+  font-size: 0.8rem;
   pointer-events: auto;
 }
 .sim-odds-hint p {
@@ -992,26 +988,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sim-rail .sim-odds-hint {
-  flex-wrap: wrap;
-}
-.sim-rail .sim-odds-hint p {
-  flex: 1 1 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
 .sim-odds-hint-actions {
   display: flex;
-  gap: 6px;
+  gap: 0;
+  flex: 0 0 auto;
 }
-.sim-odds-hint-actions button {
-  min-height: 44px;
-  padding: 0 12px;
+.sim-odds-hint-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
   color: var(--sim-text);
   background: transparent;
   border: 1px solid var(--sim-border);
   border-radius: 8px;
   font: inherit;
+  font-size: 1.1rem;
   cursor: pointer;
 }
 @media (prefers-reduced-motion: no-preference) {

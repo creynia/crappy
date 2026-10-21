@@ -16,6 +16,8 @@ export interface StrategyRow {
   lossPerHour: number;
   rollsPerDollar: number;
   avgAction: number;
+  /** the numbers describe a starting or steady layout, not a long run (see StrategyMetrics.approximate) */
+  approximate: boolean;
 }
 
 const LENS_LABEL: Record<StrategyLens, string> = {
@@ -53,6 +55,7 @@ export function buildStrategyRows(
         lossPerHour: m.expectedLossPerRoll * rollsPerHour,
         rollsPerDollar: m.rollsPerDollar,
         avgAction: m.avgAction,
+        approximate: m.approximate === true,
       };
     });
 }
@@ -106,6 +109,8 @@ export function StrategyTable(props: StrategyTableProps) {
   const per1 = (r: number) => (Number.isFinite(r) ? r.toFixed(1) : 'no cost');
   const onTable = (d: number) => fmtMoney(Math.round(d * 100), { exact: true });
   const cell = (r: StrategyRow, k: TableSortKey): string =>
+    (r.approximate && k !== 'name' ? '≈ ' : '') + rawCell(r, k);
+  const rawCell = (r: StrategyRow, k: TableSortKey): string =>
     k === 'edge'
       ? pct(r.edge)
       : k === 'lossPerRoll'
@@ -150,7 +155,10 @@ export function StrategyTable(props: StrategyTableProps) {
               <tr key={r.id} data-strategy={r.id}>
                 <th scope="row" data-label="Strategy">
                   {r.name}
-                  <span class="sim-st-lens">{LENS_LABEL[r.lens]}</span>
+                  <span class="sim-st-lens">
+                    {LENS_LABEL[r.lens]}
+                    {r.approximate ? ' · ≈ starting layout' : ''}
+                  </span>
                 </th>
                 {COLUMNS.slice(1).map((c) => (
                   <td key={c.key} data-label={c.label}>
@@ -172,6 +180,13 @@ export function StrategyTable(props: StrategyTableProps) {
           </tbody>
         </table>
       </div>
+      {rows.some((r) => r.approximate) ? (
+        <p class="sim-ar-desc" data-testid="strategy-table-approx">
+          ≈ marks plans that change their bets as they play, or that this table prices as a steady
+          layout: their numbers are an estimate for the starting layout, so do not rank them against
+          the exact rows.
+        </p>
+      ) : null}
     </div>
   );
 }

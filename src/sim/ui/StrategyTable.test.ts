@@ -18,4 +18,16 @@ describe('strategy table rows', () => {
     const names = sortRows(rows, 'name', 'asc').map((r) => r.name);
     expect(names).toEqual(names.slice().sort((a, b) => a.localeCompare(b)));
   });
+  it('flags approximate presets so they are not ranked as exact', () => {
+    const approx = rows.filter((r) => r.approximate).map((r) => r.id);
+    expect(approx).toEqual(
+      expect.arrayContaining([
+        'martingale-pass',
+        'dont-come-molly',
+        'place-6-8-press',
+        'inside-regress',
+      ]),
+    );
+    expect(rows.find((r) => r.id === 'pass-max-odds')!.approximate).toBe(false);
+  });
 });

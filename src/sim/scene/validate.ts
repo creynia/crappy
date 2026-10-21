@@ -1,6 +1,7 @@
 import { isBetTypeId, isDicePair } from '../engine/bets';
 import { createGame } from '../engine/game';
 import { RULE_PRESETS, resolveRules } from '../engine/rules';
+import { tokenProblems } from './tokens';
 import { listStrategies } from '../strategy/presets';
 import { answeredRequirements } from './conditions';
 import type { SceneConfig } from './types';
@@ -447,6 +448,7 @@ export function validateScene(
         'compareMode',
         'compare',
         'table',
+        'chart',
         'stopWin',
         'stopLoss',
         'bankroll',
@@ -479,6 +481,8 @@ export function validateScene(
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
       if (a.table !== undefined) c.bool('autoRoll.table', a.table);
+      if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
+        c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       // The panel offers these amounts as chips, so a scene can only pick one of them.
       const stopAmounts = [5000, 10_000, 25_000];
       for (const [k, v] of [
@@ -554,6 +558,13 @@ export function validateScene(
         c.str(`${p}.text`, st.text);
         if (st.hint !== undefined) c.str(`${p}.hint`, st.hint);
         if (st.math !== undefined) c.str(`${p}.math`, st.math);
+        for (const [field, value] of [
+          ['text', st.text],
+          ['hint', st.hint],
+          ['math', st.math],
+        ] as const)
+          if (typeof value === 'string')
+            for (const msg of tokenProblems(value)) c.err(`${p}.${field}`, msg);
         if (st.forcedDice !== undefined) c.dice(`${p}.forcedDice`, st.forcedDice);
         if (st.allowedBets !== undefined) c.betList(`${p}.allowedBets`, st.allowedBets);
         if (st.allowedActions !== undefined) c.actions(`${p}.allowedActions`, st.allowedActions);

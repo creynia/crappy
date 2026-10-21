@@ -1,5 +1,12 @@
-import { applyAction, createGame, equity, resolveRules } from '../engine';
-import type { GameState } from '../engine';
+import {
+  CRAPLESS_POINTS,
+  applyAction,
+  createGame,
+  equity,
+  pointsFor,
+  resolveRules,
+} from '../engine';
+import type { GameState, PointTable } from '../engine';
 import { tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
@@ -266,11 +273,8 @@ export async function simulateSweep(
   for (let i = 0; i < n; i++) {
     const m = cfg.oddsMultiples[i]!;
     let rules = base;
-    if (
-      m !== 'max' &&
-      [...Object.values(base.maxOdds), ...Object.values(base.maxLayOdds)].some((cap) => cap < m)
-    ) {
-      const uniform = { 4: m, 5: m, 6: m, 8: m, 9: m, 10: m };
+    if (m !== 'max' && pointsFor(base).some((p) => base.maxOdds[p] < m || base.maxLayOdds[p] < m)) {
+      const uniform = Object.fromEntries(CRAPLESS_POINTS.map((p) => [p, m])) as PointTable;
       rules = resolveRules({ ...base, maxOdds: uniform, maxLayOdds: uniform });
     }
     const spec =

@@ -152,7 +152,7 @@ export function lineOddsEdge(
 ): number {
   if (multiple === 'max') return flatEdge / (1 + oddsMultiplePerDecision(rules, lay));
   let t = 0;
-  for (const n of [4, 5, 6, 8, 9, 10] as PointNumber[]) {
+  for (const n of pointsFor(rules)) {
     const cap = (lay ? rules.maxLayOdds : rules.maxOdds)[n];
     t += (POINT_WAYS[n] / 36) * Math.min(multiple, cap);
   }

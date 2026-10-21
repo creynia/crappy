@@ -314,7 +314,7 @@ export function rollEffectGrid(bet: BetLike, ctx: BetCtx): RollEffect[] {
         return working &&
           LINES.has(bet.type) &&
           ctx.phase === 'come-out' &&
-          (POINT_NUMBERS as readonly number[]).includes(dice[0] + dice[1])
+          (pointsFor(ctx.rules) as readonly number[]).includes(dice[0] + dice[1])
           ? 'travel'
           : 'none';
     }

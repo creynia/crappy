@@ -172,6 +172,13 @@ export function Simulator(props: SimulatorInternalProps) {
     baseSpeed: () => settingsRef.current.speed,
   });
   const watching = watcher.watch !== null;
+  // leaving a replay removes the controls that had focus: hand it to Roll
+  const wasWatching = useRef(false);
+  useEffect(() => {
+    if (wasWatching.current && !watching)
+      rootRef.current?.querySelector<HTMLElement>('.sim-roll:not(:disabled)')?.focus();
+    wasWatching.current = watching;
+  }, [watching]);
 
   const { game: liveGame, rt } = core;
   const game = anim.shown ?? liveGame;

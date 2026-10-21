@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
@@ -638,6 +638,12 @@ describe('share link RNG position across Reset and reload (I071 review)', () => 
 });
 
 describe('watch mode accessibility', () => {
+  // earlier suites leave simulators mounted (a leaked open panel sheet swallows Escape at the document
+  // level) and a share-link hash behind: start clean
+  beforeEach(() => {
+    cleanup();
+    location.hash = '';
+  });
   const startWatch = async (initialSettings: Record<string, unknown>) => {
     const r = render(<Simulator initialSettings={initialSettings} />);
     fireEvent.click(screen.getByRole('button', { name: 'Auto-roll' }));
@@ -675,9 +681,18 @@ describe('watch mode accessibility', () => {
   it('Escape exits watch mode', async () => {
     const { container } = await startWatch(instant);
     fireEvent.click(screen.getByRole('button', { name: 'Watch on the table' }));
-    await waitFor(() => screen.getByTestId('watch-controls'));
-    fireEvent.keyDown(container.querySelector('[data-testid="simulator"]')!, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByTestId('watch-controls')).toBeNull());
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')).not.toBeNull(),
+    );
+    // starting the replay hands focus to Play/Pause (the Watch button is gone)
+    expect(document.activeElement).toBe(container.querySelector('[data-testid="watch-toggle"]'));
+    // the real keyboard path: Escape pressed on the focused control bubbles up to the simulator
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="watch-controls"]')).toBeNull(),
+    );
+    // and leaving it hands focus to Roll
+    await waitFor(() => expect(document.activeElement?.classList.contains('sim-roll')).toBe(true));
   });
 
   it('reduced motion makes watch-mode rolls instant at any speed (no animation in flight)', async () => {

@@ -19,7 +19,11 @@ export function WatchControls(p: WatchControlsProps) {
   const { watch } = p;
   const root = useRef<HTMLElement>(null);
   // bring the controls into view when the replay starts (the page was scrolled to the auto-roll panel)
-  useEffect(() => root.current?.scrollIntoView?.({ block: 'nearest' }), []);
+  // and give keyboard focus to Play/Pause: the Watch button that started the replay is gone
+  useEffect(() => {
+    root.current?.scrollIntoView?.({ block: 'nearest' });
+    root.current?.querySelector<HTMLElement>('[data-testid="watch-toggle"]')?.focus();
+  }, []);
   const total = watch.log.length;
   const finished = watch.index >= total;
   return (

@@ -1,6 +1,6 @@
 import { BET_TYPES } from '../engine/bets';
 import { isWorking } from '../engine/working';
-import type { BetTypeId, Cents, GameState } from '../engine/types';
+import type { BetTypeId, Cents, Dice, GameState } from '../engine/types';
 import { distributionFor, isLineLike, isOddsType, toOutcomes } from './outcomes';
 import { add, div, frac, mul, neg, sub, toNumber, ZERO, ONE, type Fraction } from './fraction';
 import type { BetCtx, BetLike, EdgeInfo, Outcome } from './types';
@@ -40,9 +40,9 @@ export function edgeOfBet(bet: BetLike, ctx: BetCtx): EdgeInfo {
   };
 }
 
-/** Edge of a NEW bet in ctx. */
-export function betEdge(type: BetTypeId, amount: Cents, ctx: BetCtx): EdgeInfo {
-  return edgeOfBet({ type, amount, point: null }, ctx);
+/** Edge of a NEW bet in ctx. `hop` is required for a hop bet (its dice pair). */
+export function betEdge(type: BetTypeId, amount: Cents, ctx: BetCtx, hop?: Dice): EdgeInfo {
+  return edgeOfBet({ type, amount, point: null, ...(hop ? { hop } : {}) }, ctx);
 }
 
 const COME_OUT: Pick<BetCtx, 'phase' | 'point'> = { phase: 'come-out', point: null };

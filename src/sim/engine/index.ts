@@ -11,6 +11,14 @@ export {
   nominalVig,
   upfrontVig,
   isToggleable,
+  HOP_PAYS,
+  ALL_HOPS,
+  isDicePair,
+  normalizeHop,
+  sameHop,
+  isHardHop,
+  hopText,
+  hopLabel,
 } from './bets';
 export { validateAction, legalBetTypes, maxOddsAmount, suggestAmount } from './validate';
 export { resolveRoll } from './resolve';

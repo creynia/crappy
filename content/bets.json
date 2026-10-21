@@ -408,5 +408,14 @@
     "summary": "A one-roll bet on the Horn plus Any 7.",
     "howItWorks": "Bet in multiples of 5: the Horn plus a unit on Any 7. A 7 is a push because the any-7 unit covers the others; 2, 3, 11 and 12 pay as in the Horn, less the Any 7 unit (12 nets +$26 on $5).",
     "lessonId": "sucker-bets"
+  },
+  {
+    "id": "hop",
+    "name": "Hop",
+    "shortName": "Hop",
+    "group": "prop",
+    "summary": "A one-roll bet that the next roll is one exact pair of dice, such as 2-4.",
+    "howItWorks": "Pick a pair. An easy hop (two different dice, such as 2-4) wins on 2-4 or 4-2, 2 of 36 rolls, and pays 15:1: house edge 11.11%. A hard hop (a pair, such as 3-3) wins on 1 of 36 rolls and pays 30:1: house edge 13.89%. Everything else loses.",
+    "lessonId": "sucker-bets"
   }
 ]

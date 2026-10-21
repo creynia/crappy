@@ -13,7 +13,8 @@ export interface BetCtx {
   point: PointNumber | null;
   rules: TableRules;
 }
-export type BetLike = Pick<Bet, 'type' | 'amount' | 'point'>;
+/** `hop` is the dice pair of a hop bet (I035); absent for every other bet. */
+export type BetLike = Pick<Bet, 'type' | 'amount' | 'point' | 'hop'>;
 
 export interface EdgeInfo {
   perResolved: Fraction; // -EV / amount, pushes count as decisions

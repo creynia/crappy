@@ -8,6 +8,7 @@ import {
   edgeFunnelSigma,
   simulateCompare,
   simulateMany,
+  simulateSweep,
   simulateManyCompare,
   simulateSession,
   strategyMetrics,
@@ -320,5 +321,82 @@ describe('edge convergence (I010)', () => {
       if (Math.abs(ratio + edge) <= (2 * sigma) / Math.sqrt(3000)) inside++;
     }
     expect(inside / N).toBeGreaterThan(0.85);
+  });
+});
+
+describe('simulateMany stops', () => {
+  const base = {
+    strategy: spec('pass-max-odds', { oddsMultiple: 2, unit: 1000 }),
+    rolls: 100,
+    seed: 7,
+    bankroll: 50_000,
+  };
+  const perRoll = (r: { meanExpectedLoss: number; meanRollsPlayed: number }) =>
+    r.meanExpectedLoss / r.meanRollsPlayed;
+
+  it('stops off: no stop endings and finals match a run without the stop keys', async () => {
+    const a = await simulateMany(base, 20, { sliceMs: 0 });
+    const b = await simulateMany({ ...base, stopWin: undefined, stopLoss: undefined }, 20, {
+      sliceMs: 0,
+    });
+    expect(a.stopWinRate).toBe(0);
+    expect(a.stopLossRate).toBe(0);
+    expect(Array.from(a.finals)).toEqual(Array.from(b.finals));
+    expect(a.meanRollsPlayed).toBeLessThanOrEqual(100);
+  });
+
+  it('a stop cuts the rolls played but leaves the expected loss per roll about the same', async () => {
+    const plain = await simulateMany(base, 200, { sliceMs: 0 });
+    const stopped = await simulateMany({ ...base, stopWin: 5000 }, 200, { sliceMs: 0 });
+    expect(stopped.stopWinRate).toBeGreaterThan(0);
+    expect(stopped.meanRollsPlayed).toBeLessThan(plain.meanRollsPlayed);
+    expect(Math.abs(perRoll(stopped) - perRoll(plain)) / perRoll(plain)).toBeLessThan(0.1);
+  });
+});
+
+describe('simulateSweep', () => {
+  const cfg = {
+    strategy: 'pass-max-odds' as const,
+    unit: 1000,
+    oddsMultiples: [0, 1, 2, 'max', 10, 100] as (number | 'max')[],
+    rolls: 100,
+    seed: 1,
+    bankroll: 10_000_000,
+  };
+  it('edge falls with odds, expected loss is constant, variance rises', async () => {
+    const rows = await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    const edges = rows.map((r) => +(r.edgeOnAction * 100).toFixed(3));
+    expect(edges).toEqual([1.414, 0.848, 0.606, 0.374, 0.184, 0.021]);
+    for (const r of rows)
+      expect(Math.abs(r.expectedLossCents - rows[0]!.expectedLossCents)).toBeLessThan(1);
+    for (let i = 1; i < rows.length; i++)
+      expect(rows[i]!.sdFinal).toBeGreaterThan(rows[i - 1]!.sdFinal);
+  });
+  it('odds add no expected loss per roll (analytic, independent of the sweep)', () => {
+    const rules = resolveRules('odds-100x');
+    const flat = strategyMetrics({ id: 'pass-max-odds', unit: 1000, oddsMultiple: 0 }, rules);
+    for (const m of [1, 2, 10, 100]) {
+      const x = strategyMetrics({ id: 'pass-max-odds', unit: 1000, oddsMultiple: m }, rules);
+      expect(x.expectedLossPerRoll).toBeCloseTo(flat.expectedLossPerRoll, 6);
+    }
+  });
+  it('fixed-seed regression pin (seed 1): more sessions finish ahead with odds than flat only', async () => {
+    // Not a general law: P(ahead) is not monotonic in odds for every seed; this pins seed 1 only.
+    const rows = await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    for (const r of rows.slice(1)) expect(r.probAhead).toBeGreaterThan(rows[0]!.probAhead);
+  });
+  it('the dont-pass sweep raises the lay cap too, so 10x really lays 10x', async () => {
+    const rows = await simulateSweep(
+      { ...cfg, strategy: 'dont-pass-max-lay', oddsMultiples: [6, 10] },
+      20,
+      { schedule: (fn) => fn() },
+    );
+    expect(rows[1]!.edgeOnAction).toBeLessThan(rows[0]!.edgeOnAction);
+    expect(rows[1]!.sdFinal).toBeGreaterThan(rows[0]!.sdFinal);
+  });
+  it('benchmark: 6 x 100 sessions x 100 rolls finishes (loose bound)', async () => {
+    const t = performance.now();
+    await simulateSweep(cfg, 100, { schedule: (fn) => fn() });
+    expect(performance.now() - t).toBeLessThan(20_000);
   });
 });

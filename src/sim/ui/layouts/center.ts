@@ -3,8 +3,10 @@ import type { Rect, RegionDef, RegionId, TableLayout } from './types';
 
 function r(id: RegionId, rect: Rect, label: string, sublabel: string, bet: BetTypeId): RegionDef {
   // Chips sit to the right of the printed title so the cell stays readable with a bet on it.
-  const fx = rect.w > 700 ? 0.88 : id.startsWith('hard') ? 0.86 : rect.w < 250 ? 0.76 : 0.82;
-  const fy = rect.w < 250 ? 0.6 : 0.5;
+  const bonus = id === 'fire' || id === 'all' || id === 'tall' || id === 'small';
+  const fx =
+    rect.w > 700 ? 0.88 : id.startsWith('hard') || bonus ? 0.86 : rect.w < 250 ? 0.76 : 0.82;
+  const fy = rect.w < 250 ? 0.6 : bonus ? 0.42 : 0.5;
   return {
     id,
     rect,
@@ -30,12 +32,23 @@ const regions: RegionDef[] = [
   r('horn', { x: 20, y: 660, w: 280, h: 105 }, 'Horn', '2, 3, 11, 12', 'horn'),
   r('c-e', { x: 310, y: 660, w: 280, h: 105 }, 'C and E', 'Craps and eleven', 'c-e'),
   r('world', { x: 600, y: 660, w: 280, h: 105 }, 'World', 'Horn plus any 7', 'world'),
+  // Bonus side-bet rail (I037): multi-hand bets with progress pips; placed before a new shooter.
+  r(
+    'fire',
+    { x: 20, y: 790, w: 425, h: 120 },
+    'Fire Bet',
+    '4, 5, 6 points: 24, 249, 999 to 1',
+    'fire',
+  ),
+  r('all', { x: 455, y: 790, w: 425, h: 120 }, 'All', '2 to 12 before a 7: 175 to 1', 'all'),
+  r('small', { x: 20, y: 920, w: 425, h: 120 }, 'Small', '2 to 6 before a 7: 34 to 1', 'small'),
+  r('tall', { x: 455, y: 920, w: 425, h: 120 }, 'Tall', '8 to 12 before a 7: 34 to 1', 'tall'),
 ];
 
 const zero = { x: 0, y: 0 };
 export const centerLayout: TableLayout = {
   id: 'center',
-  viewBox: { w: 900, h: 785 },
+  viewBox: { w: 900, h: 1060 },
   regions,
   puck: { 4: zero, 5: zero, 6: zero, 8: zero, 9: zero, 10: zero, off: zero },
   puckRadius: 0,

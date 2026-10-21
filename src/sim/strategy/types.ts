@@ -55,7 +55,13 @@ export interface SessionConfig {
   bankroll: Cents;
   rules?: Partial<TableRules> | RulePresetId;
   stopAtBust?: boolean; // default true
+  /**
+   * Stop when equity is at least this far above the starting bankroll (cents). Checked after each roll;
+   * equity counts bets at face value; bets left up stay on the table. A stop that is reached before a
+   * bust ends the session as stop-win; a later bust never happens.
+   */
   stopWin?: Cents;
+  /** Stop when equity is at least this far below the starting bankroll (cents). Same rules as stopWin. */
   stopLoss?: Cents;
 }
 export interface SessionResult {
@@ -77,6 +83,8 @@ export interface SessionResult {
   pointsMade: number;
   sevenOuts: number;
   longestHand: number;
+  /** Bonus side-bet payouts (I037): one entry per bet type and paytable level, in first-hit order. */
+  bonusHits?: { type: BetTypeId; pays: number; count: number }[];
 }
 export interface ManyResult {
   sessions: number;
@@ -91,6 +99,13 @@ export interface ManyResult {
   finals: Int32Array;
   meanFinal: number;
   probAhead: number;
+  /** Share of sessions that ended by reaching SessionConfig.stopWin / stopLoss. */
+  stopWinRate: number;
+  stopLossRate: number;
+  /** Mean rolls actually played per session (fewer than the requested rolls when a stop or bust ends it). */
+  meanRollsPlayed: number;
+  /** Mean analytic expected loss per session (cents), summed over the rolls actually played. */
+  meanExpectedLoss: number;
 }
 export interface ManyOptions {
   onProgress?(p: number): void;
@@ -104,4 +119,28 @@ export interface StrategyMetrics {
   edgeOnAction: number;
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
+}
+
+/** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */
+export type SweepMultiple = number | 'max';
+export interface SweepConfig {
+  strategy: StrategyId;
+  unit: Cents;
+  oddsMultiples: SweepMultiple[];
+  rolls: number;
+  seed: number;
+  bankroll: Cents;
+  rules?: Partial<TableRules> | RulePresetId;
+}
+export interface SweepRow {
+  multiple: SweepMultiple;
+  /** Analytic edge on total action, as a fraction (0.0141 = 1.41%). */
+  edgeOnAction: number;
+  /** Analytic expected loss over `rolls` rolls, in cents. */
+  expectedLossCents: number;
+  /** Standard deviation of the final result (cents) over the sessions. */
+  sdFinal: number;
+  probAhead: number;
+  bustRate: number;
+  meanFinal: number;
 }

@@ -1,5 +1,5 @@
 import { BET_TYPES } from '../engine/bets';
-import { createGame } from '../engine/game';
+import { createGame, equity } from '../engine/game';
 import { findMergeTarget, findParent, maxOddsAmount } from '../engine/validate';
 import type {
   Action,
@@ -14,6 +14,7 @@ import type {
 import type { BetInit } from '../engine/game';
 import type {
   ActionMatcher,
+  BetResult,
   Condition,
   SceneConfig,
   SceneInput,
@@ -180,9 +181,16 @@ function eventBetType(e: GameEvent): BetTypeId | undefined {
   return 'betType' in e ? e.betType : undefined;
 }
 
+const RESOLVED_EVENT: Record<BetResult, GameEvent['type']> = {
+  won: 'bet-won',
+  lost: 'bet-lost',
+  pushed: 'bet-pushed',
+};
+
 function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
   if ('all' in c) return c.all.every((x) => evaluate(x, rt, game));
   if ('any' in c) return c.any.some((x) => evaluate(x, rt, game));
+  if ('not' in c) return !evaluate(c.not, rt, game);
   if ('action' in c) return (rt.counters[actKey(c.action)] ?? 0) >= (c.count ?? 1);
   if ('event' in c) return (rt.counters[evKey(c.event, c.betType)] ?? 0) >= (c.count ?? 1);
   if ('rolls' in c) return game.rollCount - rt.stepStartRoll >= c.rolls;
@@ -190,10 +198,20 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
   if ('point' in c) return game.point === c.point;
   if ('betOnTable' in c)
     return game.bets.some(
-      (b) => b.type === c.betOnTable.type && b.amount >= (c.betOnTable.minAmount ?? 1),
+      (b) =>
+        b.type === c.betOnTable.type &&
+        b.amount >= (c.betOnTable.minAmount ?? 1) &&
+        (c.betOnTable.point === undefined || b.point === c.betOnTable.point),
     );
+  if ('betResolved' in c) {
+    const { type, result } = c.betResolved;
+    const outcomes: BetResult[] = result ? [result] : ['won', 'lost', 'pushed'];
+    return outcomes.some((r) => (rt.counters[evKey(RESOLVED_EVENT[r], type)] ?? 0) > 0);
+  }
   if ('bankrollAtLeast' in c) return game.bankroll >= c.bankrollAtLeast;
   if ('bankrollAtMost' in c) return game.bankroll <= c.bankrollAtMost;
+  if ('equityAtLeast' in c) return equity(game) >= c.equityAtLeast;
+  if ('equityAtMost' in c) return equity(game) <= c.equityAtMost;
   if ('previewed' in c) return (rt.counters[`p:${c.previewed}`] ?? 0) > 0;
   if ('autoRollCompleted' in c) {
     const om = c.autoRollCompleted.oddsMultiple;
@@ -208,6 +226,7 @@ function evaluate(c: Condition, rt: SceneRuntime, game: GameState): boolean {
 function matchersOf(c: Condition, out: ActionMatcher[] = []): ActionMatcher[] {
   if ('all' in c) c.all.forEach((x) => matchersOf(x, out));
   else if ('any' in c) c.any.forEach((x) => matchersOf(x, out));
+  else if ('not' in c) matchersOf(c.not, out);
   else if ('action' in c) out.push(c.action);
   return out;
 }
@@ -216,14 +235,18 @@ function matchersOf(c: Condition, out: ActionMatcher[] = []): ActionMatcher[] {
 export function conditionNeedsRoll(c: Condition): boolean {
   if ('all' in c) return c.all.some(conditionNeedsRoll);
   if ('any' in c) return c.any.some(conditionNeedsRoll);
+  if ('not' in c) return conditionNeedsRoll(c.not);
   if ('action' in c) return c.action.type === 'roll';
   return (
     'rolls' in c ||
     'event' in c ||
     'phase' in c ||
     'point' in c ||
+    'betResolved' in c ||
     'bankrollAtLeast' in c ||
-    'bankrollAtMost' in c
+    'bankrollAtMost' in c ||
+    'equityAtLeast' in c ||
+    'equityAtMost' in c
   );
 }
 

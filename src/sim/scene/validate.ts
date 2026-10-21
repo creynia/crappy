@@ -8,6 +8,7 @@ type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const isInt = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x);
 const POINTS = [4, 5, 6, 8, 9, 10];
+const BET_RESULTS = ['won', 'lost', 'pushed'];
 const ACTION_TYPES = ['place-bet', 'set-amount', 'remove-bet', 'set-working', 'roll'];
 const EVENT_TYPES = [
   'bet-placed',
@@ -163,14 +164,29 @@ class Ctx {
         break;
       case 'betOnTable':
         if (!isObj(val)) return this.err(`${path}.betOnTable`, 'must be an object');
-        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount']);
+        this.keys(`${path}.betOnTable`, val, ['type', 'minAmount', 'point']);
         this.bet(`${path}.betOnTable.type`, val.type);
         if (val.minAmount !== undefined)
           this.cents(`${path}.betOnTable.minAmount`, val.minAmount, { min: 1 });
+        if (val.point !== undefined) this.point(`${path}.betOnTable.point`, val.point);
+        break;
+      case 'betResolved':
+        if (!isObj(val)) return this.err(`${path}.betResolved`, 'must be an object');
+        this.keys(`${path}.betResolved`, val, ['type', 'result']);
+        this.bet(`${path}.betResolved.type`, val.type);
+        if (val.result !== undefined && !BET_RESULTS.includes(val.result as string))
+          this.err(`${path}.betResolved.result`, 'must be "won", "lost" or "pushed"');
+        break;
+      case 'not':
+        this.condition(`${path}.not`, val, autoRoll);
         break;
       case 'bankrollAtLeast':
       case 'bankrollAtMost':
         this.cents(`${path}.${k}`, val);
+        break;
+      case 'equityAtLeast':
+      case 'equityAtMost':
+        if (!isInt(val)) this.err(`${path}.${k}`, 'must be an integer number of cents');
         break;
       case 'previewed':
         this.bet(`${path}.previewed`, val);

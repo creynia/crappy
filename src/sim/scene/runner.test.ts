@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction } from '../engine';
 import { gateAction, initScene, observe, rollLock, validateScene, type SceneConfig } from './index';
+import type { Dice } from '../engine/types';
+import type { Condition } from './types';
 
 const base: SceneConfig = {
   id: 's',
@@ -96,5 +98,176 @@ describe('scene runner', () => {
     expect(mk({ strategy: 'pass-max-odds', oddsMultiples: [0, 1, 'max', 100] }).ok).toBe(true);
     const bad = mk({ strategy: 'nope', oddsMultiples: [0, 'big'] });
     expect(bad.ok).toBe(false);
+  });
+});
+
+// ---- richer conditions (I018) ----
+
+type Act = Parameters<typeof applyAction>[1];
+
+/** Plays actions through the runner; returns the step completed by each action (undefined if none). */
+function play(scene: SceneConfig, actions: Act[]) {
+  let { game, runtime } = initScene(scene);
+  const completed: (string | undefined)[] = [];
+  for (const action of actions) {
+    const res = applyAction(game, action);
+    if (!res.ok) throw new Error(`illegal ${action.type}`);
+    const r = observe(scene, runtime, res.state, { kind: 'action', action, events: res.events });
+    completed.push(r.completedStep);
+    game = r.game;
+    runtime = r.runtime;
+  }
+  return completed;
+}
+
+const place = (betType: string, amount: number): Act =>
+  ({ type: 'place-bet', betType, amount }) as Act;
+
+describe('richer step conditions', () => {
+  const comeScene = (completeWhen: Condition): SceneConfig => ({
+    id: 'come',
+    version: 1,
+    bankroll: 10000,
+    phase: 'point',
+    point: 8,
+    forcedDice: [[3, 3]],
+    allowedBets: ['come'],
+    steps: [{ id: 'come', text: 'come', completeWhen }],
+  });
+
+  it('betOnTable with point: a come bet travelled to 6 completes, to 5 does not', () => {
+    expect(
+      play(comeScene({ betOnTable: { type: 'come', point: 6 } }), [
+        place('come', 500),
+        { type: 'roll' },
+      ]),
+    ).toEqual([undefined, 'come']);
+    expect(
+      play(comeScene({ betOnTable: { type: 'come', point: 5 } }), [
+        place('come', 500),
+        { type: 'roll' },
+      ]),
+    ).toEqual([undefined, undefined]);
+  });
+
+  it('betResolved: won completes on the win, lost does not', () => {
+    const passScene = (result: 'won' | 'lost', dice: [number, number]): SceneConfig => ({
+      id: 'pass',
+      version: 1,
+      bankroll: 10000,
+      phase: 'come-out',
+      forcedDice: [dice as Dice],
+      allowedBets: ['pass-line'],
+      steps: [
+        { id: 'bet', text: 'bet', completeWhen: { betOnTable: { type: 'pass-line' } } },
+        { id: 'res', text: 'res', completeWhen: { betResolved: { type: 'pass-line', result } } },
+      ],
+    });
+    expect(play(passScene('won', [3, 4]), [place('pass-line', 500), { type: 'roll' }])).toEqual([
+      'bet',
+      'res',
+    ]);
+    expect(play(passScene('lost', [3, 4]), [place('pass-line', 500), { type: 'roll' }])).toEqual([
+      'bet',
+      undefined,
+    ]);
+    // craps (2) loses the pass line: 'lost' completes, and an unqualified betResolved completes too
+    expect(play(passScene('lost', [1, 1]), [place('pass-line', 500), { type: 'roll' }])).toEqual([
+      'bet',
+      'res',
+    ]);
+  });
+
+  it('equity bounds nest inside all and not; a losing roll drops equity to 9500', () => {
+    // equity = bankroll + bets. Placing a bet does not change it, and a condition already true at
+    // step start completes at once, so the equity step waits for the craps roll that loses $5.
+    const scene: SceneConfig = {
+      id: 'eq',
+      version: 1,
+      bankroll: 10000,
+      phase: 'come-out',
+      forcedDice: [[1, 1]],
+      allowedBets: ['pass-line'],
+      steps: [
+        { id: 'bet', text: 'bet', completeWhen: { betOnTable: { type: 'pass-line' } } },
+        {
+          id: 'lost',
+          text: 'lost',
+          completeWhen: {
+            all: [{ equityAtMost: 9500 }, { not: { equityAtLeast: 9501 } }],
+          },
+        },
+      ],
+    };
+    expect(play(scene, [place('pass-line', 500), { type: 'roll' }])).toEqual(['bet', 'lost']);
+    // before the roll the same step is not complete: equity is still $100
+    expect(play(scene, [place('pass-line', 500)])).toEqual(['bet']);
+    const anyScene: SceneConfig = {
+      ...scene,
+      steps: [
+        scene.steps![0]!,
+        {
+          id: 'any',
+          text: 'any',
+          completeWhen: { any: [{ equityAtLeast: 10001 }, { equityAtMost: 9500 }] },
+        },
+      ],
+    };
+    expect(play(anyScene, [place('pass-line', 500), { type: 'roll' }])).toEqual(['bet', 'any']);
+  });
+
+  it('not inverts a bet condition inside all', () => {
+    const scene: SceneConfig = {
+      id: 'not',
+      version: 1,
+      bankroll: 10000,
+      phase: 'come-out',
+      allowedBets: ['pass-line', 'dont-pass'],
+      steps: [
+        {
+          id: 'a',
+          text: 'a',
+          completeWhen: {
+            all: [
+              { betOnTable: { type: 'dont-pass' } },
+              { not: { betOnTable: { type: 'pass-line' } } },
+            ],
+          },
+        },
+      ],
+    };
+    expect(play(scene, [place('dont-pass', 500)])).toEqual(['a']);
+    expect(play(scene, [place('pass-line', 500), place('dont-pass', 500)])).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
+describe('validate richer conditions', () => {
+  const scene = (completeWhen: unknown) => ({
+    id: 'v',
+    version: 1,
+    allowedBets: ['come'],
+    steps: [{ id: 's', text: 's', completeWhen }],
+  });
+
+  it('accepts the new condition kinds', () => {
+    expect(validateScene(scene({ betOnTable: { type: 'come', point: 6 } })).ok).toBe(true);
+    expect(validateScene(scene({ betResolved: { type: 'come', result: 'won' } })).ok).toBe(true);
+    expect(validateScene(scene({ equityAtLeast: -500 })).ok).toBe(true);
+    expect(validateScene(scene({ not: { equityAtMost: 0 } })).ok).toBe(true);
+  });
+
+  it('rejects bad values with a path', () => {
+    const r = validateScene(scene({ betOnTable: { type: 'come', point: 7 } }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join('\n')).toContain('betOnTable.point');
+    const r2 = validateScene(scene({ betResolved: { type: 'come', result: 'push' } }));
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.errors.join('\n')).toContain('betResolved.result');
+    const r3 = validateScene(scene({ not: { equityAtLeast: 1.5 } }));
+    expect(r3.ok).toBe(false);
+    if (!r3.ok) expect(r3.errors.join('\n')).toContain('not.equityAtLeast');
   });
 });

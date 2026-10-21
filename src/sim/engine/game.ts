@@ -53,6 +53,8 @@ export interface ApplyOptions {
   expectedLossFn?: (s: GameState) => number;
   /** Expected loss (cents) per bet type for the roll about to happen. */
   expectedLossByTypeFn?: (s: GameState) => Partial<Record<BetTypeId, number>>;
+  /** Variance (cents^2) of what the roll about to happen adds to the session result, given the pre-roll state; summed into stats.variance. */
+  varianceFn?: (s: GameState) => number;
 }
 
 function addBet(
@@ -111,7 +113,15 @@ export function createGame(opts: CreateGameOptions = {}): GameState {
     seed,
     forcedDice: [...(opts.forcedDice ?? [])],
     nextBetId: 1,
-    stats: { totalWagered: 0, totalWon: 0, totalLost: 0, totalVig: 0, expectedLoss: 0, byType: {} },
+    stats: {
+      totalWagered: 0,
+      totalWon: 0,
+      totalLost: 0,
+      totalVig: 0,
+      expectedLoss: 0,
+      variance: 0,
+      byType: {},
+    },
   };
   const refs = new Map<string, string>();
   for (const init of opts.bets ?? []) {
@@ -297,6 +307,10 @@ export function applyAction(state: GameState, action: Action, opts?: ApplyOption
       const byTypeLoss = opts?.expectedLossByTypeFn ? opts.expectedLossByTypeFn(state) : null;
       const r = resolveRoll(s, dice, forced);
       let out = r.state;
+      if (opts?.varianceFn) {
+        const v = opts.varianceFn(state);
+        if (v !== 0) out = { ...out, stats: { ...out.stats, variance: out.stats.variance + v } };
+      }
       if (loss || byTypeLoss) {
         const byType = { ...out.stats.byType };
         if (byTypeLoss) {

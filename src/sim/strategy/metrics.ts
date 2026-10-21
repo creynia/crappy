@@ -218,7 +218,15 @@ function steadyState(
     seed: 0,
     forcedDice: [],
     nextBetId: 1,
-    stats: { totalWagered: 0, totalWon: 0, totalLost: 0, totalVig: 0, expectedLoss: 0, byType: {} },
+    stats: {
+      totalWagered: 0,
+      totalWon: 0,
+      totalLost: 0,
+      totalVig: 0,
+      expectedLoss: 0,
+      variance: 0,
+      byType: {},
+    },
   } as GameState;
   s = materialize(s, impl.decide(s, spec));
   // bets the strategy puts up before the point is set: they are up on come-out rolls too

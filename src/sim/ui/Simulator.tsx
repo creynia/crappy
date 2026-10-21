@@ -19,6 +19,7 @@ import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
+import { PanelSheet, type PanelId, type PanelTab } from './PanelSheet';
 import {
   buildShareUrl,
   describeSkipped,
@@ -108,10 +109,17 @@ export function Simulator(props: SimulatorInternalProps) {
   const autoSeq = useRef(boot.log?.length ?? 0);
   const rootRef = useRef<HTMLDivElement>(null);
   const requestReveal = usePanelReveal(panels, rootRef);
+  // The sandbox shows its panels in one sheet, one at a time; embedded scenes keep them inline.
+  const sheetPanels = sandbox;
+  const CLOSED: Panels = { auto: false, session: false, log: false, menu: false };
   const togglePanel = (name: keyof Panels) => {
     requestReveal(name);
-    setPanels((p) => ({ ...p, [name]: !p[name] }));
+    setPanels((p) => (sheetPanels ? { ...CLOSED, [name]: !p[name] } : { ...p, [name]: !p[name] }));
   };
+  // Switching with the sheet's own tab strip keeps focus on the tab (arrow keys keep working), so
+  // no reveal: the sheet is already in view.
+  const selectPanel = (name: PanelId) => setPanels({ ...CLOSED, [name]: true });
+  const closePanels = () => setPanels(CLOSED);
   const setAutoOpen = (v: boolean) => setPanels((p) => ({ ...p, auto: v }));
   const [hintVisible, setHintVisible] = useState(false);
   const landscape = useLandscape(scene);
@@ -425,7 +433,7 @@ export function Simulator(props: SimulatorInternalProps) {
       point={game.point}
       history={game.history}
       onOpenHistory={(n) => {
-        setPanels((p) => ({ ...p, log: true }));
+        setPanels((p) => (sheetPanels ? { ...CLOSED, log: true } : { ...p, log: true }));
         setLogFocus(n === undefined ? null : { n, nonce: ++focusNonce.current });
       }}
     />
@@ -495,49 +503,76 @@ export function Simulator(props: SimulatorInternalProps) {
         <span key={live.n}>{live.text}</span>
       </div>
 
-      {panels.menu ? (
-        <SimMenu
-          canRebet={canRebet}
-          busy={anim.busy}
-          onRebet={rebet}
-          onReset={resetGame}
-          rulesValue={menuRulesValue}
-          currentRules={liveGame.rules}
-          settings={settings}
-          setSettings={setSettings}
-          {...(sandbox
-            ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
-            : {})}
-        />
-      ) : null}
+      {(() => {
+        const panelEls = (
+          <>
+            {panels.menu ? (
+              <SimMenu
+                canRebet={canRebet}
+                busy={anim.busy}
+                onRebet={rebet}
+                onReset={resetGame}
+                rulesValue={menuRulesValue}
+                currentRules={liveGame.rules}
+                settings={settings}
+                setSettings={setSettings}
+                {...(sandbox
+                  ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
+                  : {})}
+              />
+            ) : null}
 
-      {panels.session ? (
-        <SessionPanel
-          stats={liveGame.stats}
-          rollCount={liveGame.rollCount}
-          exposure={exposureOf(liveGame.bets)}
-          bankroll={equity(liveGame)}
-        />
-      ) : null}
+            {panels.session ? (
+              <SessionPanel
+                stats={liveGame.stats}
+                rollCount={liveGame.rollCount}
+                exposure={exposureOf(liveGame.bets)}
+                bankroll={equity(liveGame)}
+              />
+            ) : null}
 
-      {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}
+            {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}
 
-      {autoAvailable && panels.auto ? (
-        <SimAutoRoll
-          scene={scene}
-          game={liveGame}
-          rulesValue={rulesSelectValue}
-          rollsPerHour={settings.rollsPerHour}
-          emit={emit}
-          feedInput={feedInput}
-          onResult={(result) =>
-            setLog((l) =>
-              appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),
-            )
-          }
-          persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
-        />
-      ) : null}
+            {autoAvailable && panels.auto ? (
+              <SimAutoRoll
+                scene={scene}
+                game={liveGame}
+                rulesValue={rulesSelectValue}
+                rollsPerHour={settings.rollsPerHour}
+                emit={emit}
+                feedInput={feedInput}
+                onResult={(result) =>
+                  setLog((l) =>
+                    appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),
+                  )
+                }
+                persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
+              />
+            ) : null}
+          </>
+        );
+        const active = (['auto', 'session', 'log', 'menu'] as const).find((k) => panels[k]);
+        if (!sheetPanels) return panelEls;
+        if (!active) return null;
+        const tabs: PanelTab[] = [
+          ...(autoAvailable ? [{ id: 'auto' as const, label: 'Auto-roll' }] : []),
+          { id: 'session' as const, label: 'Session' },
+          { id: 'log' as const, label: 'Log' },
+          ...(ui.showSettings || sandbox ? [{ id: 'menu' as const, label: 'Menu' }] : []),
+        ];
+        return (
+          <PanelSheet
+            active={active}
+            tabs={tabs}
+            onSelect={selectPanel}
+            onClose={closePanels}
+            landscape={landscape}
+            roll={{ onRoll: roll, disabled: anim.busy || !!sheet || !!lock, busy: anim.busy }}
+          >
+            {panelEls}
+          </PanelSheet>
+        );
+      })()}
 
       {sheet && sh.sheetModel ? (
         <SimSheet

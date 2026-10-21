@@ -44,6 +44,48 @@ describe('SessionPanel luck band', () => {
   });
 });
 
+describe('SessionPanel loss share (I023)', () => {
+  it('shows each bet share of the loss and the takeaway sentence', () => {
+    const base = stats(0, 1000, 183, 250_000);
+    const { container } = render(
+      <SessionPanel
+        stats={{
+          ...base,
+          totalWagered: 10_000,
+          byType: {
+            field: {
+              count: 5,
+              wagered: 1000,
+              won: 0,
+              lost: 1000,
+              vig: 0,
+              net: -1000,
+              expectedLoss: 56,
+            },
+            'pass-line': {
+              count: 5,
+              wagered: 9000,
+              won: 0,
+              lost: 0,
+              vig: 0,
+              net: 0,
+              expectedLoss: 127,
+            },
+          },
+        }}
+        rollCount={10}
+      />,
+    );
+    const share = [...container.querySelectorAll('[data-k="loss-share"]')].map(
+      (td) => td.textContent,
+    );
+    expect(share).toEqual(['69%', '31%']); // rows sort by wagered, pass line first
+    expect(container.querySelector('[data-k="loss-takeaway"]')?.textContent).toContain(
+      'Field bets were 10% of your action but 31% of your expected loss.',
+    );
+  });
+});
+
 describe('SessionPanel bankroll note (I057)', () => {
   it('says how many decisions the bankroll covers when the layout exposure is over a quarter of it', () => {
     const { container } = render(

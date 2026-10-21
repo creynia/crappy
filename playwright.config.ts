@@ -20,7 +20,7 @@ export default defineConfig({
     {
       name: 'phone-landscape',
       use: { ...devices['Pixel 7 landscape'] },
-      testMatch: /(sandbox|lessons)\.spec\.ts/,
+      testMatch: /(sandbox|lessons|layout)\.spec\.ts/,
     },
     {
       name: 'desktop',

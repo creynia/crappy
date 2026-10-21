@@ -25,6 +25,12 @@ const KNOWN_STRATEGIES = new Set([
   'no-bet',
   'my-layout',
   'martingale-pass',
+  'dont-come-molly',
+  'buy-4-10',
+  'lay-4-10',
+  'place-6-8-press',
+  'inside-regress',
+  'pass-hedge-any-craps',
 ]);
 const PRESETS = new Set(['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x', 'crapless']);
 

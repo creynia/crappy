@@ -171,6 +171,9 @@ main {
   color: var(--text);
   min-height: 84px;
 }
+.tile-wide {
+  grid-column: 1 / -1;
+}
 .row {
   display: flex;
   flex-wrap: wrap;

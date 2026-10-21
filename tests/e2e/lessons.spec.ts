@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers';
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } }); // the app forces instant animations
 
@@ -18,11 +18,12 @@ test('home Continue leads to lesson 1', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page }) => {
+test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page, guard }) => {
   await page.goto('/#/learn/pass-line');
   const scene = await openScene(page, 0);
   const stepText = scene.locator('.sim-step-text');
   await expect(stepText).toContainText('Pass Line');
+  await guard.check('lesson-scene');
 
   // roll is locked until the bet is placed
   await expect(scene.getByRole('button', { name: /^Roll/ })).toBeDisabled();
@@ -47,6 +48,7 @@ test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page 
   await quiz.getByLabel('$10', { exact: true }).check();
   await quiz.getByRole('button', { name: 'Check answer' }).click();
   await expect(quiz.getByRole('status')).toContainText('Correct');
+  await guard.check('lesson-quiz');
 
   // progress persists across reload
   await page.reload();
@@ -57,14 +59,15 @@ test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page 
   await expect(q2.locator('legend')).toContainText('answered');
 });
 
-test('lesson 1: auto-roll scene completes its step', async ({ page }) => {
+test('lesson 1: auto-roll scene completes its step', async ({ page, guard }) => {
   await page.goto('/#/learn/dice-and-combinations');
   const scene = await openScene(page, 1);
   await scene.getByRole('button', { name: /^Auto-roll 600/ }).click();
   await expect(scene.locator('.sim-step-text')).toContainText('Compare the 7 bar');
+  await guard.check('lesson-auto-roll-done');
 });
 
-test('lesson 20: compare runs all three strategies', async ({ page }) => {
+test('lesson 20: compare runs all three strategies', async ({ page, guard }) => {
   await page.goto('/#/learn/strategy-fun-per-dollar');
   const scene = await openScene(page, 0);
   await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
@@ -72,20 +75,44 @@ test('lesson 20: compare runs all three strategies', async ({ page }) => {
   await expect(summary.locator('thead th')).toHaveCount(4);
   await expect(scene.locator('.sim-chart-legend li')).toHaveCount(4); // 3 series + the expected line
   await expect(scene.locator('.sim-step-text')).toContainText(/Done|Nice work/);
+  await guard.check('lesson-compare-done');
 });
 
-test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ page }) => {
+test('lesson 6: the Pass bet is a contract bet and offers Add odds', async ({ page, guard }) => {
   await page.goto('/#/learn/odds-bet');
   const scene = await openScene(page, 0);
   await scene.locator('[data-stack]').first().click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toContainText('Contract bet');
+  await guard.check('odds-sheet-open');
   await expect(sheet).not.toContainText('Free bet');
   await expect(sheet.getByRole('button', { name: 'Remove' })).toBeDisabled();
   await sheet.getByRole('button', { name: 'Add odds' }).click();
   await expect(sheet.getByLabel('Bet amount')).toHaveText('$40');
   await sheet.getByRole('button', { name: 'Confirm' }).click();
   await expect(scene.locator('.sim-step-text')).toContainText('Tap your Odds bet');
+});
+
+test('lesson 7: the call-the-bet question locks Roll until answered', async ({ page }) => {
+  await page.goto('/#/learn/come-bets');
+  const scene = await openScene(page, 1);
+  await scene.getByRole('button', { name: 'Next' }).click();
+  const roll = scene.getByRole('button', { name: /^Roll/ });
+  await expect(roll).toBeDisabled();
+  await expect(scene.locator('.sim-lock')).toContainText('Answer the question first');
+  await expect(roll).toHaveAttribute('aria-describedby', /.+/);
+  await expect(scene.locator('.sim-ask')).toBeVisible();
+  await scene.getByRole('button', { name: 'Both lose' }).click();
+  await expect(scene.locator('.sim-ask-feedback')).toContainText('Not quite');
+  await expect(roll).toBeDisabled();
+  await scene.getByRole('button', { name: 'The Come bet loses and the odds come back' }).click();
+  await expect(scene.locator('.sim-ask-feedback')).toContainText('Correct');
+  await expect(scene.locator('.sim-ask-feedback')).toContainText('Now roll to check your call');
+  await expect(roll).toBeEnabled();
+  await roll.click();
+  await expect(scene.locator('.sim-step-text')).toContainText('lost');
+  await scene.getByRole('button', { name: 'Finish' }).click();
+  await expect(scene.locator('.sim-step-done')).toBeVisible();
 });
 
 test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }) => {
@@ -119,4 +146,18 @@ test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }
   expect(expected).toBeLessThan(-230); // about -$285 over 1,000 hands at $1 + $1
   expect(expected).toBeGreaterThan(-330);
   await expect(row('Busted')).toHaveText('No');
+});
+
+test('a panel a lesson step opens by itself does not scroll the page or take focus', async ({
+  page,
+}) => {
+  await page.goto('/#/learn/dice-and-combinations');
+  const scene = await openScene(page, 1); // scrolls the lazily mounted simulator into view
+  const panel = scene.locator('.sim-autoroll');
+  await expect(panel).toBeVisible();
+  const y0 = await page.evaluate<number>('window.scrollY');
+  await expect(panel).toBeVisible();
+  expect(await page.evaluate<number>('window.scrollY')).toBe(y0);
+  await expect(panel).not.toBeFocused();
+  await expect(panel.locator('h1, h2, h3, legend').first()).not.toBeFocused();
 });

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BetSheet, type BetSheetProps, type SheetPreview } from './BetSheet';
 import { CenterPanel } from './CenterPanel';
 import { ChipRack } from './ChipRack';
-import { chipBreakdown } from './ChipStack';
+import { ChipStack, chipBreakdown } from './ChipStack';
 import { DiceGrid } from './DiceGrid';
 import { HistoryStrip, rollOutcome } from './HistoryStrip';
 import { Puck } from './Puck';
@@ -11,7 +11,7 @@ import { RollButton } from './RollButton';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts } from './Toasts';
-import { portraitLayout } from './layouts';
+import { portraitLayout, spotPosition } from './layouts';
 import { buildEvFacts } from './text';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
@@ -55,6 +55,22 @@ function preview(tier: EdgeTier, over: Partial<SheetPreview> = {}): SheetPreview
       rows: [{ label: '7 first', ways: 6, outOf: 11, probability: fr(6, 11), net: fr(-1000) }],
       evFormula: 'formula here',
     },
+    ...over,
+  };
+}
+
+function sheetProps(over: Partial<BetSheetProps> = {}): BetSheetProps {
+  return {
+    title: 'Place 6',
+    preview: preview('good'),
+    typeOptions: [{ id: 'place-6', label: 'Place 6', enabled: true }],
+    selectedType: 'place-6',
+    amount: 1200,
+    step: 500,
+    onTypeChange: vi.fn(),
+    onAmountChange: vi.fn(),
+    onConfirm: vi.fn(),
+    onCancel: vi.fn(),
     ...over,
   };
 }
@@ -165,6 +181,90 @@ describe('Table', () => {
       />,
     );
     expect(screen.getByLabelText(/Place 6 \$12, off/)).toBeTruthy();
+  });
+
+  it('animates chip movement: travel ghosts start at the come box and head for the number', () => {
+    const come = bet('b3', 'come', 1000, 8);
+    const { container, rerender } = render(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        travellingBets={[come]}
+        chipMs={200}
+      />,
+    );
+    // the stack is hidden while its ghost waits at the come box, but the region still names the bet
+    expect(container.querySelector('[data-stack="b3"]')).toBeNull();
+    expect(screen.getByLabelText(/Come \$10, working/)).toBeTruthy();
+    const ghost = container.querySelector<SVGGElement>('.sim-ghost-travel')!;
+    expect(ghost.getAttribute('data-travel')).toBe('b3');
+    expect(ghost.classList.contains('is-moving')).toBe(false);
+    const from = spotPosition(
+      portraitLayout.regions.find((r) => r.id === 'come')!,
+      'come',
+    );
+    const to = spotPosition(
+      portraitLayout.regions.find((r) => r.id === 'box-8')!,
+      'come',
+    );
+    expect(ghost.querySelector('.sim-stack')?.getAttribute('transform')).toBe(
+      `translate(${from.x} ${from.y})`,
+    );
+    const style = ghost.getAttribute('style') ?? '';
+    const dx = Number(/--dx: (-?[\d.]+)px/.exec(style)?.[1]);
+    const dy = Number(/--dy: (-?[\d.]+)px/.exec(style)?.[1]);
+    expect(from.x + dx).toBeCloseTo(to.x, 6);
+    expect(from.y + dy).toBeCloseTo(to.y, 6);
+    expect(container.querySelector('.sim-chips')?.getAttribute('style')).toContain(
+      '--sim-chip-ms: 200ms',
+    );
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        travellingBets={[come]}
+        chipMs={200}
+        chipPhase="travel"
+      />,
+    );
+    expect(container.querySelector('.sim-ghost-travel')?.classList.contains('is-moving')).toBe(
+      true,
+    );
+    // sweeps and payouts: static until their own step, then moving
+    const field = bet('b4', 'field', 500);
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        lostBets={[field]}
+        wonBets={[{ bet: come, payout: 1000 }]}
+        chipMs={150}
+      />,
+    );
+    expect(container.querySelector('[data-stack="b3"]')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-travel')).toBeNull();
+    expect(container.querySelector('.sim-ghost-lose')?.classList.contains('is-moving')).toBe(false);
+    expect(container.querySelector('.sim-ghost-win')).toBeNull();
+    expect(container.querySelector('[data-stack="b3"]')?.className).toContain('is-won');
+    rerender(
+      <Table layout={portraitLayout} bets={[come]} point={8} lostBets={[field]} chipPhase="lose" />,
+    );
+    expect(container.querySelector('.sim-ghost-lose')?.classList.contains('is-moving')).toBe(true);
+    // a winner that came down (field) keeps a settled ghost until the payout slides in
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[]}
+        point={8}
+        wonBets={[{ bet: field, payout: 1000 }]}
+        chipPhase="win"
+      />,
+    );
+    expect(container.querySelector('[data-won="b4"] .sim-ghost-settled')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-win.is-moving')).not.toBeNull();
   });
 
   it('CenterPanel renders the bonus rail with progress pips', () => {
@@ -290,8 +390,10 @@ describe('RollButton, StatusBar, history, toasts', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
-    fireEvent.click(screen.getByLabelText('Dismiss'));
+    const toasts = document.querySelector('.sim-toasts')!;
+    expect(toasts.getAttribute('aria-hidden')).toBeNull();
+    expect(toasts.getAttribute('aria-live')).toBeNull();
+    fireEvent.click(screen.getByLabelText(/^Dismiss/));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });
   it('Toasts auto-dismiss', () => {
@@ -362,6 +464,18 @@ describe('BetSheet', () => {
     });
     expect(screen.getByRole('alert').textContent).toContain('No come bets on the come-out.');
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Confirm' }).disabled).toBe(true);
+  });
+
+  it("type switcher shows each option's edge with a text tier", () => {
+    sheet({
+      typeOptions: [
+        { id: 'place-4', label: 'Place 4', enabled: true, edgeText: '6.67%', tier: 'poor' },
+        { id: 'buy-4', label: 'Buy 4', enabled: false, edgeText: '1.67%', tier: 'good' },
+      ],
+      selectedType: 'place-4',
+    });
+    expect(screen.getByRole('radio', { name: /^Place 4 6\.67% Costly$/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Buy 4 1\.67% Good bet$/ })).toBeTruthy();
   });
 
   it('segmented control reports type changes and disables illegal types', () => {
@@ -498,6 +612,37 @@ describe('BetSheet', () => {
     expect(onRemove).toHaveBeenCalledOnce();
   });
 
+  it('working copy follows the toggle: OFF explains the cost of ON, ON shows the saving', () => {
+    const offCopy = 'Off on the come-out by table convention. Turning it ON costs about $0.06.';
+    const onCopy = 'Working on the come-out. Turning it OFF saves about $0.06.';
+    const { rerender } = render(
+      <BetSheet
+        {...sheetProps()}
+        mode="manage"
+        working={{ value: false, canToggle: true, copy: offCopy }}
+      />,
+    );
+    expect(screen.getByText(offCopy)).toBeTruthy();
+    rerender(
+      <BetSheet
+        {...sheetProps()}
+        mode="manage"
+        working={{ value: true, canToggle: true, copy: onCopy }}
+      />,
+    );
+    expect(screen.queryByText(offCopy)).toBeNull();
+    expect(screen.getByText(onCopy)).toBeTruthy();
+  });
+
+  it('ChipStack marks an off bet with the text OFF, not colour alone', () => {
+    render(
+      <svg>
+        <ChipStack x={0} y={0} amount={1200} off />
+      </svg>,
+    );
+    expect(screen.getByText('OFF')).toBeTruthy();
+  });
+
   it('manage mode offers Remove and a working toggle', () => {
     const onRemove = vi.fn();
     const onToggleWorking = vi.fn();
@@ -525,5 +670,99 @@ describe('DiceGrid', () => {
     expect(screen.getByText('Win (4)')).toBeTruthy();
     expect(screen.getByText('extra')).toBeTruthy();
     expect(screen.getAllByLabelText(/1 and 1, total 2: wins/)).toHaveLength(1);
+  });
+});
+
+describe('StepPanel ask', () => {
+  const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+  const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+  it('renders keyboard-reachable option buttons and live feedback', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const picks: number[] = [];
+    const { container, rerender } = render(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 0, correct: false }}
+      />,
+    );
+    const opts = container.querySelectorAll<HTMLButtonElement>('button.sim-ask-opt');
+    expect(opts).toHaveLength(2);
+    // not a live region: the simulator's one announcer speaks it
+    expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBeNull();
+    expect(container.querySelector('[role="group"]')!.getAttribute('aria-labelledby')).toBe(
+      'ask-q-s',
+    );
+    fireEvent.click(opts[0]!);
+    expect(picks).toEqual([0]);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 1, correct: false }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Not quite');
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('b is right');
+    expect(opts[1]!.disabled).toBe(false); // retry allowed
+    fireEvent.click(opts[1]!);
+    rerender(
+      <StepPanel
+        step={step}
+        index={0}
+        total={1}
+        hintVisible={false}
+        showNext={false}
+        done={false}
+        onNext={() => undefined}
+        onAnswer={(i) => picks.push(i)}
+        asked={{ count: 2, correct: true }}
+      />,
+    );
+    expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Correct.');
+    expect(opts[0]!.disabled).toBe(true);
+  });
+});
+
+describe('StepPanel ask focus', () => {
+  it('hands focus to the Roll button after a correct answer (the options disable)', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+    const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+    const ui = (correct: boolean) => (
+      <div class="sim-root">
+        <StepPanel
+          step={step}
+          index={0}
+          total={1}
+          hintVisible={false}
+          showNext={false}
+          done={false}
+          onNext={() => undefined}
+          asked={{ count: 1, correct }}
+        />
+        <button type="button" class="sim-roll" disabled={!correct}>
+          Roll
+        </button>
+      </div>
+    );
+    const { container, rerender } = render(ui(false));
+    container.querySelector<HTMLButtonElement>('.sim-ask-opt')!.focus();
+    rerender(ui(true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).toBe(container.querySelector('.sim-roll'));
+    expect(container.querySelector('.sim-ask-feedback')!.hasAttribute('tabindex')).toBe(false);
   });
 });

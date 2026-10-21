@@ -1,0 +1,244 @@
+/* Practice hub and drill runner (src/app/screens/Practice.tsx, src/app/practice/*). */
+.pr-hub {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.pr-hub .card {
+  margin: 0;
+}
+.pr-stats {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+.pr-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.8rem;
+}
+.pr-level {
+  min-height: 44px;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.pr-level.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-weight: 700;
+}
+.pr-level-n {
+  font-weight: 700;
+}
+.pr-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pr-card {
+  margin-top: 0.6rem;
+}
+.pr-count {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+.pr-count:focus {
+  outline: none;
+}
+.pr-tag {
+  color: var(--fair);
+}
+.pr-visuals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.6rem 1.4rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, var(--felt), var(--felt-dark));
+  color: #f8f5ec;
+}
+.pr-visual {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.pr-visual figcaption {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.pr-prompt {
+  font-weight: 600;
+  margin: 0.9rem 0 0.7rem;
+}
+.pr-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
+}
+.pr-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pr-choice:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.pr-choice.right {
+  opacity: 1;
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 22%, transparent);
+}
+.pr-choice.is-answer {
+  border-width: 2px;
+  border-style: dashed;
+}
+.pr-choice.wrong {
+  opacity: 1;
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 22%, transparent);
+}
+.pr-choice-dice,
+.pr-mini-dice {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+.pr-number {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.pr-number label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+}
+.pr-number input {
+  width: 8rem;
+  min-height: 44px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem;
+}
+.pr-feedback {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.pr-feedback p {
+  margin: 0 0 0.6rem;
+}
+.pr-feedback.ok {
+  border-color: var(--good);
+}
+.pr-feedback.no {
+  border-color: var(--bad);
+}
+.pr-feedback.ok strong {
+  color: var(--good);
+}
+.pr-feedback.no strong {
+  color: var(--bad);
+}
+.pr-summary h2 {
+  margin-top: 0;
+}
+.pr-summary h2:focus {
+  outline: none;
+}
+.pr-missed {
+  padding-left: 1.1rem;
+}
+.pr-missed li {
+  margin: 0.4rem 0;
+}
+
+/* ---------- Call the bet ---------- */
+.pr-call {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-table {
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+.pr-call .sim-stack-hit {
+  cursor: pointer;
+}
+.pr-call-sel {
+  margin: 0;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+.pr-choice.is-picked {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+.pr-call-check {
+  justify-self: start;
+}
+.pr-call-why {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.pr-call-why li.wrong {
+  color: var(--bad);
+  font-weight: 600;
+}
+.pr-call-tables {
+  display: grid;
+  gap: 0.6rem;
+}
+.pr-call-side {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+/* wide landscape: felt on the left, the call buttons beside it */
+.pr-call.is-wide {
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr);
+  align-items: start;
+}
+.pr-call.is-wide .pr-call-table {
+  max-width: none;
+}

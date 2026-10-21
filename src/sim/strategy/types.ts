@@ -22,7 +22,13 @@ export type StrategyId =
   | 'hardways-all'
   | 'no-bet'
   | 'my-layout'
-  | 'martingale-pass';
+  | 'martingale-pass'
+  | 'dont-come-molly'
+  | 'buy-4-10'
+  | 'lay-4-10'
+  | 'place-6-8-press'
+  | 'inside-regress'
+  | 'pass-hedge-any-craps';
 
 /** One bet of a player layout snapshot (used by `my-layout`). */
 export interface LayoutBet {
@@ -44,6 +50,8 @@ export interface Strategy {
   name: string;
   lens: StrategyLens;
   description: string;
+  /** Bet size grows with losses (martingale): per-dollar statistics that assume steady bets, like the edge chart's funnel, do not apply. */
+  escalating?: boolean;
   /** Actions to take before the next roll so the layout matches the strategy. Must return only legal actions. */
   decide(state: GameState, spec: StrategySpec): Action[];
 }
@@ -68,9 +76,13 @@ export interface SessionResult {
   rollsPlayed: number;
   equity: Int32Array; // after each roll; [0] = start
   expected: Float64Array; // start - cumulative stats.expectedLoss
+  /** Cumulative total wagered (cents) after each roll; [0] = 0. Same length as `equity`. */
+  wagered: Float64Array;
   finalEquity: Cents;
   totalWagered: Cents;
   expectedLoss: number;
+  /** sum of per-resolution variances, cents^2 (see SessionStats.variance) */
+  variance: number;
   actualLoss: Cents;
   /** Count of each dice total, index 2..12 (0 and 1 unused). Used by the totals histogram. */
   totals: Int32Array;
@@ -117,6 +129,8 @@ export interface StrategyMetrics {
   edgeOnAction: number;
   expectedLossPerRoll: number; // dollars
   rollsPerDollar: number;
+  /** True when the strategy changes its layout over time (press, regress); the numbers describe its starting layout only. */
+  approximate?: boolean;
 }
 
 /** One entry of an odds sweep: a number is a multiple of the flat bet, 'max' is the table maximum. */

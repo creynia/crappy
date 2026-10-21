@@ -57,6 +57,34 @@ Rules:
 - `scene` blocks are `SceneConfig` YAML (money in cents, canonical bet ids from `src/sim/engine/bets.ts`).
   They are checked with `validateScene`; a bad scene fails the build with the file name.
   Scene ids must be unique inside a lesson.
+- A step's `completeWhen` is a condition. Kinds: `all`, `any`, `not` (nest freely); `action` (with
+  `count`); `event` (with `betType`, `count`); `rolls`; `phase`; `point`; `betOnTable`
+  (`type`, optional `minAmount` and `point`, e.g. a come bet travelled to 6); `betResolved`
+  (`type`, optional `result`: `won`, `lost` or `pushed`; `pushed` is a push such as a dont-pass bet on
+  12, not odds returned when they are off; a win on a standing bet such as a come bet counts as
+  resolved on that roll, so `won` means the bet paid); `bankrollAtLeast` / `bankrollAtMost`;
+  `equityAtLeast` / `equityAtMost` (equity is bankroll plus chips on the table); `previewed`;
+  `autoRollCompleted`; `acknowledged`.
+- Example, a come bet that travels to 6 and then wins (two steps; the second waits for the win):
+
+  ```yaml
+  steps:
+    - id: travel
+      text: Place a $5 come bet. The next roll moves it to 6.
+      completeWhen: { betOnTable: { type: come, point: 6 } }
+    - id: win
+      text: Roll the 6 to win the come bet.
+      completeWhen: { betResolved: { type: come, result: won } }
+  ```
+
+- A condition that is already true when a step starts completes that step at once. Equity does not
+  change when a bet is placed, so wait for a roll (for example `forcedDice` that loses) before
+  testing equity.
+- Step `text`, `hint` and `math` can hold live values, shown from the table as the learner plays.
+  Unknown tokens fail validation. Tokens: `{{bankroll}}` cash on hand, `{{point}}` the point or
+  "off", `{{onTable}}` chips on the table, `{{session}}` won minus lost this session, `{{ev:<bet>}}`
+  EV of your working bets of that type ("no bet" if none), `{{edge:<bet>}}` house edge of your
+  bet ("no bet" if none). Example: `Your Don't Pass is now worth {{ev:dont-pass}}.`
 - Quiz `q`, `options` and `explain` are plain text (not Markdown); HTML is escaped, not rendered.
 - Headings: write `##` (or any level); the compiler shifts the lesson's headings so the shallowest becomes an `<h2>` under the page's `<h1>`.
 - `quiz` blocks are a YAML list of `{ id?, q, options, answer, explain }`. The id defaults to

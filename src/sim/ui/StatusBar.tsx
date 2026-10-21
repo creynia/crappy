@@ -11,7 +11,7 @@ export interface StatusBarProps {
   session: Cents;
   point: PointNumber | null;
   history: readonly RollRecord[];
-  onOpenHistory?: () => void;
+  onOpenHistory?: (n?: number) => void;
   /** hide the roll history strip (compact landscape rail) */
   compact?: boolean;
 }
@@ -48,9 +48,7 @@ export function StatusBar({
         <span class={`sim-point${point ? ' has-point' : ''}`}>
           {point ? `Point: ${point}` : 'Come-out roll'}
         </span>
-        <span class="sim-last" aria-live="polite">
-          {last ? <Dice dice={last.dice} size="sm" /> : null}
-        </span>
+        <span class="sim-last">{last ? <Dice dice={last.dice} size="sm" /> : null}</span>
         {compact ? null : <HistoryStrip history={history} onOpenAll={onOpenHistory} />}
       </div>
     </div>

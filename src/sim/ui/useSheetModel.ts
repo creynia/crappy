@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
-import { BET_TYPES } from '../engine/bets';
-import type { Action, BetTypeId, Cents, GameState } from '../engine/types';
+import { BET_TYPES, isToggleable } from '../engine/bets';
+import type { Action, BetTypeId, Cents, Dice, GameState } from '../engine/types';
 import { validateAction } from '../engine/validate';
 import { previewAction } from '../math/preview';
 import type { ActionPreview } from '../math/types';
@@ -10,15 +10,17 @@ import type { QuickAction, TypeOption } from './BetSheet';
 import { centerLayout, portraitLayout, regionIdForBet } from './layouts';
 import type { RegionDef, RegionId } from './layouts/types';
 import type { ResolvedSimSettings } from './settings';
+import { workingProp } from './workingProp';
 import {
   defaultAmount,
   defaultBetForRegion,
   minAmountFor,
   oddsRoom,
+  hopSheetFields,
   parentFor,
   placeAction,
 } from './simHelpers';
-import { betLabel, buildEvFacts, fmtMoney } from './text';
+import { betLabel, buildEvFacts, fmtMoney, typeEdgeLabel } from './text';
 import type { SimulatorEvent } from './types';
 import { emitObserve, type Core } from './simCore';
 import type { DoActionResult } from './useGameCore';
@@ -31,6 +33,8 @@ export interface SheetState {
   amount: Cents;
   /** manage mode: the existing bet */
   betId?: string;
+  /** hop bets (I035): the chosen pair */
+  hop?: Dice;
 }
 
 const regionFor = (id: RegionId): RegionDef | undefined => ALL_REGIONS.find((r) => r.id === id);
@@ -59,7 +63,7 @@ export function buildSheetModel(
     ? sheet.amount === bet.amount
       ? { type: 'remove-bet', betId: bet.id }
       : { type: 'set-amount', betId: bet.id, amount: sheet.amount }
-    : placeAction(sheet.type, sheet.amount, sheet.regionId, game);
+    : placeAction(sheet.type, sheet.amount, sheet.regionId, game, sheet.hop);
   let preview: ActionPreview = previewAction(game, action, { rollsPerHour });
   const showEV = st?.showEV ?? scene.showEV ?? true;
   const needed: Action['type'] = bet
@@ -101,7 +105,9 @@ export function buildSheetModel(
   const type = bet ? bet.type : sheet.type;
   const parent = parentFor(type, sheet.regionId, game);
   const def = BET_TYPES[type];
-  const facts = buildEvFacts(preview, game);
+  // basic EV detail hides the swing line, like the alternative (lessons 06-08)
+  const facts0 = buildEvFacts(preview, game);
+  const facts = scene.evDetail === 'basic' && facts0 ? { ...facts0, swingCents: null } : facts0;
   const removePreview = bet
     ? previewAction(game, { type: 'remove-bet', betId: bet.id }, { rollsPerHour })
     : undefined;
@@ -111,9 +117,16 @@ export function buildSheetModel(
         const allowed = betTypeAllowed(scene, rt, t);
         const odds = BET_TYPES[t].category === 'odds';
         const hasParent = !odds || !!parentFor(t, sheet.regionId, game);
+        // the amount tapping this type would actually place, so the label and the tap agree
+        // the selected type is priced at the sheet's own amount; others at the amount a tap would place
+        const tapAmount =
+          t === sheet.type ? sheet.amount : defaultAmount(t, sheet.regionId, game, chip);
+        const edge = typeEdgeLabel(t, tapAmount, game);
+        const at = tapAmount !== sheet.amount ? ` at ${fmtMoney(tapAmount)}` : '';
         return {
           id: t,
           label: betLabel(t),
+          ...(edge ? { edgeText: `${edge.edgeText}${at}`, tier: edge.tier } : {}),
           enabled: allowed && hasParent,
           ...(!allowed
             ? { reason: 'Not available in this lesson' }
@@ -159,6 +172,7 @@ export function buildSheetModel(
           parentId: bet.id,
         }
       : null;
+  const working = bet && isToggleable(bet.type) ? workingProp(game, bet, rollsPerHour) : undefined;
   return {
     bet,
     action,
@@ -171,6 +185,7 @@ export function buildSheetModel(
     removePreview,
     contract,
     addOdds,
+    working,
   };
 }
 
@@ -183,6 +198,8 @@ interface SheetDeps {
   setCore: (c: Core) => void;
   emit: (e: SimulatorEvent) => void;
   pushToast: (text: string, tone?: 'info') => void;
+  /** live announcement for messages that are not roll results */
+  announce: (text: string) => void;
   doAction: (a: Action) => DoActionResult;
   /** the displayed game (animation-aware) and live scene state, for the model */
   game: GameState;
@@ -201,7 +218,7 @@ export function useSheetModel(d: SheetDeps) {
     const { game: g, rt: r } = coreRef.current;
     const action: Action = s.betId
       ? { type: 'remove-bet', betId: s.betId }
-      : placeAction(s.type, s.amount, s.regionId, g);
+      : placeAction(s.type, s.amount, s.regionId, g, s.hop);
     const p = previewAction(g, action, { rollsPerHour: settingsRef.current.rollsPerHour });
     emit({ type: 'previewed', preview: p });
     const sc = sceneRef.current;
@@ -221,17 +238,19 @@ export function useSheetModel(d: SheetDeps) {
     const allowedTypes = region.betTypes.filter((t) => betTypeAllowed(sceneRef.current, r, t));
     if (!allowedTypes.length) {
       d.pushToast('That bet is not available in this lesson.', 'info');
+      d.announce('That bet is not available in this lesson.');
       return;
     }
     let type = defaultBetForRegion(region, g);
     if (!allowedTypes.includes(type)) type = allowedTypes[0]!;
     const amount = defaultAmount(type, id, g, chip);
     const needsParent = BET_TYPES[type].category === 'odds' && !parentFor(type, id, g);
-    if (settingsRef.current.skipPreview && !needsParent) {
+    // a hop always opens the sheet: the pair is picked there
+    if (settingsRef.current.skipPreview && !needsParent && type !== 'hop') {
       d.doAction(placeAction(type, amount, id, g));
       return;
     }
-    openSheet({ regionId: id, type, amount });
+    openSheet({ regionId: id, type, amount, ...hopSheetFields(type, undefined) });
   };
 
   const onStackTap = (betId: string) => {

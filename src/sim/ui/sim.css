@@ -342,11 +342,46 @@
 }
 
 /* ---------- toasts ---------- */
+/* An overlay, never part of the page flow: showing or dismissing a toast must not move anything, and
+   it must never sit on a betting region. Portrait: just above the felt, over the status row (bankroll
+   and last dice, which nothing taps). Landscape (`.sim-land`, chosen in code): over the status block
+   in the side rail, below any lesson step card. Positioned against the felt body, not the viewport, so it never
+   lands on the app header or the tab bar. */
 .sim-toasts {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   pointer-events: none;
+}
+.sim-status-wrap {
+  position: relative;
+}
+.sim-land .sim-toasts {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: auto;
+  gap: 2px;
+  /* never taller than the status block, so a long toast cannot reach the Roll button below it */
+  max-height: 100%;
+  overflow: hidden;
+}
+.sim-land .sim-toast > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.sim-land .sim-toast {
+  font-size: 0.75rem;
+  line-height: 1.15;
+  padding: 2px 6px 2px 8px;
 }
 .sim-toast {
   pointer-events: auto;
@@ -354,13 +389,16 @@
   gap: 8px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 10px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
   border-left: 6px solid var(--sim-muted);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  touch-action: pan-y; /* horizontal swipes dismiss; vertical ones still scroll the page */
+  will-change: transform, opacity;
 }
 .sim-toast-win {
   border-left-color: var(--sim-win);
@@ -371,7 +409,7 @@
 .sim-toast-x {
   min-width: 44px;
   min-height: 44px;
-  margin: -8px -12px -8px 0;
+  margin: -8px -8px -8px 0;
   border: 0;
   background: none;
   color: inherit;
@@ -462,6 +500,29 @@
   color: var(--sim-accent-ink);
   border-color: var(--sim-accent);
   font-weight: 700;
+}
+.sim-seg-edge {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.sim-seg-edge[data-tier='free'] {
+  color: var(--ev-free);
+}
+.sim-seg-edge[data-tier='good'] {
+  color: var(--ev-good);
+}
+.sim-seg-edge[data-tier='fair'] {
+  color: var(--ev-fair);
+}
+.sim-seg-edge[data-tier='poor'] {
+  color: var(--ev-poor);
+}
+.sim-seg-edge[data-tier='avoid'] {
+  color: var(--ev-avoid);
+}
+.sim-seg button.is-selected .sim-seg-edge {
+  color: inherit;
 }
 .sim-stepper {
   display: flex;
@@ -656,11 +717,14 @@
   .sim-dice.is-rolling .sim-die-1 {
     animation: sim-tumble-b var(--sim-tumble, 1000ms) ease-out both;
   }
-  .sim-ghost-lose {
-    animation: sim-lose 150ms ease-in forwards;
+  .sim-ghost-lose.is-moving {
+    animation: sim-lose var(--sim-chip-ms, 150ms) ease-in forwards;
   }
-  .sim-ghost-win {
-    animation: sim-win 200ms ease-out both;
+  .sim-ghost-win.is-moving {
+    animation: sim-win var(--sim-chip-ms, 200ms) ease-out both;
+  }
+  .sim-ghost-travel.is-moving {
+    animation: sim-travel var(--sim-chip-ms, 200ms) ease-in-out both;
   }
   .sim-stack-hit.is-won {
     animation: sim-flash 600ms ease-out;
@@ -678,6 +742,9 @@
   }
   .sim-ghost-lose {
     opacity: 0;
+  }
+  .sim-ghost-travel {
+    transform: translate(var(--dx, 0), var(--dy, 0));
   }
   .sim-puck {
     transition: none;
@@ -739,6 +806,15 @@
     opacity: 1;
   }
 }
+/* come-bet travel: the box-to-number offset comes from --dx / --dy (viewBox units) */
+@keyframes sim-travel {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx, 0), var(--dy, 0));
+  }
+}
 @keyframes sim-flash {
   50% {
     filter: brightness(1.6);
@@ -757,6 +833,52 @@
   }
 }
 
+.sim-tree,
+.sim-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.sim-tree ul {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--sim-border);
+}
+.sim-tree-leaf,
+.sim-tree summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--sim-border);
+  overflow-wrap: anywhere;
+}
+.sim-tree summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+  min-height: 44px;
+  align-items: center;
+  list-style: none;
+}
+.sim-tree summary::-webkit-details-marker {
+  display: none;
+}
+.sim-tree summary::before {
+  content: '▸';
+}
+.sim-tree details[open] > summary::before {
+  content: '▾';
+}
+.sim-tree-total {
+  margin: 4px 2px 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.sim-tree-net {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 /* "Why?" 36-dice grid: letters + patterns carry meaning, colour only reinforces */
 .sim-dicegrid {
   margin: 0.75rem 0 0.5rem;
@@ -844,4 +966,167 @@
   text-align: center;
   font-size: 0.875rem;
   margin-top: 0.375rem;
+}
+
+.sim-chart-legend {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.85em;
+}
+
+/* Roll log */
+.sim-roll-log h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.sim-log-filter {
+  min-height: 36px;
+}
+.sim-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.sim-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.sim-log-entry {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 4px 6px 8px;
+  border-bottom: 1px solid var(--sim-border);
+  border-left: 4px solid transparent;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.sim-log-entry.is-win {
+  border-left-color: #2b8a4b;
+}
+.sim-log-entry.is-loss {
+  border-left-color: #b3261e;
+}
+.sim-log-entry.is-focus {
+  background: rgb(255 214 64 / 0.25);
+}
+.sim-log-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sim-log-dice {
+  display: inline-flex;
+  gap: 2px;
+}
+.sim-log-bank {
+  grid-column: 1 / -1;
+  color: var(--sim-muted);
+  font-size: 0.8125rem;
+}
+.sim-log-more {
+  margin-top: 6px;
+}
+.sim-log-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.5rem;
+}
+
+/* Luck band */
+.sim-luck-text {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+.sim-luck-text.is-lucky,
+.sim-luck-text.is-unlucky {
+  font-weight: 700;
+}
+.sim-luck-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  border: 1px solid var(--sim-border);
+  background: linear-gradient(
+    to right,
+    rgb(200 60 60 / 0.35) 0 10%,
+    rgb(80 160 100 / 0.3) 10% 90%,
+    rgb(60 120 200 / 0.35) 90% 100%
+  );
+  margin-bottom: 0.5rem;
+}
+.sim-luck-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--sim-muted);
+}
+.sim-luck-marker {
+  position: absolute;
+  top: -3px;
+  width: 6px;
+  height: 14px;
+  margin-left: -3px;
+  border-radius: 2px;
+  background: var(--sim-text, currentColor);
+}
+
+.sim-luck-scale {
+  margin-bottom: 0.5rem;
+}
+.sim-luck-scale .sim-luck-bar {
+  margin-bottom: 2px;
+}
+.sim-luck-ticks {
+  position: relative;
+  height: 1rem;
+  font-size: 0.7rem;
+  color: var(--sim-muted);
+}
+.sim-luck-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+/* ---------- Table annotate (drills): call badges and enlarged stack targets ---------- */
+.sim-calls {
+  pointer-events: none;
+}
+.sim-stack-target {
+  fill: transparent;
+}
+.sim-call rect {
+  fill: #fff;
+  stroke: #1d2b22;
+  stroke-width: 2;
+}
+.sim-call text {
+  fill: #1d2b22;
+  font-weight: 700;
+}
+.sim-call.is-selected rect {
+  fill: var(--gold, #f5c542);
+  stroke-width: 4;
+}
+.sim-call.is-right rect {
+  fill: var(--sim-win, #2f9e44);
+  stroke: #fff;
+}
+.sim-call.is-wrong rect {
+  fill: var(--sim-loss, #c92a2a);
+  stroke: #fff;
+}
+.sim-call.is-right text,
+.sim-call.is-wrong text {
+  fill: #fff;
 }

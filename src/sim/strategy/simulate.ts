@@ -1,6 +1,6 @@
 import { applyAction, createGame, equity, isBonusType, resolveRules } from '../engine';
 import type { GameState } from '../engine';
-import { tableExpectedLossPerRoll, toNumber } from '../math';
+import { makeVarianceFn, tableExpectedLossPerRoll, toNumber } from '../math';
 import { lineOddsEdge, strategyMetrics } from './metrics';
 import { getImpl } from './presets';
 import type {
@@ -33,9 +33,11 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
   const stopAtBust = cfg.stopAtBust ?? true;
   const start = cfg.bankroll;
   const expectedLossFn = makeExpectedLossFn();
+  const varianceFn = makeVarianceFn();
   let state = createGame({ rules: cfg.rules, bankroll: cfg.bankroll, seed: cfg.seed });
   const eq = new Int32Array(cfg.rolls + 1);
   const exp = new Float64Array(cfg.rolls + 1);
+  const wag = new Float64Array(cfg.rolls + 1);
   const totals = new Int32Array(13);
   eq[0] = start;
   exp[0] = start;
@@ -66,7 +68,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
       endedBy = 'bust';
       break;
     }
-    const r = applyAction(state, { type: 'roll' }, { expectedLossFn });
+    const r = applyAction(state, { type: 'roll' }, { expectedLossFn, varianceFn });
     if (!r.ok) throw new Error(`roll rejected: ${r.error.message}`);
     state = r.state;
     played = i;
@@ -91,6 +93,7 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     const e = equity(state);
     eq[i] = e;
     exp[i] = start - state.stats.expectedLoss;
+    wag[i] = state.stats.totalWagered;
     if (e > peak) peak = e;
     else if (peak - e > maxDd) maxDd = peak - e;
     if (cfg.stopWin !== undefined && e - start >= cfg.stopWin) {
@@ -108,9 +111,11 @@ export function simulateSession(cfg: SessionConfig): SessionResult {
     rollsPlayed: played,
     equity: played === cfg.rolls ? eq : eq.slice(0, played + 1),
     expected: played === cfg.rolls ? exp : exp.slice(0, played + 1),
+    wagered: played === cfg.rolls ? wag : wag.slice(0, played + 1),
     finalEquity,
     totalWagered: state.stats.totalWagered,
     expectedLoss: state.stats.expectedLoss,
+    variance: state.stats.variance,
     actualLoss: start - finalEquity,
     totals,
     endedBy,

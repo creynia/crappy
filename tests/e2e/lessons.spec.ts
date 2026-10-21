@@ -101,6 +101,7 @@ test('lesson 7: the call-the-bet question locks Roll until answered', async ({ p
   await expect(scene.locator('.sim-ask-feedback')).toContainText('Correct');
   await roll.click();
   await expect(scene.locator('.sim-step-done')).toBeVisible();
+});
 
 test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }) => {
   test.setTimeout(120_000);

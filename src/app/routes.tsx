@@ -2,6 +2,7 @@ import type { VNode } from 'preact';
 import { matchPath } from './router';
 import type { ParsedHash } from './router';
 import { BetDetail, BetsList } from './screens/Bets';
+import { Challenge } from './screens/Challenge';
 import { Glossary } from './screens/Glossary';
 import { Home } from './screens/Home';
 import { Learn } from './screens/Learn';
@@ -24,6 +25,7 @@ export const ROUTES: { pattern: string; render: Render }[] = [
     pattern: '/practice/:drillId',
     render: (p, r) => <DrillView id={p.drillId!} query={r.query} />,
   },
+  { pattern: '/challenge', render: (_p, r) => <Challenge query={r.query} /> },
   { pattern: '/bets', render: () => <BetsList /> },
   { pattern: '/bets/:betId', render: (p) => <BetDetail id={p.betId!} /> },
   { pattern: '/glossary', render: (_p, r) => <Glossary query={r.query} /> },

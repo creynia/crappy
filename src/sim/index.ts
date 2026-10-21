@@ -12,4 +12,7 @@ export type { DiceProps } from './ui/Dice';
 export { ChipStack, ChipFace, chipBreakdown } from './ui/ChipStack';
 export type { ChipStackProps } from './ui/ChipStack';
 export { Puck } from './ui/Puck';
+export { Table } from './ui/Table';
+export type { TableProps, StackAnnotation } from './ui/Table';
+export { centerLayout, landscapeLayout, portraitLayout } from './ui/layouts';
 export type { SimSettings, SimulatorProps, SimulatorEvent, SimulatorHandle } from './ui/types';

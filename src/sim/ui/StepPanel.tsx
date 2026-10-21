@@ -14,11 +14,17 @@ export interface StepPanelProps {
   nextLabel?: string;
   done: boolean;
   onNext: () => void;
+  /** accessible name of the panel (default "Lesson step") */
+  label?: string;
   /** the learner picked an option of the step's `ask` */
   onAnswer?: (choice: number) => void;
   /** answers given to the current step's ask so far, and whether one was correct */
   asked?: { count: number; correct: boolean };
   onRestart?: () => void;
+  /** demo step: play the scripted actions again */
+  onReplay?: () => void;
+  /** demo narration so far, one line per scripted frame */
+  captions?: string[];
   /** Live values for {{tokens}} in the step text, hint and math. */
   resolve?: TokenResolver;
 }
@@ -115,9 +121,24 @@ export function StepPanel(p: StepPanelProps) {
   const [mathOpen, setMathOpen] = useState(false);
   useEffect(() => setMathOpen(false), [p.step.id]);
   return (
-    <section class="sim-step" aria-label="Lesson step" data-step={p.step.id}>
+    <section
+      class="sim-step"
+      aria-label={p.label ?? 'Lesson step'}
+      data-step={p.step.id}
+      tabIndex={-1}
+    >
       <div class="sim-step-count">
         {p.done ? 'Done' : `Step ${p.index + 1} of ${p.total}`}
+        {p.onReplay ? (
+          <button
+            type="button"
+            class="sim-linkbtn sim-replay"
+            aria-label="Replay the demo"
+            onClick={p.onReplay}
+          >
+            Replay
+          </button>
+        ) : null}
         {p.onRestart ? (
           <button type="button" class="sim-linkbtn" onClick={p.onRestart}>
             Restart
@@ -133,6 +154,13 @@ export function StepPanel(p: StepPanelProps) {
           asked={p.asked ?? { count: 0, correct: false }}
           {...(p.onAnswer ? { onAnswer: p.onAnswer } : {})}
         />
+      ) : null}
+      {p.captions && p.captions.length ? (
+        <ol class="sim-demo-captions" aria-label="What happens in the demo">
+          {p.captions.map((c, i) => (
+            <li key={i}>{c}</li>
+          ))}
+        </ol>
       ) : null}
       {p.hintVisible && p.step.hint ? (
         <p class="sim-step-hint" role="note">

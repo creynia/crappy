@@ -9,6 +9,9 @@ export interface SimMenuProps {
   rulesValue: RulePresetId;
   settings: ResolvedSimSettings;
   setSettings: (s: ResolvedSimSettings) => void;
+  /** sandbox only: share the table as a link / copy it as a lesson scene */
+  onShare?: () => void;
+  onCopyScene?: () => void;
 }
 
 /** The sandbox table menu: rebet, reset, rules preset, speed and skip-preview. */
@@ -20,6 +23,8 @@ export function SimMenu({
   rulesValue,
   settings,
   setSettings,
+  onShare,
+  onCopyScene,
 }: SimMenuProps) {
   return (
     <section class="sim-menu" aria-label="Table menu">
@@ -31,6 +36,20 @@ export function SimMenu({
           Reset bankroll
         </button>
       </div>
+      {onShare || onCopyScene ? (
+        <div class="sim-menu-row">
+          {onShare ? (
+            <button type="button" onClick={onShare}>
+              Share table
+            </button>
+          ) : null}
+          {onCopyScene ? (
+            <button type="button" onClick={onCopyScene}>
+              Copy as scene YAML
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <label class="sim-menu-field">
         Rules
         <select

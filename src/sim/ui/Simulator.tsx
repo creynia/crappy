@@ -9,6 +9,7 @@ import { SessionPanel } from './SessionPanel';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
+import { buildShareUrl, toSceneYaml } from './shareLink';
 import { SimSheet } from './SimSheet';
 import { SimStep } from './SimStep';
 import { SANDBOX_SCENE, initialChip, randomSeed } from './simCore';
@@ -97,6 +98,9 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- events + effects ----------
   useEffect(() => {
     emit({ type: 'ready', state: coreRef.current.game });
+    // parts of a shared link the table could not use
+    if (boot.skipped?.length)
+      pushToast(`Skipped from the link: ${boot.skipped.join('; ')}.`, 'info');
     return () => anim.cancel();
   }, []);
   const startedRef = useGuidedSteps(scene, rt, step, emit, setHintVisible, setAutoOpen);
@@ -167,6 +171,36 @@ export function Simulator(props: SimulatorInternalProps) {
     }
   };
   const canRebet = lastOneRoll.current.some((r) => !liveGame.bets.some((b) => b.type === r.type));
+  // Share links (I071): the live table as a URL (Web Share, else the clipboard) or a scene block.
+  const shareBase = () => {
+    try {
+      return `${location.origin}${location.pathname}${location.search}`;
+    } catch {
+      return '';
+    }
+  };
+  const copyText = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      pushToast(`${what} copied to the clipboard.`, 'info');
+    } catch {
+      pushToast(`Could not copy. ${what}: ${text}`, 'info');
+    }
+  };
+  const shareTable = async () => {
+    const url = buildShareUrl(shareBase(), coreRef.current.game);
+    const nav = typeof navigator === 'undefined' ? undefined : navigator;
+    if (nav?.share) {
+      try {
+        await nav.share({ title: 'Craps table', url });
+        return;
+      } catch {
+        /* cancelled or unsupported: fall back to the clipboard */
+      }
+    }
+    await copyText(url, 'Link');
+  };
+  const copyScene = () => copyText(toSceneYaml(coreRef.current.game), 'Scene YAML');
 
   // ---------- imperative handle ----------
   useEffect(() => {
@@ -314,6 +348,9 @@ export function Simulator(props: SimulatorInternalProps) {
           rulesValue={rulesSelectValue}
           settings={settings}
           setSettings={setSettings}
+          {...(sandbox
+            ? { onShare: () => void shareTable(), onCopyScene: () => void copyScene() }
+            : {})}
         />
       ) : null}
 

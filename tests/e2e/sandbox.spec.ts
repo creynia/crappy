@@ -396,6 +396,68 @@ test.describe('sandbox flows', () => {
     await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
   });
 
+  test('share link: the menu copies a link that reproduces the layout and the next rolls', async ({
+    page,
+  }) => {
+    // capture the share text instead of the system share sheet / clipboard
+    await page.addInitScript(() => {
+      const w = globalThis as unknown as { __shared: string[] };
+      w.__shared = [];
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: (t: string) => Promise.resolve(void w.__shared.push(t)) },
+        configurable: true,
+      });
+    });
+    await page.goto(url('seed=11&' + dice('4-4')));
+    await place(page, 'pass');
+    await roll(page); // point 8 (forced), then the seed takes over
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await place(page, 'come');
+    await menu(page).click();
+    await page.getByRole('button', { name: 'Share table' }).click();
+    await expect(page.locator('.sim-toast').last()).toContainText('Link copied');
+    const shared = await page.evaluate(
+      () => (globalThis as unknown as { __shared: string[] }).__shared,
+    );
+    expect(shared[0]).toMatch(
+      /#\/play\?seed=11&rules=standard-vegas&bankroll=500&point=8&bets=pass-line:5,come:5$/,
+    );
+    await page.getByRole('button', { name: 'Copy as scene YAML' }).click();
+    const yaml = (
+      await page.evaluate(() => (globalThis as unknown as { __shared: string[] }).__shared)
+    )[1]!;
+    expect(yaml).toContain('point: 8');
+    expect(yaml).toContain('type: come, amount: 500');
+    // the original rolls on; the link opened elsewhere rolls the same dice
+    await menu(page).click();
+    await roll(page);
+    // the live announcer keeps the last roll's text in both orientations
+    const announcer = page.getByTestId('roll-announcer');
+    await expect(announcer).not.toHaveText('');
+    const total = await announcer.innerText();
+    await page.goto('/');
+    await page.goto(shared[0]!.slice(shared[0]!.indexOf('#')));
+    await expect(bank(page)).resolves.toBe('$490');
+    await expect(page.locator('[data-stack]')).toHaveCount(2);
+    await expect(page.locator('.sim-puck.is-on')).toHaveCount(1);
+    await roll(page);
+    await expect(page.getByTestId('roll-announcer')).toHaveText(total);
+  });
+
+  test('share link: malformed parts are skipped with a toast', async ({ page }) => {
+    await page.goto(
+      url('seed=1&bankroll=200&point=9&bets=pass-line:5,hard-8:1,come-odds@6:10,junk:3'),
+    );
+    await expect(page.locator('.sim-toast').last()).toContainText('Skipped from the link');
+    await expect(page.locator('.sim-toast').last()).toContainText('junk');
+    await expect(page.locator('.sim-toast').last()).toContainText('come-odds');
+    await expect(bank(page)).resolves.toBe('$194');
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // pass line; hard 8 sits on the center panel
+    await expect(page.locator('.sim-center-ind')).toContainText('Center bets: $1');
+    await expect(page.locator('.sim-puck.is-on')).toHaveCount(1);
+  });
+
   test('tapping the table skips the roll animation', async ({ page }) => {
     // Freeze time so only the tap can finish the roll: with the clock paused the animation timers
     // never fire, so "Roll is enabled again" proves the skip, not a fast machine.

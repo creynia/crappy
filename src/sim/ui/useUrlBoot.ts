@@ -5,12 +5,16 @@ import { initScene } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { loadSandbox } from './persist';
 import { resolveSettings, type ResolvedSimSettings } from './settings';
+import { bootFromParams } from './shareLink';
 import { randomSeed, type Core } from './simCore';
 import type { SimulatorProps } from './types';
 
 const PRESETS: RulePresetId[] = ['standard-vegas', 'field-3x-12', 'odds-10x', 'odds-100x'];
 
-/** Sandbox URL params (supported in production): seed, dice, rules, speed. Read from ?search and #/path?query. */
+/**
+ * Sandbox URL params (supported in production): seed, dice, rules, speed, and the share-link set
+ * bankroll, point, bets, skip (see shareLink.ts). Read from ?search and #/path?query.
+ */
 export function readUrlParams(): URLSearchParams {
   const p = new URLSearchParams();
   try {
@@ -44,9 +48,11 @@ export function buildCore(
   mode: 'sandbox' | 'embedded',
   persistKey: string | undefined,
   url: URLSearchParams,
-): { core: Core; startEquity: Cents; chip?: Cents } {
+): { core: Core; startEquity: Cents; chip?: Cents; skipped?: string[] } {
   const sandbox = mode === 'sandbox';
-  const hasUrl = sandbox && (url.has('seed') || url.has('dice') || url.has('rules'));
+  const hasUrl =
+    sandbox &&
+    ['seed', 'dice', 'rules', 'bankroll', 'point', 'bets', 'skip'].some((k) => url.has(k));
   const urlRules = url.get('rules');
   const rules: SceneConfig['rules'] =
     scene.rules ??
@@ -72,6 +78,23 @@ export function buildCore(
   const seedParam = url.get('seed');
   const seed = sandbox && seedParam && /^\d+$/.test(seedParam) ? Number(seedParam) : undefined;
   const dice = sandbox ? parseDice(url.get('dice')) : [];
+  // A shared table: rules, rack, point and layout from the link; forced dice still apply first.
+  const shared =
+    sandbox && !scene.steps?.length
+      ? bootFromParams(url, {
+          rules: typeof rules === 'string' ? rules : settings.rulesPreset,
+          bankroll: scene.bankroll ?? 50_000,
+          seed: seed ?? randomSeed(),
+        })
+      : null;
+  if (shared) {
+    const game = dice.length ? { ...shared.game, forcedDice: dice } : shared.game;
+    return {
+      core: { game, rt: { stepIndex: 0, stepStartRoll: 0, counters: {}, done: true } },
+      startEquity: equity(game),
+      skipped: shared.skipped,
+    };
+  }
   const sc: SceneConfig = {
     ...withRules,
     ...(dice.length ? { forcedDice: [...(scene.forcedDice ?? []), ...dice] } : {}),

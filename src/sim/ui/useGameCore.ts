@@ -12,6 +12,7 @@ import type {
 } from '../engine/types';
 import { tableExpectedLossPerRoll, expectedLossByTypePerRoll } from '../math/ev';
 import { toNumber } from '../math/fraction';
+import { makeVarianceFn } from '../math';
 import { gateAction } from '../scene';
 import type { SceneConfig, SceneInput } from '../scene/types';
 import type { SimulatorEvent } from './types';
@@ -28,6 +29,8 @@ interface GameCoreOptions {
   /** a confirmed roll: animate from pre to post */
   onRolled: (pre: GameState, post: GameState, events: GameEvent[]) => void;
 }
+
+const varianceFn = makeVarianceFn();
 
 /** Game state + scene runtime, scene observation (feed) and the gated action dispatcher. */
 export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: GameCoreOptions) {
@@ -62,6 +65,7 @@ export function useGameCore({ boot, sceneRef, emit, onRejected, onRolled }: Game
     const res = applyAction(g, action, {
       expectedLossFn: (s) => toNumber(tableExpectedLossPerRoll(s)),
       expectedLossByTypeFn: expectedLossByTypePerRoll,
+      varianceFn,
     });
     if (!res.ok) {
       emit({ type: 'action-rejected', action, error: res.error });

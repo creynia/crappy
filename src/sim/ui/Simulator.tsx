@@ -6,6 +6,7 @@ import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
 import { SessionPanel } from './SessionPanel';
+import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
 import { SimControls, type Panels } from './SimControls';
 import { SimMenu } from './SimMenu';
@@ -371,6 +372,7 @@ export function Simulator(props: SimulatorInternalProps) {
           rollsPerHour={settings.rollsPerHour}
           emit={emit}
           feedInput={feedInput}
+          persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
         />
       ) : null}
 

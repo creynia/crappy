@@ -113,6 +113,62 @@ test.describe('sandbox', () => {
     await guard.check('auto-roll-done');
   });
 
+  test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
+    const noHScroll = async (label: string) => {
+      const m = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+        '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+      );
+      expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
+    };
+    for (const { width, height } of [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
+      // single-strategy auto-roll in the sandbox
+      await page.setViewportSize({ width, height });
+      await page.goto('/#/play?speed=fast');
+      const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+      if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+      const panel = page.locator('.sim-auto');
+      await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+      await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`auto-roll @${width}`);
+
+      // strategy compare run on a lesson scene (the 4-column summary table)
+      await page.goto('/#/learn/strategy-fun-per-dollar');
+      const scene = page.locator('section.scene').nth(0);
+      await scene.scrollIntoViewIfNeeded();
+      await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
+      await expect(scene.getByTestId('auto-roll-summary')).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`compare @${width}`);
+    }
+  });
+
+  test('auto-roll starting bankroll picker sets the run bankroll without page overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/play?speed=fast');
+    const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+    if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+    const panel = page.locator('.sim-auto');
+    await panel
+      .getByRole('group', { name: 'Starting bankroll' })
+      .getByRole('button', { name: '$5,000' })
+      .click();
+    await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+    await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole('region', { name: 'Strategy summary' })).toContainText(
+      '$5,000.00',
+    );
+    const scroll = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+      '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+    );
+    expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
+  });
+
   test('sandbox state persists across reload', async ({ page, guard }) => {
     await page.goto(url());
     await page.locator('[data-region="pass"]').click();

@@ -181,7 +181,7 @@ describe('AutoRollPanel bankroll controls', () => {
     [...scope.querySelectorAll('button')].find((b) => b.textContent === text) as HTMLButtonElement;
   const config = { rollOptions: [100], sessions: [100] };
 
-  it('disables stop-if-down chips above the starting bankroll', async () => {
+  it('disables stop-if-down chips above the starting bankroll', () => {
     const el = document.createElement('div');
     render(<AutoRollPanel initialSeed={7} bankroll={20_000} config={config} />, el);
     expect(btn(group(el, 'Stop when behind by'), '$250').disabled).toBe(true);

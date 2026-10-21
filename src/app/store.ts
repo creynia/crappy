@@ -75,10 +75,16 @@ export class Store {
     return Object.hasOwn(this.data.lessons, id) ? this.data.lessons[id] : undefined;
   }
 
-  /** Clear a lesson's quiz results (keeps completedAt and scene progress), e.g. to retake an exam. */
+  /**
+   * Clear a lesson's quiz results (keeps completedAt and scene progress), e.g. to retake an exam. Answers to
+   * in-scene questions (keys "<scene>:<step>") are practice, not exam answers, so they are kept.
+   */
   resetLesson(id: string) {
     if (!Object.hasOwn(this.data.lessons, id)) return;
-    this.patchLesson(id, (l) => ({ ...l, quizzes: {} }));
+    this.patchLesson(id, (l) => ({
+      ...l,
+      quizzes: Object.fromEntries(Object.entries(l.quizzes).filter(([k]) => k.includes(':'))),
+    }));
   }
 
   status(id: string): LessonStatus {

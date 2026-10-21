@@ -191,3 +191,11 @@
 .pr-missed li {
   margin: 0.4rem 0;
 }
+/* ranked feedback (best move): the rank is in the text, so ties can share a number */
+.pr-explain-list {
+  list-style: none;
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 0;
+  display: grid;
+  gap: 0.25rem;
+}

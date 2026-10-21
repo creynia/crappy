@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { previewAction, toNumber } from '../../../sim/math';
 import { validateAction } from '../../../sim/engine';
 import { createDrillRng } from '../rng';
-import { bestMove, bestOf, MIN_MARGIN, type BestMoveItem } from './bestMove';
+import { bestMove, bestOf, MIN_MARGIN, rankedLines, type BestMoveItem } from './bestMove';
 
 const item = (seed: number, level: number) =>
   bestMove.generate(createDrillRng(seed), level) as BestMoveItem;
@@ -54,8 +54,14 @@ describe('best move drill', () => {
     const wrong = bestMove.check(it_, other.id);
     expect(wrong.ok).toBe(false);
     expect(wrong.expected).toBe(it_.options.find((o) => o.id === it_.best)!.label);
-    for (const o of it_.options) expect(wrong.explain).toContain(o.headline);
-    expect(wrong.explain).toMatch(/^Ranked by expected value per dollar: 1\./);
+    expect(wrong.explain).toContain('per bet resolved');
+    expect(wrong.explain).toContain('swings');
+    const list = wrong.explainList!;
+    expect(list).toHaveLength(it_.options.length);
+    expect(list[0]).toMatch(/^1\. /);
+    for (const o of it_.options) expect(list.some((l) => l.includes(o.headline))).toBe(true);
+    // the house edge is stated once (in the headline), not again in a trailing parenthesis
+    for (const l of list) expect(l).not.toMatch(/house edge [\d.]+%\).*of the money at risk/);
   });
 
   it('level 1 always offers free odds and marks them best; level 3 prices taking down a winning DP', () => {
@@ -79,6 +85,64 @@ describe('best move drill', () => {
       expect(l3.best).toBe('lay-odds');
     }
     expect(seen).toBe(true);
+  });
+
+  it('every template appears at every level that offers it', () => {
+    const want: Record<number, string[]> = {
+      1: ['odds-first', 'come-out', 'field-vs-props'],
+      2: ['odds-first', 'numbers', 'come-out', 'which-number', 'buy-or-place', 'field-vs-props'],
+      3: [
+        'odds-first',
+        'numbers',
+        'dont-side',
+        'come-out',
+        'which-number',
+        'buy-or-place',
+        'field-vs-props',
+      ],
+    };
+    for (const level of [1, 2, 3]) {
+      const seen = new Set<string>();
+      for (let seed = 0; seed < 400; seed++) seen.add(item(seed, level).template);
+      expect([...seen].sort(), `level ${level}`).toEqual([...want[level]!].sort());
+    }
+  });
+
+  it('the new templates have a best move that is neither free odds nor a line bet', () => {
+    const bestOfTemplate = (t: string) => {
+      const out = new Set<string>();
+      for (let seed = 0; seed < 600; seed++) {
+        const x = item(seed, 3);
+        if (x.template === t) out.add(x.best);
+      }
+      return [...out];
+    };
+    expect(bestOfTemplate('numbers')).toEqual(['buy-30']);
+    expect(bestOfTemplate('which-number')).toEqual(['place-6']);
+    expect(bestOfTemplate('buy-or-place')).toEqual(['buy']);
+    expect(bestOfTemplate('field-vs-props')).toEqual(['field']);
+  });
+
+  it('ranked lines number ties alike', () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const x = item(seed, 3);
+      if (x.template !== 'buy-or-place') continue;
+      const lines = rankedLines(x);
+      // place the n for $20 and for $10 have the same edge: they share a rank
+      expect(lines.filter((l) => l.includes('(tied)'))).toHaveLength(2);
+      return;
+    }
+    throw new Error('no buy-or-place item');
+  });
+
+  it("places the point at a full-pay amount in the don't-side template", () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const x = item(seed, 3);
+      const p = x.options.find((o) => o.id === 'place');
+      if (x.template !== 'dont-side' || !p) continue;
+      const pt = x.state.point!;
+      expect(p.stake).toBe(pt === 6 || pt === 8 ? 1200 : 1000);
+    }
   });
 
   it('bestOf rejects ties', () => {

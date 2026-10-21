@@ -30,6 +30,8 @@ export interface BestMoveItem extends DrillItem {
   /** id of the option with the highest EV per dollar */
   best: string;
   situation: string;
+  /** which template built it */
+  template: string;
 }
 
 /** Options closer than this (EV per dollar, as a fraction) are a tie: the item is rejected. */
@@ -38,6 +40,7 @@ export const MIN_MARGIN = 0.002;
 const BANKROLL = 50_000;
 
 interface Template {
+  id: string;
   /** which levels offer it (1-based) */
   levels: readonly number[];
   build(rng: DrillRng): { state: GameState; situation: string; candidates: Candidate[] } | null;
@@ -82,6 +85,7 @@ function maxOdds(state: GameState, flat: Cents, point: PointNumber): Cents {
 const TEMPLATES: Template[] = [
   // 1. Pass line up, point on: odds beat every number bet
   {
+    id: 'odds-first',
     levels: [1, 2, 3],
     build(rng) {
       const point = rng.pick(POINT_NUMBERS);
@@ -128,8 +132,10 @@ const TEMPLATES: Template[] = [
       };
     },
   },
-  // 2. Numbers: place 6/8 vs place 4/10 vs buy 4 ($10 vs $20) vs big 6
+  // 2. Numbers: place 6/8 vs place 4/10 vs buy 4/10 at $10 and $30 (the $1 vig: 10% vs 3.3% of the
+  //    bet). Buy $30 (1.11%) beats place 6 $12 (1.52%) by more than MIN_MARGIN.
   {
+    id: 'numbers',
     levels: [2, 3],
     build(rng) {
       const point = rng.pick([5, 9, 6, 8] as const);
@@ -156,10 +162,10 @@ const TEMPLATES: Template[] = [
           stake: 1000,
         },
         {
-          id: 'buy-20',
-          label: `Buy the ${outside} for $20`,
-          action: place(`buy-${outside}`, 2000),
-          stake: 2000,
+          id: 'buy-30',
+          label: `Buy the ${outside} for $30`,
+          action: place(`buy-${outside}`, 3000),
+          stake: 3000,
         },
       ];
       return {
@@ -171,6 +177,7 @@ const TEMPLATES: Template[] = [
   },
   // 3. Don't side: taking down a winning Don't Pass vs laying odds vs chasing the number
   {
+    id: 'dont-side',
     levels: [3],
     build(rng) {
       const point = rng.pick(POINT_NUMBERS);
@@ -178,6 +185,8 @@ const TEMPLATES: Template[] = [
       const state = game({ point, bets: [{ type: 'dont-pass', amount: flat }] });
       const dp = state.bets[0]!;
       const lay = Math.min(maxOdds(state, flat, point) * 2, flat * state.rules.maxLayOdds[point]);
+      // a full-pay place bet: $12 on 6/8 (7 to 6), $10 elsewhere
+      const placeAmt = point === 6 || point === 8 ? 1200 : 1000;
       const candidates: Candidate[] = [
         {
           id: 'take-down',
@@ -193,9 +202,9 @@ const TEMPLATES: Template[] = [
         },
         {
           id: 'place',
-          label: `Place the ${point} for $10`,
-          action: place(`place-${point}`, 1000),
-          stake: 1000,
+          label: `Place the ${point} for ${dollars(placeAmt)}`,
+          action: place(`place-${point}`, placeAmt),
+          stake: placeAmt,
         },
         { id: 'any-7', label: 'Bet $5 on Any Seven', action: place('any-7', 500), stake: 500 },
       ];
@@ -212,6 +221,7 @@ const TEMPLATES: Template[] = [
   },
   // 4. Come-out: line bets vs the shiny one-roll bets
   {
+    id: 'come-out',
     levels: [1, 2, 3],
     build(rng) {
       const state = game({ point: null });
@@ -236,6 +246,105 @@ const TEMPLATES: Template[] = [
       return {
         state,
         situation: `Come-out roll, nothing on the table, ${dollars(state.bankroll)} in the rack. Which bet gives the house the least?`,
+        candidates,
+      };
+    },
+  },
+  // 5. No line bet, point on: which number to place (best: place 6/8, a 1.52% bet)
+  {
+    id: 'which-number',
+    levels: [2, 3],
+    build(rng) {
+      const point = rng.pick(POINT_NUMBERS);
+      const state = game({ point });
+      const six = rng.pick([6, 8] as const);
+      const four = rng.pick([4, 10] as const);
+      const five = rng.pick([5, 9] as const);
+      const candidates: Candidate[] = [
+        {
+          id: 'place-6',
+          label: `Place the ${six} for $12`,
+          action: place(`place-${six}`, 1200),
+          stake: 1200,
+        },
+        {
+          id: 'place-4',
+          label: `Place the ${four} for $10`,
+          action: place(`place-${four}`, 1000),
+          stake: 1000,
+        },
+        {
+          id: 'place-5',
+          label: `Place the ${five} for $10`,
+          action: place(`place-${five}`, 1000),
+          stake: 1000,
+        },
+        { id: 'field', label: 'Bet $10 on the Field', action: place('field', 1000), stake: 1000 },
+      ];
+      return {
+        state,
+        situation: pointOn(point, state.bankroll, 'You have no bets on the table.'),
+        candidates,
+      };
+    },
+  },
+  // 6. Betting the 4 or 10: buy it for $20 (1.67%) or place it (6.67%)?
+  {
+    id: 'buy-or-place',
+    levels: [2, 3],
+    build(rng) {
+      const point = rng.pick(POINT_NUMBERS);
+      const state = game({ point });
+      const n = rng.pick([4, 10] as const);
+      const hard = n === 4 ? 'hard-4' : 'hard-10';
+      const candidates: Candidate[] = [
+        { id: 'buy', label: `Buy the ${n} for $20`, action: place(`buy-${n}`, 2000), stake: 2000 },
+        {
+          id: 'place',
+          label: `Place the ${n} for $20`,
+          action: place(`place-${n}`, 2000),
+          stake: 2000,
+        },
+        {
+          id: 'place-10',
+          label: `Place the ${n} for $10`,
+          action: place(`place-${n}`, 1000),
+          stake: 1000,
+        },
+        { id: 'hard', label: `Bet $5 on Hard ${n}`, action: place(hard, 500), stake: 500 },
+      ];
+      return {
+        state,
+        situation: pointOn(point, state.bankroll, `You want action on the ${n}.`),
+        candidates,
+      };
+    },
+  },
+  // 7. One-roll fun: the Field (5.56%) beats the other quick bets
+  {
+    id: 'field-vs-props',
+    levels: [1, 2, 3],
+    build(rng) {
+      const point = rng.pick(POINT_NUMBERS);
+      const state = game({ point });
+      const candidates: Candidate[] = [
+        { id: 'field', label: 'Bet $10 on the Field', action: place('field', 1000), stake: 1000 },
+        { id: 'big-6', label: 'Bet $10 on Big 6', action: place('big-6', 1000), stake: 1000 },
+        {
+          id: 'any-craps',
+          label: 'Bet $5 on Any Craps',
+          action: place('any-craps', 500),
+          stake: 500,
+        },
+        { id: 'yo', label: 'Bet $5 on Yo (11)', action: place('yo-11', 500), stake: 500 },
+      ];
+      return {
+        state,
+        situation: pointOn(
+          point,
+          state.bankroll,
+          'You want a quick bet with no line bet behind it.',
+        ),
         candidates,
       };
     },
@@ -281,7 +390,8 @@ export function generate(rng: DrillRng, level: number): BestMoveItem {
   const pool = TEMPLATES.filter((t) => t.levels.includes(level));
   // a handful of tries: a template whose options tie or fail validation is skipped
   for (let attempt = 0; attempt < 20; attempt++) {
-    const built = rng.pick(pool).build(rng);
+    const tpl = rng.pick(pool);
+    const built = tpl.build(rng);
     if (!built) continue;
     const options = priceOptions(built.state, built.candidates);
     if (!options) continue;
@@ -302,6 +412,7 @@ export function generate(rng: DrillRng, level: number): BestMoveItem {
       options: shuffled,
       best: best.id,
       situation: built.situation,
+      template: tpl.id,
     };
   }
   throw new Error('bestMove: no tie-free situation found');
@@ -309,14 +420,28 @@ export function generate(rng: DrillRng, level: number): BestMoveItem {
 
 const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
 
-function explain(item: BestMoveItem): string {
+/** The options best first, numbered by rank; options with the same EV per dollar share a rank. */
+export function rankedLines(item: BestMoveItem): string[] {
   const ranked = [...item.options].sort((a, b) => b.evPerDollar - a.evPerDollar);
-  const lines = ranked.map((o, i) => {
-    const per = o.evPerDollar >= 0 ? 'no cost' : `${pct(-o.evPerDollar)} of the money at risk`;
-    return `${i + 1}. ${o.label}: ${o.headline} (${per}).`;
+  let rank = 0;
+  return ranked.map((o, i) => {
+    const prev = ranked[i - 1];
+    const tied =
+      (prev && Math.abs(prev.evPerDollar - o.evPerDollar) < 1e-12) ||
+      (ranked[i + 1] && Math.abs(ranked[i + 1]!.evPerDollar - o.evPerDollar) < 1e-12);
+    if (!prev || Math.abs(prev.evPerDollar - o.evPerDollar) >= 1e-12) rank = i + 1;
+    // the headline already states the house edge when there is one
+    const per = /%/.test(o.headline)
+      ? ''
+      : o.evPerDollar >= 0
+        ? ' (no cost)'
+        : ` (${pct(-o.evPerDollar)} of the money at risk)`;
+    return `${rank}${tied ? ' (tied)' : ''}. ${o.label}: ${o.headline}${per}.`;
   });
-  return `Ranked by expected value per dollar: ${lines.join(' ')}`;
 }
+
+const METRIC =
+  'Ranked by expected value per dollar, per bet resolved. Odds bets cost nothing, but they still add to the swings.';
 
 export const bestMove = defineDrill<BestMoveItem, string>({
   id: 'best-move',
@@ -330,7 +455,8 @@ export const bestMove = defineDrill<BestMoveItem, string>({
       ok: answer === item.best,
       expected: best.label,
       correct: item.best,
-      explain: explain(item),
+      explain: METRIC,
+      explainList: rankedLines(item),
     };
   },
 });

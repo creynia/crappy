@@ -328,6 +328,7 @@ const SCENE_KEYS = [
   'ui',
   'autoRoll',
   'steps',
+  'challenge',
 ];
 const STEP_KEYS = [
   'id',
@@ -407,6 +408,8 @@ export function validateScene(
         'speed',
         'compact',
         'winPrompt',
+        'showRestart',
+        'stepPanelLabel',
       ]);
       if (
         u.orientation !== undefined &&
@@ -429,8 +432,10 @@ export function validateScene(
         'showSettings',
         'compact',
         'winPrompt',
+        'showRestart',
       ])
         if (u[k] !== undefined) c.bool(`ui.${k}`, u[k]);
+      if (u.stepPanelLabel !== undefined) c.str('ui.stepPanelLabel', u.stepPanelLabel);
       if (u.speed !== undefined && !['normal', 'fast', 'instant'].includes(u.speed as string))
         c.err('ui.speed', 'must be normal, fast or instant');
     }
@@ -449,6 +454,7 @@ export function validateScene(
         'sessions',
         'compareMode',
         'compare',
+        'table',
         'chart',
         'stopWin',
         'stopLoss',
@@ -481,6 +487,7 @@ export function validateScene(
           });
       }
       if (a.compareMode !== undefined) c.bool('autoRoll.compareMode', a.compareMode);
+      if (a.table !== undefined) c.bool('autoRoll.table', a.table);
       if (a.chart !== undefined && a.chart !== 'bankroll' && a.chart !== 'edge')
         c.err('autoRoll.chart', 'must be "bankroll" or "edge"');
       // The panel offers these amounts as chips, so a scene can only pick one of them.
@@ -541,6 +548,19 @@ export function validateScene(
     }
   }
 
+  if (s.challenge !== undefined) {
+    if (!isObj(s.challenge)) c.err('challenge', 'must be an object');
+    else {
+      c.keys('challenge', s.challenge, ['rolls', 'scoring']);
+      if (!(isInt(s.challenge.rolls) && s.challenge.rolls >= 1))
+        c.err('challenge.rolls', 'must be a positive integer');
+      if (!isObj(s.challenge.scoring)) c.err('challenge.scoring', 'must be an object');
+      else {
+        c.keys('challenge.scoring', s.challenge.scoring, ['minResolved']);
+        c.cents('challenge.scoring.minResolved', s.challenge.scoring.minResolved);
+      }
+    }
+  }
   if (s.steps !== undefined) {
     if (!Array.isArray(s.steps) || s.steps.length === 0)
       c.err('steps', 'must be a non-empty array');

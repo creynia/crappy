@@ -45,6 +45,10 @@ export interface SceneConfig {
     compact?: boolean;
     /** ask Press / Same / Regress / Take down after a place or buy bet wins (off in scenes unless true) */
     winPrompt?: boolean;
+    /** hide the step panel's Restart (default shown); a challenge keeps its seed */
+    showRestart?: boolean;
+    /** accessible name of the step panel (default "Lesson step") */
+    stepPanelLabel?: string;
   };
   autoRoll?: {
     enabled: boolean;
@@ -57,6 +61,8 @@ export interface SceneConfig {
     chart?: 'bankroll' | 'edge';
     /** per-strategy specs to compare side by side (implies compareMode) */
     compare?: StrategySpec[];
+    /** open on the sortable all-presets comparison table */
+    table?: boolean;
     /** default "stop when ahead by" amount, in cents; the learner can change it in the panel */
     stopWin?: Cents;
     /** default "stop when behind by" amount, in cents */
@@ -67,6 +73,8 @@ export interface SceneConfig {
     sweep?: { strategy: StrategyId; oddsMultiples: (number | 'max')[] };
   };
   steps?: SceneStep[];
+  /** Challenge mode (I030): a scored session of `rolls` rolls; see scene/challenge.ts */
+  challenge?: { rolls: number; scoring: { minResolved: Cents } };
 }
 
 export interface SceneStep {

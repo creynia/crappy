@@ -535,13 +535,16 @@ export const STRATEGIES: Impl[] = [
     'Re-bets the layout you built, every roll, as bets come down.',
     repeatLayout,
   ),
-  make(
-    'martingale-pass',
-    'Martingale on the pass line',
-    'fun',
-    'Double the pass line bet after each loss, back to one unit after a win (capped at the table max and your bankroll).',
-    martingale,
-  ),
+  {
+    ...make(
+      'martingale-pass',
+      'Martingale on the pass line',
+      'fun',
+      'Double the pass line bet after each loss, back to one unit after a win (capped at the table max and your bankroll).',
+      martingale,
+    ),
+    escalating: true,
+  },
   make(
     'dont-come-molly',
     "Don't Molly",

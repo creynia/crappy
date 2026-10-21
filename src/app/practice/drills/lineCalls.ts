@@ -95,9 +95,10 @@ function choicesFor(level: number): Choice[] {
 function generate(rng: DrillRng, level: number): LineCallItem {
   const bet: LineBet = level >= 3 && rng.chance(0.5) ? 'dont-pass' : 'pass-line';
   const point: PointNumber | null = level >= 2 && rng.chance(0.5) ? rng.pick(POINT_NUMBERS) : null;
-  // With a point on, most totals mean nothing; lean towards the deciding totals half the time.
-  const dice: Dice =
-    point !== null && rng.chance(0.5) ? rng.pick(combos(rng.pick([7, point]))) : rng.dice();
+  // Lean towards deciding totals half the time, so "No decision" is not the usual answer:
+  // with a point on, 7 or the point; on the come-out, a natural (7, 11) or craps (2, 3, 12).
+  const deciding: readonly number[] = point !== null ? [7, point] : [7, 11, 2, 3, 12];
+  const dice: Dice = rng.chance(0.5) ? rng.pick(combos(rng.pick(deciding))) : rng.dice();
   const { outcome, events } = resolveLineBet(bet, point, dice);
   const name = BET_TYPES[bet].label;
   const sorted = [...dice].sort().join('');
@@ -124,13 +125,14 @@ function generate(rng: DrillRng, level: number): LineCallItem {
 export const lineCalls = defineDrill<LineCallItem, string>({
   id: 'line-calls',
   title: 'Line calls',
-  summary: 'Pass or don’t pass: win, lose or no decision?',
+  summary: "Pass or Don't Pass: win, lose or no decision?",
   levels: ['Come-out only', 'Come-out and point', "Add Don't Pass"],
   generate,
   check(item, answer) {
     return {
       ok: answer === item.outcome,
       expected: LABELS[item.outcome],
+      correct: item.outcome,
       explain: explain(item),
     };
   },

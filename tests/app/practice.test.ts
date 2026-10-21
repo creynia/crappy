@@ -9,12 +9,14 @@ import {
   answerRound,
   createRound,
   currentEntry,
+  dueReview,
   isRoundDone,
   itemFor,
   missedEntries,
   nextItem,
   type Round,
 } from '../../src/app/practice/round';
+import { emptyDrillProgress } from '../../src/app/storage';
 import { defineDrill, type DrillItem } from '../../src/app/practice/types';
 
 // A tiny drill with a known answer: "what is n?" for n drawn from 0..99 (level scales the range).
@@ -128,7 +130,7 @@ describe('answering a round', () => {
     for (let i = 0; i < REVIEW_GAP; i++) r = answer(r, true).round;
     expect(currentEntry(r)!.item.key).toBe(missedKey);
     const again = answer(r, true);
-    expect(again.effects).toEqual({}); // re-asks never touch the saved review list
+    expect(again.effects).toEqual({ scored: false }); // re-asks never touch review or streak
     expect(again.round.score).toBe(REVIEW_GAP);
     r = again.round;
     while (!isRoundDone(r)) r = answer(r, true).round;
@@ -150,11 +152,39 @@ describe('answering a round', () => {
     expect(r.streak).toBe(0);
   });
 
-  it('clears a saved review item answered right on the first try', () => {
+  it('passes a saved review item answered right on the first try', () => {
     const ref = { seed: 77, level: 1 };
     const r = createRound(numbers, { seed: 1, level: 1, review: [ref] });
-    expect(answer(r, true).effects).toEqual({ clearReview: ref });
-    expect(answer(r, false).effects).toEqual({ addReview: ref });
+    expect(answer(r, true).effects).toEqual({ scored: true, passReview: ref });
+    expect(answer(r, false).effects).toEqual({ scored: true, addReview: ref });
+  });
+
+  it('re-asks leave the round streak alone', () => {
+    let r = createRound(numbers, { seed: 2, level: 1 });
+    r = answer(r, true).round;
+    r = answer(r, false).round; // streak 0, re-asked later
+    for (let i = 0; i < REVIEW_GAP; i++) r = answer(r, true).round;
+    expect(r.streak).toBe(REVIEW_GAP);
+    expect(currentEntry(r)!.scored).toBe(false);
+    r = answer(r, true).round;
+    expect(r.streak).toBe(REVIEW_GAP);
+  });
+
+  it('dueReview: only items due by the current round, earliest first', () => {
+    const p = {
+      ...emptyDrillProgress(),
+      rounds: 3,
+      review: [
+        { seed: 1, level: 1, due: 3, gap: 2 },
+        { seed: 2, level: 1, due: 5, gap: 4 },
+        { seed: 3, level: 2, due: 1, gap: 1 },
+      ],
+    };
+    expect(dueReview(p)).toEqual([
+      { seed: 3, level: 2 },
+      { seed: 1, level: 1 },
+    ]);
+    expect(dueReview(undefined)).toEqual([]);
   });
 });
 

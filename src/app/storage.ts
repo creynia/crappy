@@ -62,6 +62,16 @@ export interface PracticeItemRef {
   level: number;
 }
 
+/** Review steps in rounds: a miss comes back next round, then 2, then 4 rounds later. */
+export const REVIEW_GAPS = [1, 2, 4] as const;
+
+/** A saved review item: due at the start of round `due` (0-based count of completed rounds). */
+export interface ReviewItem extends PracticeItemRef {
+  due: number;
+  /** current step from REVIEW_GAPS */
+  gap: number;
+}
+
 /** Per-drill practice progress (src/app/practice). */
 export interface DrillProgress {
   /** completed 10-item rounds */
@@ -77,7 +87,7 @@ export interface DrillProgress {
   level: number;
   lastPlayedAt?: number;
   /** spaced review: items missed on the first try, oldest first; cleared when answered right in a later round */
-  review: PracticeItemRef[];
+  review: ReviewItem[];
 }
 
 export const STORAGE_VERSION = 2;
@@ -158,11 +168,18 @@ export function sanitizeDrillProgress(raw: unknown): DrillProgress {
   if (at !== undefined) p.lastPlayedAt = at;
   if (Array.isArray(o.review))
     for (const r of o.review as unknown[]) {
-      const seed = isObj(r) ? num(r.seed) : undefined;
-      const level = isObj(r) ? num(r.level) : undefined;
+      if (!isObj(r)) continue;
+      const seed = num(r.seed);
+      const level = num(r.level);
       if (seed === undefined || level === undefined || !Number.isInteger(seed)) continue;
       if (p.review.length >= REVIEW_LIMIT) break;
-      p.review.push({ seed: seed | 0, level: Math.max(1, Math.min(9, Math.floor(level))) });
+      const gap = num(r.gap);
+      p.review.push({
+        seed: seed | 0,
+        level: Math.max(1, Math.min(9, Math.floor(level))),
+        due: count(r.due),
+        gap: REVIEW_GAPS.includes(gap as 1) ? gap! : 1,
+      });
     }
   return p;
 }
@@ -219,26 +236,91 @@ export function sanitize(input: unknown): Persisted | null {
       lessons[id] = p;
     }
   }
-  const practice: Record<string, DrillProgress> = {};
-  if (isObj(raw.practice))
-    for (const [id, v] of safeEntries(raw.practice)) practice[id] = sanitizeDrillProgress(v);
-  return { version: 2, lessons, settings: sanitizeSettings(raw.settings), practice };
+  return {
+    version: 2,
+    lessons,
+    settings: sanitizeSettings(raw.settings),
+    practice: sanitizePractice(raw.practice),
+  };
 }
 
-/** Never throws; anything unreadable gives defaults. */
-export function load(storage: StorageLike): Persisted {
+function sanitizePractice(raw: unknown): Record<string, DrillProgress> {
+  const practice: Record<string, DrillProgress> = {};
+  if (isObj(raw)) for (const [id, v] of safeEntries(raw)) practice[id] = sanitizeDrillProgress(v);
+  return practice;
+}
+
+/**
+ * Practice progress is also kept under its own key. A tab still running the previous build
+ * (data version 1) rewrites STORAGE_KEY without `practice`; on the next load that v1 data is
+ * migrated and practice is restored from this key instead of being lost.
+ */
+export const PRACTICE_KEY = 'crappy:v1:practice';
+
+/** Where unreadable saved data is copied before defaults are used (one per tag, first kept). */
+export const backupKey = (tag: string) => `crappy:v1:backup-${tag}`;
+
+export interface LoadResult {
+  data: Persisted;
+  /**
+   * The saved data comes from a newer version of the app: use defaults in memory and never
+   * write, so going back to the newer build finds its data intact.
+   */
+  readOnly: boolean;
+}
+
+function backup(storage: StorageLike, tag: string, text: string) {
   try {
-    const text = storage.getItem(STORAGE_KEY);
-    if (text) return sanitize(JSON.parse(text)) ?? defaultPersisted();
+    if (storage.getItem(backupKey(tag)) === null) storage.setItem(backupKey(tag), text);
   } catch {
-    /* fall through */
+    /* storage full or unavailable: nothing more we can do */
   }
-  return defaultPersisted();
+}
+
+/** Never throws. Unreadable data is backed up before defaults are used. */
+export function loadWithStatus(storage: StorageLike): LoadResult {
+  const fresh = (readOnly = false): LoadResult => ({ data: defaultPersisted(), readOnly });
+  let text: string | null;
+  try {
+    text = storage.getItem(STORAGE_KEY);
+  } catch {
+    return fresh();
+  }
+  if (!text) return fresh();
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    backup(storage, 'corrupt', text);
+    return fresh();
+  }
+  const version = isObj(raw) ? raw.version : undefined;
+  if (typeof version === 'number' && version > STORAGE_VERSION) return fresh(true);
+  const data = sanitize(raw);
+  if (!data) {
+    backup(storage, typeof version === 'number' ? `v${version}` : 'unknown', text);
+    return fresh();
+  }
+  if (version === 1) {
+    try {
+      const shadow = storage.getItem(PRACTICE_KEY);
+      if (shadow) data.practice = sanitizePractice(JSON.parse(shadow));
+    } catch {
+      /* keep the empty practice record */
+    }
+  }
+  return { data, readOnly: false };
+}
+
+/** Never throws; anything unreadable gives defaults (see loadWithStatus). */
+export function load(storage: StorageLike): Persisted {
+  return loadWithStatus(storage).data;
 }
 
 export function save(storage: StorageLike, data: Persisted): boolean {
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(data));
+    storage.setItem(PRACTICE_KEY, JSON.stringify(data.practice));
     return true;
   } catch {
     return false;

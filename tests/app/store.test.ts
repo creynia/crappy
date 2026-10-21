@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MemoryStorage, STORAGE_KEY, load } from '../../src/app/storage';
+import { MemoryStorage, REVIEW_LIMIT, STORAGE_KEY, load } from '../../src/app/storage';
 import { Store, nextLesson, overallProgress } from '../../src/app/store';
 import type { ContentBundle } from '../../src/content/types';
 
@@ -187,16 +187,17 @@ describe('practice progress', () => {
     s.recordPracticeAnswer('d', true);
     s.recordPracticeAnswer('d', false, { addReview: { seed: 1, level: 1 } });
     s.recordPracticeAnswer('d', false, { addReview: { seed: 1, level: 1 } });
-    s.recordPracticeAnswer('d', true, { clearReview: { seed: 9, level: 1 } });
+    s.recordPracticeAnswer('d', true, { passReview: { seed: 9, level: 1 } });
+    s.recordPracticeAnswer('d', true, { scored: false }); // a re-ask: streak unchanged
     expect(s.drill('d')).toMatchObject({
       streak: 1,
       bestStreak: 2,
-      review: [{ seed: 1, level: 1 }],
+      review: [{ seed: 1, level: 1, due: 1, gap: 1 }],
     });
-    s.recordPracticeAnswer('d', true, { clearReview: { seed: 1, level: 1 } });
-    expect(s.drill('d')?.review).toEqual([]);
     s.recordPracticeRound('d', 7, 2, 50);
     s.recordPracticeRound('d', 5, 2, 60);
+    s.recordPracticeAnswer('d', true, { passReview: { seed: 1, level: 1 } });
+    expect(s.drill('d')?.review).toEqual([{ seed: 1, level: 1, due: 4, gap: 2 }]);
     expect(s.drill('d')).toMatchObject({ rounds: 2, best: 7, last: 5, level: 2, lastPlayedAt: 60 });
     s.setPracticeLevel('d', 3);
     expect(s.drill('d')?.level).toBe(3);
@@ -205,5 +206,35 @@ describe('practice progress', () => {
     expect(new Store(m).drill('d')?.best).toBe(7);
     s.reset();
     expect(s.drill('d')).toBeUndefined();
+  });
+});
+
+describe('spaced review schedule', () => {
+  it('a miss comes back next round, then 2, then 4 rounds later, then leaves', () => {
+    const s = new Store(new MemoryStorage());
+    const ref = { seed: 5, level: 1 };
+    const round = () => s.recordPracticeRound('d', 0, 1);
+    const item = () => s.drill('d')!.review[0];
+    s.recordPracticeAnswer('d', false, { addReview: ref }); // round 0
+    expect(item()).toEqual({ ...ref, due: 1, gap: 1 });
+    round();
+    s.recordPracticeAnswer('d', true, { passReview: ref }); // round 1
+    expect(item()).toEqual({ ...ref, due: 3, gap: 2 });
+    round();
+    round();
+    s.recordPracticeAnswer('d', true, { passReview: ref }); // round 3
+    expect(item()).toEqual({ ...ref, due: 7, gap: 4 });
+    s.recordPracticeAnswer('d', false, { addReview: ref }); // missed again: back to the start
+    expect(item()).toEqual({ ...ref, due: 4, gap: 1 });
+    expect(s.drill('d')!.review).toHaveLength(1);
+  });
+
+  it('keeps the REVIEW_LIMIT most recent misses', () => {
+    const s = new Store(new MemoryStorage());
+    for (let i = 0; i < REVIEW_LIMIT + 3; i++)
+      s.recordPracticeAnswer('d', false, { addReview: { seed: i, level: 1 } });
+    const seeds = s.drill('d')!.review.map((r) => r.seed);
+    expect(seeds).toHaveLength(REVIEW_LIMIT);
+    expect(seeds[0]).toBe(3);
   });
 });

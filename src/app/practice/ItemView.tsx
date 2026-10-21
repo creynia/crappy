@@ -110,7 +110,20 @@ export function ItemView(props: {
       <div class="pr-choices" role="group" aria-label="Answers">
         {spec.choices.map((c) => {
           const picked = answered?.answer === c.id;
-          const state = !answered ? '' : picked ? (answered.result.ok ? ' right' : ' wrong') : '';
+          const isCorrect =
+            answered !== null &&
+            (answered.result.correct !== undefined
+              ? answered.result.correct === c.id
+              : answered.result.expected === c.label);
+          const state = !answered
+            ? ''
+            : picked
+              ? answered.result.ok
+                ? ' right'
+                : ' wrong'
+              : isCorrect
+                ? ' right is-answer'
+                : '';
           return (
             <button
               type="button"
@@ -127,6 +140,7 @@ export function ItemView(props: {
                 </span>
               )}
               <span>{c.label}</span>
+              {state.includes('is-answer') && <span class="sr">(correct answer)</span>}
             </button>
           );
         })}

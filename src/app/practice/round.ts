@@ -1,6 +1,6 @@
 // A practice round: 10 scored items, missed items re-asked later in the round, and items
-// from the drill's spaced-review list mixed in first. Pure and deterministic given the seed.
-import type { PracticeItemRef } from '../storage';
+// from the drill's spaced-review list that are due (see dueReview) mixed in first. Pure and deterministic given the seed.
+import type { DrillProgress, PracticeItemRef } from '../storage';
 import { createDrillRng, deriveSeed } from './rng';
 import type { AnyDrill, CheckResult, DrillItem } from './types';
 
@@ -51,7 +51,19 @@ export interface Round {
 /** What to persist after an answer (see Store.recordPracticeAnswer). */
 export interface AnswerEffects {
   addReview?: PracticeItemRef;
-  clearReview?: PracticeItemRef;
+  /** a saved review item answered right on the first try */
+  passReview?: PracticeItemRef;
+  /** false for in-round re-asks (they leave the streak alone) */
+  scored: boolean;
+}
+
+/** Saved review items due by this round, earliest first (spaced: see Store.recordPracticeAnswer). */
+export function dueReview(p: DrillProgress | undefined): PracticeItemRef[] {
+  if (!p) return [];
+  return p.review
+    .filter((r) => r.due <= p.rounds)
+    .sort((a, b) => a.due - b.due)
+    .map(({ seed, level }) => ({ seed, level }));
 }
 
 export function clampLevel(drill: AnyDrill, level: number): number {
@@ -124,10 +136,10 @@ export function answerRound(
     const again: RoundEntry = { ...entry, scored: false, repeats: entry.repeats + 1 };
     rest.splice(Math.min(REVIEW_GAP, rest.length), 0, again);
   }
-  const effects: AnswerEffects = {};
+  const effects: AnswerEffects = { scored: entry.scored };
   if (entry.scored && !result.ok) effects.addReview = entry.ref;
-  if (entry.scored && result.ok && entry.fromReview) effects.clearReview = entry.ref;
-  const streak = result.ok ? round.streak + 1 : 0;
+  if (entry.scored && result.ok && entry.fromReview) effects.passReview = entry.ref;
+  const streak = !entry.scored ? round.streak : result.ok ? round.streak + 1 : 0;
   const answered: AnsweredEntry = { entry, answer, result };
   return {
     result,

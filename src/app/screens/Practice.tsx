@@ -9,6 +9,7 @@ import {
   answerRound,
   clampLevel,
   createRound,
+  dueReview,
   isRoundDone,
   missedEntries,
   nextItem,
@@ -57,7 +58,10 @@ export function PracticeHub() {
 export function DrillView(props: { id: string; query: URLSearchParams }) {
   const drill = getDrill(props.id);
   if (!drill) return <NotFound />;
-  return <DrillRunner key={drill.id} drill={drill} query={props.query} />;
+  // A new seed or level in the URL starts a new round.
+  return (
+    <DrillRunner key={`${drill.id}?${props.query.toString()}`} drill={drill} query={props.query} />
+  );
 }
 
 function DrillRunner({ drill, query }: { drill: AnyDrill; query: URLSearchParams }) {
@@ -77,7 +81,7 @@ function DrillRunner({ drill, query }: { drill: AnyDrill; query: URLSearchParams
     createRound(drill, {
       seed: deriveSeed(baseSeed.current, roundNo.current++),
       level: lvl,
-      review: store.drill(drill.id)?.review ?? [],
+      review: dueReview(store.drill(drill.id)),
     });
   const [round, setRound] = useState<Round>(() => makeRound(level));
   const recorded = useRef(false);
@@ -205,7 +209,12 @@ function RoundSummary(props: { round: Round; best: number; onAgain: () => void }
               <li key={i}>
                 {a.entry.item.visuals?.map((v, j) =>
                   v.kind === 'dice' ? (
-                    <span key={j} class="pr-mini-dice" aria-label={`${v.dice[0]} and ${v.dice[1]}`}>
+                    <span
+                      key={j}
+                      class="pr-mini-dice"
+                      role="img"
+                      aria-label={`${v.dice[0]} and ${v.dice[1]}`}
+                    >
                       <DieIcon value={v.dice[0]} size={20} />
                       <DieIcon value={v.dice[1]} size={20} />
                     </span>

@@ -92,6 +92,8 @@ export interface CheckResult {
   explain: string;
   /** the correct answer in words, e.g. "Wins" or "$14" */
   expected: string;
+  /** the correct answer value (for choices: its id), so the input can mark it after a miss */
+  correct?: BuiltinAnswer;
 }
 
 /** Props for a drill's custom answer input. Call `onAnswer` once; `disabled` after answering. */

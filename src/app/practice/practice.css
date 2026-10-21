@@ -120,6 +120,10 @@
   border-color: var(--good);
   background: color-mix(in srgb, var(--good) 22%, transparent);
 }
+.pr-choice.is-answer {
+  border-width: 2px;
+  border-style: dashed;
+}
 .pr-choice.wrong {
   opacity: 1;
   border-color: var(--bad);

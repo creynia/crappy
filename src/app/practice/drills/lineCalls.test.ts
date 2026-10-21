@@ -37,7 +37,7 @@ describe('line calls drill', () => {
           ]);
   });
 
-  it('levels: 1 come-out pass only; 2 adds points; 3 adds don’t pass and push', () => {
+  it("levels: 1 come-out pass only; 2 adds points; 3 adds don't pass and push", () => {
     const items = (level: number) =>
       Array.from(
         { length: 300 },

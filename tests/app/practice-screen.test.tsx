@@ -76,6 +76,12 @@ describe('practice routes', () => {
       expect(el.querySelector('.pr-feedback strong')?.textContent).toBe(
         wrong ? 'Not quite.' : 'Correct.',
       );
+      if (wrong) {
+        // the right answer is marked too
+        const marked = el.querySelector('.pr-choice.is-answer');
+        expect(marked?.textContent).toContain(labels[current.outcome]);
+        expect(marked?.textContent).toContain('(correct answer)');
+      }
       await act(() => (byText(el, 'Next') ?? byText(el, 'See results'))!.click());
     }
     expect(asked).toBe(11); // 10 questions + 1 re-ask of the miss
@@ -83,7 +89,7 @@ describe('practice routes', () => {
     expect(el.querySelectorAll('.pr-missed li')).toHaveLength(1);
     const p = store.drill('line-calls')!;
     expect(p).toMatchObject({ rounds: 1, best: 9, last: 9, level: 1 });
-    expect(p.review).toEqual([expected.queue[0]!.ref]);
+    expect(p.review).toEqual([{ ...expected.queue[0]!.ref, due: 1, gap: 1 }]);
 
     // Play again: the missed item opens the next round as a review item.
     await act(() => byText(el, 'Play again')!.click());
@@ -98,5 +104,19 @@ describe('practice routes', () => {
     expect(l3.getAttribute('aria-checked')).toBe('true');
     expect(store.drill('line-calls')?.level).toBe(3);
     expect(el.querySelectorAll('.pr-choice')).toHaveLength(4);
+  });
+
+  it('a new seed in the URL starts a new round', async () => {
+    const { el } = await mount('#/practice/line-calls?seed=1&level=2');
+    const prompt = (seed: number) =>
+      createRound(lineCalls, { seed: deriveSeed(seed, 0), level: 2 }).queue[0]!.item.key;
+    expect(el.querySelector('.pr-item')?.getAttribute('data-key')).toBe(prompt(1));
+    await act(async () => {
+      location.hash = '#/practice/line-calls?seed=2&level=2';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(prompt(1)).not.toBe(prompt(2));
+    expect(el.querySelector('.pr-item')?.getAttribute('data-key')).toBe(prompt(2));
   });
 });

@@ -4,7 +4,8 @@ import {
   defaultPersisted,
   emptyDrillProgress,
   encodeExport,
-  load,
+  loadWithStatus,
+  REVIEW_GAPS,
   REVIEW_LIMIT,
   save,
   type DrillProgress,
@@ -24,12 +25,16 @@ export class Store {
   private data: Persisted;
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** saved data is from a newer app version: keep changes in memory only (see loadWithStatus) */
+  readonly readOnly: boolean;
 
   constructor(
     private storage: StorageLike = createStorage(),
     private debounceMs = 300,
   ) {
-    this.data = load(storage);
+    const r = loadWithStatus(storage);
+    this.data = r.data;
+    this.readOnly = r.readOnly;
   }
 
   get snapshot(): Persisted {
@@ -57,7 +62,7 @@ export class Store {
   flush() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    save(this.storage, this.data);
+    if (!this.readOnly) save(this.storage, this.data);
   }
 
   private patchLesson(id: string, fn: (p: LessonProgress) => LessonProgress) {
@@ -149,22 +154,39 @@ export class Store {
   }
 
   /**
-   * One answered drill item: updates the running streak and the spaced-review list
-   * (`addReview`: missed on the first try; `clearReview`: a review item answered right).
+   * One answered drill item: updates the running streak (`scored: false` for in-round re-asks,
+   * which leave it alone) and the spaced-review list:
+   * - `addReview`: missed on the first try; due next round (gap 1), replacing any earlier entry.
+   * - `passReview`: a review item answered right; it moves to the next gap in REVIEW_GAPS
+   *   (due 2, then 4 rounds later) and leaves the list after passing at the last gap.
+   * The list keeps the REVIEW_LIMIT most recent misses; older ones drop off on purpose (a
+   * learner who misses that much is better served by the fresh misses).
    */
   recordPracticeAnswer(
     drillId: string,
     ok: boolean,
-    opts: { addReview?: PracticeItemRef; clearReview?: PracticeItemRef } = {},
+    opts: { addReview?: PracticeItemRef; passReview?: PracticeItemRef; scored?: boolean } = {},
   ) {
     const same = (a: PracticeItemRef) => (b: PracticeItemRef) =>
       a.seed === b.seed && a.level === b.level;
     this.patchDrill(drillId, (p) => {
-      const streak = ok ? p.streak + 1 : 0;
+      const streak = opts.scored === false ? p.streak : ok ? p.streak + 1 : 0;
       let review = p.review;
-      if (opts.clearReview) review = review.filter((r) => !same(opts.clearReview!)(r));
-      if (opts.addReview && !review.some(same(opts.addReview)))
-        review = [...review, { ...opts.addReview }].slice(-REVIEW_LIMIT);
+      if (opts.passReview) {
+        const hit = same(opts.passReview);
+        review = review.flatMap((r) => {
+          if (!hit(r)) return [r];
+          const next = REVIEW_GAPS.find((g) => g > r.gap);
+          return next ? [{ ...r, gap: next, due: p.rounds + next }] : [];
+        });
+      }
+      if (opts.addReview) {
+        const { seed, level } = opts.addReview;
+        review = [
+          ...review.filter((r) => !same(opts.addReview!)(r)),
+          { seed, level, due: p.rounds + 1, gap: 1 },
+        ].slice(-REVIEW_LIMIT);
+      }
       return { ...p, streak, bestStreak: Math.max(p.bestStreak, streak), review };
     });
   }

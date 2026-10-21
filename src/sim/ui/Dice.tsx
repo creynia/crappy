@@ -1,4 +1,3 @@
-import './sim.css';
 import { useEffect, useState } from 'preact/hooks';
 import type { Dice as DicePair } from '../engine/types';
 import { tumbleFaces } from './animation';

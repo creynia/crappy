@@ -468,6 +468,13 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+/* short landscape phones: keep the switcher one line tall so the EV block stays above the fold */
+@media (max-height: 500px) {
+  .sim-seg-edge {
+    display: inline;
+    margin-left: 4px;
+  }
+}
 .sim-seg-edge[data-tier='free'] {
   color: var(--ev-free);
 }

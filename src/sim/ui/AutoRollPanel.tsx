@@ -224,6 +224,21 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     });
   };
 
+  const needsLayout = strategyIds.includes('my-layout') && !(layout && layout.length > 0);
+  const nameOf = (id: StrategyId): string => all.find((s) => s.id === id)?.name ?? id;
+  const button = (active: boolean, label: string, onClick: () => void, key?: string | number) => (
+    <button
+      key={key ?? label}
+      type="button"
+      aria-pressed={active}
+      disabled={running}
+      onClick={onClick}
+      class="sim-ar-btn"
+    >
+      {label}
+    </button>
+  );
+
   const unitControl = (
     <div class="sim-ar-group" role="group" aria-label="Unit">
       <span>Unit</span>
@@ -245,21 +260,6 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ))}
       </select>
     </label>
-  );
-
-  const needsLayout = strategyIds.includes('my-layout') && !(layout && layout.length > 0);
-  const nameOf = (id: StrategyId): string => all.find((s) => s.id === id)?.name ?? id;
-  const button = (active: boolean, label: string, onClick: () => void, key?: string | number) => (
-    <button
-      key={key ?? label}
-      type="button"
-      aria-pressed={active}
-      disabled={running}
-      onClick={onClick}
-      class="sim-ar-btn"
-    >
-      {label}
-    </button>
   );
 
   return (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BET_TYPES } from '../../engine';
-import { BOX_BAR } from './shared';
+import { BOX_BAR, STACK_RISE } from './shared';
 import {
   centerLayout,
   findRegion,
@@ -132,20 +132,20 @@ describe('chip spots: every bet type renders at its documented spot (simulator.m
       const box = findRegion(layout, `box-${n}`)!;
       const s = box.chipSpots;
       const barBottom = box.rect.y + box.rect.h * BOX_BAR;
-      // don't come and lay on the top bar
-      for (const k of ['dc-point', 'lay'] as const) expect(s[k]!.y, k).toBeLessThan(barBottom);
+      // don't come (and its lay odds) on the top bar; lay bets on the right under the puck
+      for (const k of ['dc-point', 'dc-odds'] as const) expect(s[k]!.y, k).toBeLessThan(barBottom);
+      expect(s.lay!.x).toBeGreaterThan(box.rect.x + box.rect.w * 0.75);
+      expect(s.lay!.y).toBeGreaterThan(layout.puck[n].y);
       // come odds sit offset on the come chips, lay odds on the don't-come chips
-      expect(dist(s.odds!, s['come-point']!)).toBeLessThan(r * 1.5);
-      expect(dist(s.odds!, s['come-point']!)).toBeGreaterThan(r * 0.5);
-      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeLessThan(r * 1.5);
-      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeGreaterThan(r * 0.5);
+      expect(dist(s.odds!, s['come-point']!)).toBeLessThan(r * 2);
+      expect(dist(s.odds!, s['come-point']!)).toBeGreaterThan(r);
+      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeLessThan(r * 2);
+      expect(dist(s['dc-odds']!, s['dc-point']!)).toBeGreaterThan(r);
       // place and buy below the numeral, side by side; the come-point area is clear of them
       expect(s.main!.y).toBeGreaterThan(box.rect.y + box.rect.h * 0.7);
       expect(s.buy!.y).toBe(s.main!.y);
       expect(dist(s.main!, s.buy!)).toBeGreaterThanOrEqual(r * 2);
       expect(dist(s['come-point']!, s.main!)).toBeGreaterThanOrEqual(r * 2);
-      // the lay stack clears the ON puck at the top right
-      expect(dist(s.lay!, layout.puck[n])).toBeGreaterThanOrEqual(r + layout.puckRadius - 1);
     }
   });
 
@@ -156,6 +156,53 @@ describe('chip spots: every bet type renders at its documented spot (simulator.m
         const s = findRegion(layout, id)!.chipSpots;
         expect(dist(s.odds!, s.main!), id).toBeGreaterThanOrEqual(layout.chipRadius * 2);
         expect(dist(s.odds!, s.main!), id).toBeLessThan(layout.chipRadius * 4);
+      }
+    },
+  );
+
+  it.each([portraitLayout, landscapeLayout])(
+    '$id: stacks that share a box keep their distance (review: no covered buttons)',
+    (layout) => {
+      const r = layout.chipRadius;
+      for (const n of [4, 5, 6, 8, 9, 10] as const) {
+        const box = findRegion(layout, `box-${n}`)!;
+        const s = box.chipSpots;
+        const puck = layout.puck[n];
+        const why = `${layout.id} box ${n}`;
+        expect(dist(s.lay!, s['dc-odds']!), why).toBeGreaterThanOrEqual(2 * r);
+        expect(dist(s.lay!, s['dc-point']!), why).toBeGreaterThanOrEqual(2 * r);
+        expect(dist(s.odds!, s.main!), why).toBeGreaterThanOrEqual(2 * r);
+        expect(dist(s.buy!, puck), why).toBeGreaterThanOrEqual(2 * r);
+        expect(dist(s.lay!, s.buy!), why).toBeGreaterThanOrEqual(2 * r);
+        expect(dist(s.lay!, puck), why).toBeGreaterThanOrEqual(r + layout.puckRadius);
+        expect(dist(s['dc-odds']!, puck), why).toBeGreaterThanOrEqual(r + layout.puckRadius);
+        // a full stack stays inside its box at the top, and every spot's chips stay inside it
+        for (const [k, p] of Object.entries(s)) {
+          expect(p.y - r - STACK_RISE, `${why} ${k} top`).toBeGreaterThanOrEqual(box.rect.y);
+          expect(p.x - r, `${why} ${k} left`).toBeGreaterThanOrEqual(box.rect.x);
+          expect(p.x + r, `${why} ${k} right`).toBeLessThanOrEqual(box.rect.x + box.rect.w);
+        }
+      }
+    },
+  );
+
+  it.each([portraitLayout, landscapeLayout])(
+    '$id: odds offset on the flat keep both amount badges readable and the flat tappable',
+    (layout) => {
+      const r = layout.chipRadius;
+      const badge = { w: 1.5 * r, h: 0.84 * r }; // ChipStack badge, for amounts up to "$99"
+      for (const n of [4, 5, 6, 8, 9, 10] as const) {
+        const s = findRegion(layout, `box-${n}`)!.chipSpots;
+        for (const [flat, odds] of [
+          [s['come-point']!, s.odds!],
+          [s['dc-point']!, s['dc-odds']!],
+        ] as const) {
+          const dx = Math.abs(odds.x - flat.x);
+          const dy = Math.abs(odds.y - flat.y);
+          expect(dx >= badge.w || dy >= badge.h, `${layout.id} ${n}`).toBe(true);
+          expect(dist(odds, flat), `${layout.id} ${n}`).toBeGreaterThan(r); // centre not covered
+          expect(dist(odds, flat), `${layout.id} ${n}`).toBeLessThan(2 * r); // still "on" it
+        }
       }
     },
   );

@@ -22,8 +22,10 @@ const big8Rect: Rect = { x: 675, y: 850, w: 205, h: 115 };
 const dpRect: Rect = { x: 20, y: 980, w: 860, h: 110 };
 const passRect: Rect = { x: 20, y: 1105, w: 860, h: 135 };
 
+const CHIP_R = 34;
+
 const regions: RegionDef[] = [
-  ...boxes.map(([n, r]) => numberBox(n, r)),
+  ...boxes.map(([n, r]) => numberBox(n, r, CHIP_R)),
   {
     id: 'come',
     rect: comeRect,
@@ -99,6 +101,6 @@ export const portraitLayout: TableLayout = {
   regions,
   puck,
   puckRadius: 42,
-  chipRadius: 34,
+  chipRadius: CHIP_R,
   minTapUnits: 102,
 };

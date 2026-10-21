@@ -232,7 +232,7 @@ export function Table({
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
+                aria-label={`Edit ${betLabel(s.type)} bet, ${fmtMoney(s.amount)}${s.off ? ', off' : s.on ? ', on for the come-out' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);

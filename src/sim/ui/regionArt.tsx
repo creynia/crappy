@@ -48,16 +48,19 @@ function OddsArea({ region, label }: { region: RegionDef; label: string }) {
         stroke-dasharray="7 5"
         opacity="0.8"
       />
-      <text
-        x={p.x}
-        y={p.y + r * 0.13}
-        class="sim-tiny"
-        font-size={r * 0.36}
-        text-anchor="middle"
-        fill={YELLOW}
-      >
-        {label}
-      </text>
+      {label.split(' ').map((word, i, all) => (
+        <text
+          key={word}
+          x={p.x}
+          y={p.y + r * 0.13 + (i - (all.length - 1) / 2) * r * 0.42}
+          class="sim-tiny"
+          font-size={r * 0.36}
+          text-anchor="middle"
+          fill={YELLOW}
+        >
+          {word}
+        </text>
+      ))}
     </g>
   );
 }

@@ -14,6 +14,8 @@ const fieldRect: Rect = { x: 220, y: 410, w: 1255, h: 140 };
 const dpRect: Rect = { x: 20, y: 560, w: 1455, h: 105 };
 const passRect: Rect = { x: 20, y: 675, w: 1455, h: 110 };
 
+const CHIP_R = 30;
+
 const regions: RegionDef[] = [
   {
     id: 'dont-come',
@@ -23,7 +25,7 @@ const regions: RegionDef[] = [
     betTypes: ['dont-come'],
     chipSpots: { main: { x: dcRect.x + dcRect.w / 2, y: dcRect.y + dcRect.h * 0.52 } },
   },
-  ...boxes.map(([n, r]) => numberBox(n, r)),
+  ...boxes.map(([n, r]) => numberBox(n, r, CHIP_R)),
   {
     id: 'big-6',
     rect: big6Rect,
@@ -91,6 +93,6 @@ export const landscapeLayout: TableLayout = {
   regions,
   puck,
   puckRadius: 34,
-  chipRadius: 30,
+  chipRadius: CHIP_R,
   minTapUnits: 99,
 };

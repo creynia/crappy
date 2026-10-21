@@ -213,6 +213,11 @@ describe('Table chip placement (dealer positions)', () => {
     expect(markers('b1')).toEqual(['off']);
     expect(markers('b2')).toEqual(['on']);
     expect(markers('b3')).toEqual([]);
+    const label = (id: string) =>
+      document.querySelector(`[data-stack="${id}"]`)!.getAttribute('aria-label');
+    expect(label('b1')).toBe('Edit Place 6 bet, $12, off');
+    expect(label('b2')).toBe('Edit Place 8 bet, $12, on for the come-out');
+    expect(label('b3')).toBe('Edit Place 5 bet, $5');
   });
   it('no ON puck once a point is set (everything works then)', () => {
     const on = { ...bet('b2', 'place-8', 1200), working: 'on' as const };
@@ -238,7 +243,10 @@ describe('Table chip placement (dealer positions)', () => {
   it('prints odds areas on the pass line and the don’t pass bar', () => {
     render(<Table layout={portraitLayout} bets={[]} point={null} />);
     expect(document.querySelector('[data-odds-area="pass"]')).toBeTruthy();
-    expect(document.querySelector('[data-odds-area="dont-pass"]')?.textContent).toBe('LAY ODDS');
+    const words = [...document.querySelectorAll('[data-odds-area="dont-pass"] text')].map(
+      (t) => t.textContent,
+    );
+    expect(words).toEqual(['LAY', 'ODDS']); // two lines, to fit the circle
   });
 });
 

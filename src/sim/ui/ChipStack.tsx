@@ -157,12 +157,12 @@ export function ChipStack({
 
 /** A small black-and-white puck on the stack's top right: OFF (not working) or ON (turned on). */
 function MiniPuck({ r, on }: { r: number; on: boolean }) {
-  const pr = r * 0.48;
+  const pr = r * 0.6;
   return (
     <g
       class={`sim-mini-puck ${on ? 'is-on' : 'is-off'}`}
       data-marker={on ? 'on' : 'off'}
-      transform={`translate(${r * 0.78} ${-r * 0.78})`}
+      transform={`translate(${r * 0.8} ${-r * 0.8})`}
     >
       <circle
         r={pr}
@@ -173,7 +173,7 @@ function MiniPuck({ r, on }: { r: number; on: boolean }) {
       <text
         y={pr * 0.3}
         text-anchor="middle"
-        font-size={pr * (on ? 0.82 : 0.66)}
+        font-size={pr * 0.75}
         font-weight="900"
         fill={on ? '#111' : '#f8f5ec'}
       >
@@ -185,11 +185,17 @@ function MiniPuck({ r, on }: { r: number; on: boolean }) {
 
 /** The dealer's BUY / LAY button (lammer) on the stack's top left. */
 function StackButton({ r, kind }: { r: number; kind: 'buy' | 'lay' }) {
-  const br = r * 0.46;
+  const br = r * 0.56;
   return (
-    <g class="sim-lammer" data-marker={kind} transform={`translate(${-r * 0.78} ${-r * 0.78})`}>
+    <g class="sim-lammer" data-marker={kind} transform={`translate(${-r * 0.8} ${-r * 0.8})`}>
       <circle r={br} fill="#f5c542" stroke="#3a2a00" stroke-width={br * 0.12} />
-      <text y={br * 0.3} text-anchor="middle" font-size={br * 0.7} font-weight="900" fill="#3a2a00">
+      <text
+        y={br * 0.3}
+        text-anchor="middle"
+        font-size={br * 0.62}
+        font-weight="900"
+        fill="#3a2a00"
+      >
         {kind === 'buy' ? 'BUY' : 'LAY'}
       </text>
     </g>

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
-import type { Bet, Cents, RulePresetId } from '../engine/types';
+import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
+import { RollLog, type RollLogFocus } from './RollLog';
 import { SessionPanel } from './SessionPanel';
 import { AUTOROLL_BANKROLL_KEY } from './bankroll';
 import { SimAutoRoll } from './SimAutoRoll';
@@ -21,6 +22,7 @@ import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
 import { clearSandbox } from './persist';
+import { appendLog, autoRollEntry, summarizeRoll, type RollLogEntry } from './rollLog';
 import { fmtMoney } from './text';
 import type { SimulatorEvent, SimulatorHandle, SimulatorProps } from './types';
 import { useAnimationPlayer } from './useAnimationPlayer';
@@ -47,11 +49,15 @@ const isCenterBet = (b: Bet) => {
 };
 
 export function Simulator(props: SimulatorInternalProps) {
-  const [scene, setScene] = useState<SceneConfig>(props.scene ?? SANDBOX_SCENE);
+  const initialScene = props.scene ?? SANDBOX_SCENE;
   const mode = props.mode ?? (props.scene ? 'embedded' : 'sandbox');
   const sandbox = mode === 'sandbox';
+  const { settings, setSettings, boot } = useUrlBoot(props, initialScene, mode);
+  // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
+  const [scene, setScene] = useState<SceneConfig>(() =>
+    boot.customRules ? { ...initialScene, rules: boot.customRules } : initialScene,
+  );
   const ui = scene.ui ?? {};
-  const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -68,7 +74,16 @@ export function Simulator(props: SimulatorInternalProps) {
   const [live, setLive] = useState({ text: '', n: 0 });
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
-  const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
+  const [panels, setPanels] = useState<Panels>({
+    auto: false,
+    session: false,
+    log: false,
+    menu: false,
+  });
+  const [log, setLog] = useState<RollLogEntry[]>(() => boot.log ?? []);
+  const [logFocus, setLogFocus] = useState<RollLogFocus | null>(null);
+  const focusNonce = useRef(0);
+  const autoSeq = useRef(boot.log?.length ?? 0);
   const rootRef = useRef<HTMLDivElement>(null);
   const requestReveal = usePanelReveal(panels, rootRef);
   const togglePanel = (name: keyof Panels) => {
@@ -85,7 +100,15 @@ export function Simulator(props: SimulatorInternalProps) {
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
 
-  const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast, announce);
+  const anim = useAnimationPlayer(
+    () => settingsRef.current.speed,
+    pushToast,
+    announce,
+    (pre, post, events) => {
+      const entry = summarizeRoll(pre, post, events);
+      if (entry) setLog((l) => appendLog(l, entry));
+    },
+  );
   const { core, coreRef, setCore, startEquity, lastOneRoll, feedInput, doAction } = useGameCore({
     boot,
     sceneRef,
@@ -114,6 +137,7 @@ export function Simulator(props: SimulatorInternalProps) {
     settings,
     liveGame,
     chip,
+    log,
   );
 
   // ---------- sheet ----------
@@ -156,7 +180,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | Partial<TableRules> }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
@@ -165,6 +189,8 @@ export function Simulator(props: SimulatorInternalProps) {
     startedRef.current = -1;
     startEquity.current = equity(init.game);
     setToasts([]);
+    setLog([]);
+    setLogFocus(null);
     setCore({ game: init.game, rt: init.runtime });
     if (sandbox && props.persistKey) clearSandbox(props.persistKey);
   };
@@ -194,6 +220,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
   const rulesSelectValue = typeof scene.rules === 'string' ? scene.rules : settings.rulesPreset;
+  // I033: a rules object (the custom editor, or a restored custom sandbox) shows as "Custom"
+  const menuRulesValue = typeof scene.rules === 'object' ? 'custom' : rulesSelectValue;
 
   const tableProps = {
     bets: game.bets,
@@ -261,6 +289,10 @@ export function Simulator(props: SimulatorInternalProps) {
       session={session}
       point={game.point}
       history={game.history}
+      onOpenHistory={(n) => {
+        setPanels((p) => ({ ...p, log: true }));
+        setLogFocus(n === undefined ? null : { n, nonce: ++focusNonce.current });
+      }}
     />
   );
 
@@ -328,7 +360,8 @@ export function Simulator(props: SimulatorInternalProps) {
           busy={anim.busy}
           onRebet={rebet}
           onReset={resetGame}
-          rulesValue={rulesSelectValue}
+          rulesValue={menuRulesValue}
+          currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
         />
@@ -338,6 +371,8 @@ export function Simulator(props: SimulatorInternalProps) {
         <SessionPanel stats={liveGame.stats} rollCount={liveGame.rollCount} />
       ) : null}
 
+      {panels.log ? <RollLog entries={log} focus={logFocus} /> : null}
+
       {autoAvailable && panels.auto ? (
         <SimAutoRoll
           scene={scene}
@@ -346,6 +381,11 @@ export function Simulator(props: SimulatorInternalProps) {
           rollsPerHour={settings.rollsPerHour}
           emit={emit}
           feedInput={feedInput}
+          onResult={(result) =>
+            setLog((l) =>
+              appendLog(l, autoRollEntry(result, coreRef.current.game, ++autoSeq.current)),
+            )
+          }
           persistKey={sandbox ? AUTOROLL_BANKROLL_KEY : undefined}
         />
       ) : null}

@@ -281,7 +281,7 @@ describe('RollButton, StatusBar, history, toasts', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
+    expect(document.querySelector('.sim-toasts')!.getAttribute('aria-hidden')).toBe('true');
     fireEvent.click(screen.getByLabelText('Dismiss'));
     expect(onDismiss).toHaveBeenCalledWith('t');
   });

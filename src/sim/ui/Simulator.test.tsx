@@ -31,6 +31,15 @@ describe('Simulator sandbox', () => {
     expect(container.textContent).toContain('On table $5');
   });
 
+  it('announces each roll exactly once through one live region', async () => {
+    const { container } = render(<Simulator initialSettings={instant} onEvent={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="roll-announcer"]')!.textContent).toMatch(/\S/),
+    );
+    expect(container.querySelectorAll('[aria-live]').length).toBe(1);
+  });
+
   it('rolls and reports', async () => {
     const events: SimulatorEvent[] = [];
     render(<Simulator initialSettings={instant} onEvent={(e) => events.push(e)} />);

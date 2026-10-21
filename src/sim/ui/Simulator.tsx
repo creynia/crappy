@@ -61,6 +61,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const [chip, setChip] = useState<Cents>(initialChip(chips, ui.defaultChip, boot.chip));
   const [view, setView] = useState<'table' | 'center'>(ui.view ?? 'table');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [announce, setAnnounce] = useState('');
   const toastN = useRef(0);
   const guided = !!scene.steps?.length;
   const [panels, setPanels] = useState<Panels>({ auto: false, session: false, menu: false });
@@ -72,6 +73,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const pushToast = useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
     const id = `t${++toastN.current}`;
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
+    setAnnounce(text);
   }, []);
 
   const anim = useAnimationPlayer(() => settingsRef.current.speed, pushToast);
@@ -288,6 +290,9 @@ export function Simulator(props: SimulatorInternalProps) {
         )}
       </div>
 
+      <div class="sim-sr" role="status" aria-live="polite" data-testid="roll-announcer">
+        {announce}
+      </div>
       <Toasts
         toasts={toasts}
         onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}

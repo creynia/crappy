@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BET_TYPES } from '../engine/bets';
 import { equity, isWorking } from '../engine/game';
-import type { Bet, Cents, RulePresetId } from '../engine/types';
+import type { Bet, Cents, RulePresetId, TableRules } from '../engine/types';
 import { betTypeAllowed, currentStep, highlightedFor, initScene, rollLock } from '../scene';
 import type { SceneConfig } from '../scene/types';
 import { CenterPanel } from './CenterPanel';
@@ -49,6 +49,11 @@ export function Simulator(props: SimulatorInternalProps) {
   const sandbox = mode === 'sandbox';
   const ui = scene.ui ?? {};
   const { settings, setSettings, boot } = useUrlBoot(props, scene, mode);
+  // I033: a restored custom-rules sandbox keeps its rules for resets and the Rules menu
+  useEffect(() => {
+    const r = boot.customRules;
+    if (r) setScene((s) => ({ ...s, rules: r }));
+  }, []);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const settingsRef = useRef(settings);
@@ -143,7 +148,7 @@ export function Simulator(props: SimulatorInternalProps) {
   };
 
   // ---------- menu actions ----------
-  const resetGame = (opts?: { rules?: RulePresetId }) => {
+  const resetGame = (opts?: { rules?: RulePresetId | TableRules }) => {
     anim.clear();
     sh.setSheet(null);
     const sc: SceneConfig = { ...scene, ...(opts?.rules ? { rules: opts.rules } : {}) };
@@ -181,6 +186,8 @@ export function Simulator(props: SimulatorInternalProps) {
   // ---------- render ----------
   const autoAvailable = scene.autoRoll ? scene.autoRoll.enabled : sandbox;
   const rulesSelectValue = typeof scene.rules === 'string' ? scene.rules : settings.rulesPreset;
+  // I033: a rules object (the custom editor, or a restored custom sandbox) shows as "Custom"
+  const menuRulesValue = typeof scene.rules === 'object' ? 'custom' : rulesSelectValue;
 
   const tableProps = {
     bets: game.bets,
@@ -300,7 +307,8 @@ export function Simulator(props: SimulatorInternalProps) {
           busy={anim.busy}
           onRebet={rebet}
           onReset={resetGame}
-          rulesValue={rulesSelectValue}
+          rulesValue={menuRulesValue}
+          currentRules={liveGame.rules}
           settings={settings}
           setSettings={setSettings}
         />

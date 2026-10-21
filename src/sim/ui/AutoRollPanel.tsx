@@ -21,6 +21,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import type { ChartMode, ChartSeries } from './BankrollChart';
 import { ResultsHistogram } from './ResultsHistogram';
+import { RulesEditor } from './RulesEditor';
 import { SweepPanel } from './SweepPanel';
 import { TotalsHistogram } from './TotalsHistogram';
 import { betLabel, fmtMoney } from './text';
@@ -158,7 +159,10 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const rulesInput = typeof props.rules === 'object' ? props.rules : preset;
+  // I033: "Custom…" in the Rules select edits a rules object for the runs in this panel
+  const [customRules, setCustomRules] = useState<TableRules | null>(null);
+  const [editingRules, setEditingRules] = useState(false);
+  const rulesInput = typeof props.rules === 'object' ? props.rules : (customRules ?? preset);
   const rules = useMemo(() => resolveRules(rulesInput), [rulesInput]);
   const unitOptions = UNITS.filter((u) => u >= rules.tableMin);
   if (unitOptions.length === 0) unitOptions.push(rules.tableMin);
@@ -394,18 +398,46 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <label class="sim-ar-group">
             Rules
             <select
-              value={preset}
+              value={editingRules || customRules ? 'custom' : preset}
               disabled={running}
-              onChange={(e) => setPreset(e.currentTarget.value as RulePresetId)}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                if (v === 'custom') return setEditingRules(true);
+                setEditingRules(false);
+                setCustomRules(null);
+                setPreset(v as RulePresetId);
+              }}
             >
               {PRESET_IDS.map((id) => (
                 <option key={id} value={id}>
                   {PRESET_LABEL[id]}
                 </option>
               ))}
+              <option value="custom">Custom…</option>
             </select>
           </label>
         )}
+        {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <button
+            type="button"
+            class="sim-ar-btn"
+            disabled={running}
+            onClick={() => setEditingRules(true)}
+          >
+            Edit custom rules
+          </button>
+        ) : null}
+        {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+          <RulesEditor
+            initial={rules}
+            disabled={running}
+            onCancel={() => setEditingRules(false)}
+            onApply={(r) => {
+              setEditingRules(false);
+              setCustomRules(r);
+            }}
+          />
+        ) : null}
         <div class="sim-ar-group">
           <label>
             Seed{' '}

@@ -66,6 +66,17 @@ describe('section 2.3 target numbers (per resolved / per roll)', () => {
     same(e.perRoll, perRoll);
   });
 
+  it('hops (I035): easy hop 2-4 is 1/9 (11.11%), hard hop 3-3 is 5/36 (13.89%)', () => {
+    const easy = betEdge('hop', 100, comeOut(), [2, 4]);
+    const hard = betEdge('hop', 100, comeOut(), [3, 3]);
+    same(easy.perResolved, frac(1, 9));
+    same(easy.perRoll, frac(1, 9));
+    same(hard.perResolved, frac(5, 36));
+    same(hard.perRoll, frac(5, 36));
+    expect(edgeTier(easy.perResolved)).toBe('avoid');
+    expect(edgeTier(hard.perResolved)).toBe('avoid');
+  });
+
   it('bonus side bets (I037): Fire 20.763%, Small/Tall 7.761%, All 7.464%', () => {
     same(edge('small', 1).perResolved, frac(1687, 21736));
     same(edge('tall', 1).perResolved, frac(1687, 21736));

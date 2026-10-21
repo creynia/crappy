@@ -389,7 +389,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
             </p>
           )}
           {needsLayout && (
-            <p role="status" class="sim-ar-desc">
+            <p class="sim-ar-desc">
               Build a layout on the table first; with no bets this just rolls the dice.
             </p>
           )}

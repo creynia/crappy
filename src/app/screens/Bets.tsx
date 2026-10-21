@@ -2,7 +2,16 @@ import { useState } from 'preact/hooks';
 import { Link } from '../components/Link';
 import { TierBadge } from '../components/TierBadge';
 import { Html } from '../components/Html';
-import { shortPayout, betRows, formatEdge, betLabel, betPayout, houseEdge, tierOf } from '../bets';
+import {
+  shortPayout,
+  betRows,
+  edgeFact,
+  formatEdge,
+  betLabel,
+  betPayout,
+  houseEdge,
+  tierOf,
+} from '../bets';
 import type { BetRow } from '../bets';
 import { useContent } from '../context';
 import { NotFound } from './NotFound';
@@ -99,7 +108,7 @@ export function BetDetail({ id }: { id: string }) {
         </div>
         <div>
           <dt>House edge</dt>
-          <dd>{formatEdge(edge)}</dd>
+          <dd>{edgeFact(id)}</dd>
         </div>
       </dl>
       {copy ? (

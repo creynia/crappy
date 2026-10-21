@@ -4,6 +4,8 @@ import type {
   BetTypeDef,
   BetTypeId,
   Cents,
+  Dice,
+  Die,
   PointNumber,
   Resolution,
   RollContext,
@@ -54,6 +56,7 @@ export const BET_TYPE_IDS: readonly BetTypeId[] = [
   'horn',
   'c-e',
   'world',
+  'hop',
   'fire',
   'all',
   'tall',
@@ -131,6 +134,53 @@ export function withProgress(progress: readonly number[] | undefined, n: number)
   set.add(n);
   return [...set].sort((a, b) => a - b);
 }
+
+// ---------------------------------------------------------------------------
+// Hop bets (I035): one-roll bets on a single dice pair
+// ---------------------------------------------------------------------------
+
+/** Easy hop (two different dice, either order: 2 of 36) pays 15 to 1; hard hop (a pair: 1 of 36) pays 30 to 1. */
+export const HOP_PAYS = { easy: 15, hard: 30 } as const;
+
+/** True for a pair of integer dice 1-6 (the shape a hop parameter must have). */
+export function isDicePair(x: unknown): x is Dice {
+  return (
+    Array.isArray(x) &&
+    x.length === 2 &&
+    x.every((d) => Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 6)
+  );
+}
+
+/** A hop pair normalized low-high, so 4-2 and 2-4 are the same bet. */
+export function normalizeHop(d: Dice): Dice {
+  return d[0] <= d[1] ? [d[0], d[1]] : [d[1], d[0]];
+}
+
+export function sameHop(a: Dice | undefined, b: Dice | undefined): boolean {
+  if (!a || !b) return false;
+  const x = normalizeHop(a);
+  const y = normalizeHop(b);
+  return x[0] === y[0] && x[1] === y[1];
+}
+
+export const isHardHop = (d: Dice): boolean => d[0] === d[1];
+
+/** '2-4' (low-high). */
+export function hopText(d: Dice): string {
+  const n = normalizeHop(d);
+  return `${n[0]}-${n[1]}`;
+}
+
+/** 'Hop 2-4' / 'Hop 3-3 (hard)'. */
+export function hopLabel(d: Dice): string {
+  return `Hop ${hopText(d)}${isHardHop(d) ? ' (hard)' : ''}`;
+}
+
+const DIE_VALUES: readonly Die[] = [1, 2, 3, 4, 5, 6];
+/** The 21 distinct hop pairs, normalized low-high, in reading order (1-1, 1-2, ..., 6-6). */
+export const ALL_HOPS: readonly Dice[] = DIE_VALUES.flatMap((a) =>
+  DIE_VALUES.filter((b) => b >= a).map((b): Dice => [a, b]),
+);
 
 // ---------------------------------------------------------------------------
 // Payout helpers
@@ -639,6 +689,24 @@ specs.push(
   ),
 );
 
+specs.push({
+  id: 'hop',
+  label: 'Hop',
+  shortLabel: 'HOP',
+  category: 'prop',
+  oneRoll: true,
+  afterWin: 'comes-down',
+  describePayout: flat(
+    `${HOP_PAYS.easy} to 1 on an easy hop (2-4), ${HOP_PAYS.hard} to 1 on a hard hop (3-3)`,
+  ),
+  resolve(bet, r, rules) {
+    // A hop without its pair cannot be placed (validate.ts); if one is ever forged it never wins.
+    if (!bet.hop) return LOSE;
+    if (!sameHop(bet.hop, r.dice)) return LOSE;
+    const x = isHardHop(bet.hop) ? HOP_PAYS.hard : HOP_PAYS.easy;
+    return win(payout(bet.amount, x, 1, rules.payoutUnit));
+  },
+});
 specs.push({
   id: 'fire',
   label: 'Fire Bet',

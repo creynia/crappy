@@ -3,7 +3,10 @@ import {
   betTypeAvailable,
   isDontSide,
   isBetTypeId,
+  isDicePair,
   isToggleable,
+  normalizeHop,
+  sameHop,
   nominalVig,
   payRatio,
   payout,
@@ -18,6 +21,7 @@ import type {
   BetTypeDef,
   BetTypeId,
   Cents,
+  Dice,
   GameState,
   PointNumber,
   Validation,
@@ -66,12 +70,15 @@ export function findParent(
   return undefined;
 }
 
-/** The existing instance a new placement of this type merges into, if any. */
+/** The existing instance a new placement of this type merges into, if any (hop: the same pair). */
 export function findMergeTarget(
   state: GameState,
   betType: BetTypeId,
   parent?: Bet,
+  hop?: Dice,
 ): Bet | undefined {
+  if (betType === 'hop')
+    return hop ? state.bets.find((b) => b.type === 'hop' && sameHop(b.hop, hop)) : undefined;
   if (BET_TYPES[betType].category === 'odds')
     return parent
       ? state.bets.find((b) => b.type === betType && b.parentId === parent.id)
@@ -260,13 +267,24 @@ function validatePlace(
           ? `Crapless craps has no don't side, so ${def.label} is not offered.`
           : `${def.label} is not offered on a crapless craps table.`,
     );
+  if (betType === 'hop') {
+    if (!isDicePair(action.hop))
+      return fail('bad-dice', 'A hop bet needs a pair of dice, each showing 1 to 6, such as 2-4.');
+  } else if (action.hop !== undefined) {
+    return fail('bad-dice', `${def.label} does not take a dice pair; only hop bets do.`);
+  }
   const shapeErr = shape(def, amount);
   if (shapeErr) return shapeErr;
   const { rules } = state;
 
   const isOdds = def.category === 'odds';
   const parent = isOdds ? findParent(state, betType, parentId) : undefined;
-  const existing = findMergeTarget(state, betType, parent);
+  const existing = findMergeTarget(
+    state,
+    betType,
+    parent,
+    action.hop ? normalizeHop(action.hop) : undefined,
+  );
   const total = (existing?.amount ?? 0) + amount;
 
   // 3. min / max
@@ -499,7 +517,12 @@ export function legalBetTypes(state: GameState): BetTypeId[] {
             validateAction(rich, { type: 'place-bet', betType: id, amount: probe, parentId: b.id })
               .ok,
         )
-      : validateAction(rich, { type: 'place-bet', betType: id, amount: probe }).ok;
+      : validateAction(rich, {
+          type: 'place-bet',
+          betType: id,
+          amount: probe,
+          ...(id === 'hop' ? { hop: [1, 2] as Dice } : {}),
+        }).ok;
     if (ok) out.push(id);
   }
   return out;

@@ -45,7 +45,8 @@ export function SimStep({
           onNext={onNext}
           {...(onAnswer ? { onAnswer } : {})}
           asked={{ count: rt.counters.ans ?? 0, correct: (rt.counters.ansOk ?? 0) > 0 }}
-          onRestart={onRestart}
+          {...(restart ? { onRestart } : {})}
+          label={label}
         />
       ) : null}
       {guided && rt.done ? (

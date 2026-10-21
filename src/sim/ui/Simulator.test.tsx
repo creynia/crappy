@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Simulator } from '../index';
+import { Simulator, challengeScene } from '../index';
 import type { SceneConfig, SimulatorEvent } from '../index';
 import { askFeedback } from './StepPanel';
 import { buildEvFacts } from './text';
@@ -124,6 +124,26 @@ describe('auto-roll compare scene', () => {
     const heads = container.querySelectorAll('[data-testid="auto-roll-summary"] thead th');
     expect(heads).toHaveLength(4); // label + 3 strategies
     await waitFor(() => expect(events.some((e) => e.type === 'scene-completed')).toBe(true));
+  });
+});
+
+describe('challenge scene panel (I030)', () => {
+  it('has no Restart while the challenge runs and is labelled Challenge', () => {
+    render(<Simulator scene={challengeScene({ seed: 1, rolls: 3 })} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Challenge' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Roll/ }));
+    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
+  });
+  it('a lesson scene still offers Restart under the default label', () => {
+    const lesson: SceneConfig = {
+      id: 'l',
+      version: 1,
+      steps: [{ id: 's', text: 'Roll once.', completeWhen: { rolls: 1 } }],
+    };
+    render(<Simulator scene={lesson} initialSettings={instant} />);
+    expect(screen.getByRole('region', { name: 'Lesson step' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeTruthy();
   });
 });
 

@@ -86,6 +86,19 @@ describe('challenge scoring: house edge on action, measured at resolution', () =
     }
   });
 
+  it('perfect play over a 300-roll challenge lands in the Perfect band on at least 9 seeds in 10', () => {
+    const scores: number[] = [];
+    for (let seed = 1; seed <= 40; seed++) {
+      const { tally } = play(seed, 300, passMaxOdds);
+      scores.push(scored(tally).score!);
+    }
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    expect(pp(mean)).toBeGreaterThan(0.33);
+    expect(pp(mean)).toBeLessThan(0.43);
+    const perfect = scores.filter((s) => bandFor(s).id === 'perfect').length;
+    expect(perfect / scores.length).toBeGreaterThanOrEqual(0.9);
+  });
+
   it("don't pass + 6x lay odds lands near 0.273% (1.36% on the flat bet, odds on 2/3 of decisions)", () => {
     for (let seed = 1; seed <= 10; seed++) {
       const { tally } = play(seed, 4000, dontMaxLay);
@@ -176,8 +189,8 @@ describe('challenge scoring: house edge on action, measured at resolution', () =
     expect(r.score).toBeNull();
     expect(r.band).toBe('no-action');
     expect(bandFor(0.003).id).toBe('perfect');
-    expect(bandFor(0.004).id).toBe('perfect');
-    expect(bandFor(0.0041).id).toBe('sharp');
+    expect(bandFor(0.0045).id).toBe('perfect');
+    expect(bandFor(0.0046).id).toBe('sharp');
     expect(bandFor(0.015).id).toBe('solid');
     expect(bandFor(0.04).id).toBe('leaky');
     expect(bandFor(0.2).id).toBe('sucker');

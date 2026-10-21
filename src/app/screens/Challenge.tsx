@@ -212,7 +212,7 @@ export function Challenge({ query }: { query: URLSearchParams }) {
     <div class="page page-wide">
       <header class="challenge-head">
         <h1>Challenge</h1>
-        <p class="muted" role="status" aria-live="polite" data-testid="challenge-rolls">
+        <p class="muted" data-testid="challenge-rolls">
           Roll {rolls} of {scene?.challenge?.rolls ?? 300} · seed {seed}
         </p>
         <button

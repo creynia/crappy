@@ -10,6 +10,8 @@ test('challenge: 300 scored rolls, result screen and best score', async ({ page 
   await page.goto('/#/challenge?seed=7');
   const rolls = page.getByTestId('challenge-rolls');
   await expect(rolls).toContainText('Roll 0 of 300');
+  await expect(page.getByRole('region', { name: 'Challenge' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restart' })).toHaveCount(0);
   const roll = page.getByRole('button', { name: /^Roll/ });
   const sheet = page.getByRole('dialog');
   // Pass line with max odds whenever a point is on: the "perfect" line of play.

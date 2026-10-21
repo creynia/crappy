@@ -195,7 +195,7 @@ export interface RankBand {
 export const RANK_BANDS: readonly RankBand[] = [
   {
     id: 'perfect',
-    max: 0.004,
+    max: 0.0045,
     label: 'Perfect strategy',
     blurb: 'Line bets with full odds and nothing else. The house barely got a look in.',
   },
@@ -287,7 +287,8 @@ export function scoreChallenge(
       blurb: `Have at least ${Math.round(cfg.scoring.minResolved / 100).toLocaleString('en-US')} dollars of bets decided by the dice to earn a score.`,
     };
   }
-  const band = bandFor(edgeOnAction);
+  // banded at the two decimals the score shows (as a percentage), so the band matches the number
+  const band = bandFor(Math.round(edgeOnAction * 1e4) / 1e4);
   return { ...base, score: edgeOnAction, band: band.id, label: band.label, blurb: band.blurb };
 }
 

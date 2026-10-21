@@ -497,6 +497,28 @@ test.describe('sandbox flows', () => {
     await expect(page.locator('.sim-toast').last()).toContainText('Natural');
   });
 
+  test('roll log keeps every roll and a history pill opens it at that roll', async ({ page }) => {
+    await page.goto('/#/play?speed=instant&seed=1&' + dice('3-3', '2-2', '3-4'));
+    await place(page, 'pass');
+    await roll(page); // point 6
+    await roll(page); // 4: nothing
+    await roll(page); // 7: seven out
+    await page.getByRole('button', { name: 'Log' }).click();
+    const items = page.getByRole('list', { name: /Rolls, newest first/ }).getByRole('listitem');
+    await expect(items).toHaveCount(3);
+    await expect(items.first()).toContainText('Seven out.');
+    await expect(items.last()).toContainText('Point is 6.');
+    await page.getByRole('button', { name: 'Losses' }).click();
+    await expect(items).toHaveCount(1);
+    // tapping the oldest pill in the status strip focuses that roll (the compact landscape rail has no strip)
+    await page.getByRole('button', { name: 'All' }).click();
+    const pill = page.locator('.sim-history [data-roll="1"]');
+    if (await pill.isVisible()) {
+      await pill.click();
+      await expect(page.locator('.sim-log-entry.is-focus')).toContainText('Point is 6.');
+    }
+  });
+
   test('opening Session or Auto-roll scrolls the panel into view and focuses its heading', async ({
     page,
   }) => {

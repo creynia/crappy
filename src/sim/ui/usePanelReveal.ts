@@ -2,10 +2,11 @@ import type { RefObject } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import type { Panels } from './SimControls';
 
-type RevealKey = 'auto' | 'session';
+type RevealKey = 'auto' | 'session' | 'log';
 const SELECTOR: Record<RevealKey, string> = {
   auto: '.sim-autoroll',
   session: '.sim-session-panel',
+  log: '.sim-roll-log',
 };
 
 /** Reduced motion if the app setting or the OS preference asks for it. */
@@ -43,8 +44,9 @@ export function usePanelReveal(
     if (!key || !panels[key]) return;
     const el = scope.current?.querySelector<HTMLElement>(SELECTOR[key]);
     if (el) revealPanel(el, prefersReducedMotion());
-  }, [panels.auto, panels.session]);
+  }, [panels.auto, panels.session, panels.log]);
   return (name) => {
-    if (name === 'auto' || name === 'session') pending.current = panels[name] ? null : name;
+    if (name === 'auto' || name === 'session' || name === 'log')
+      pending.current = panels[name] ? null : name;
   };
 }

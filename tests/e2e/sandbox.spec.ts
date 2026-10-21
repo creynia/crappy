@@ -391,6 +391,67 @@ test.describe('sandbox flows', () => {
     expect(await run('Max')).toBe(max); // same seed, same settings: identical result
   });
 
+  test('a come bet slides from the box to its number, then sweeps on the seven-out', async ({
+    page,
+  }) => {
+    // Drive the animation timeline with a controlled clock so each step is observable.
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '2-3', '3-4'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await place(page, 'come');
+    await roll(page); // 5: the come bet travels
+    await page.clock.runFor(700); // dice 650: the travel step (no puck on a 5) is under way
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).toHaveClass(/is-moving/);
+    await expect(ghost).toHaveAttribute('style', /--dx: -?\d.*--dy: -?\d/);
+    await expect(page.locator('[data-stack]')).toHaveCount(1); // only the pass line while the chips move
+    await page.clock.runFor(300);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+    await roll(page); // seven-out: both bets are swept
+    await page.clock.runFor(700); // dice settled, puck moving: the chips still sit on their spots
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(2);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(0);
+    await page.clock.runFor(100);
+    await expect(page.locator('.sim-ghost-lose.is-moving')).toHaveCount(2);
+    await page.clock.runFor(1000);
+    await expect(page.locator('.sim-ghost-lose')).toHaveCount(0);
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
+  test('point made with a come bet in the box: the chip waits at the box until the travel step', async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.goto('/#/play?speed=normal&seed=1&' + dice('4-4', '5-3'));
+    await place(page, 'pass');
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await roll(page); // point 8
+    await page.clock.runFor(2000);
+    await place(page, 'come');
+    const comeBox = await page.locator('[data-stack="b2"] .sim-stack').getAttribute('transform');
+    await roll(page); // 8: point made, pass wins, the come bet travels to the 8
+    await page.clock.runFor(700); // dice settled (650), puck step running: nothing has moved yet
+    const ghost = page.locator('.sim-ghost-travel');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).not.toHaveClass(/is-moving/);
+    await expect(ghost.locator('.sim-stack')).toHaveAttribute('transform', comeBox!);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(0); // never drawn at the 8 early
+    await page.clock.runFor(100); // the travel step starts at 750
+    await expect(ghost).toHaveClass(/is-moving/);
+    await page.clock.runFor(250);
+    await expect(ghost).toHaveCount(0);
+    await expect(page.locator('[data-stack="b2"]')).toHaveCount(1);
+    await page.clock.runFor(1000);
+    await expect(page.getByRole('button', { name: /^Roll(?!ing)/ })).toBeEnabled();
+  });
+
   test('tapping the table skips the roll animation', async ({ page }) => {
     // Freeze time so only the tap can finish the roll: with the clock paused the animation timers
     // never fire, so "Roll is enabled again" proves the skip, not a fast machine.

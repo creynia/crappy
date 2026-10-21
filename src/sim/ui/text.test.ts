@@ -176,3 +176,17 @@ describe('tiers and ev facts', () => {
     expect(facts({ type: 'roll' })).toBeNull();
   });
 });
+
+describe('buy/lay vig strip facts', () => {
+  const state = () => createGame({ phase: 'come-out', bankroll: 100000 });
+  const f = (action: Action) => buildEvFacts(previewAction(state(), action), state())!;
+  it('buy-4 $39 lists the nearby amounts and marks the current one', () => {
+    const v = f({ type: 'place-bet', betType: 'buy-4', amount: 3900 }).vigCliff!;
+    expect(v.map((r) => r.amount)).toEqual([2900, 3400, 3900, 4400, 4900]);
+    expect(v.find((r) => r.current)!.amount).toBe(3900);
+    expect(v.find((r) => r.current)!.edge).toBeCloseTo(1 / 117, 12);
+  });
+  it('the strip is only for buy and lay bets', () => {
+    expect(f({ type: 'place-bet', betType: 'place-6', amount: 600 }).vigCliff).toBeUndefined();
+  });
+});

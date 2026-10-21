@@ -426,6 +426,31 @@ export function EvLines({ facts: f }: { facts: EvFacts }) {
           {f.combined.label} together: <b>{fmtPct(f.combined.edge)}</b> per dollar.
         </li>
       ) : null}
+      {f.vigFlat !== null && f.vigFlat !== undefined ? (
+        <li data-line="vig-cliff">
+          Vig is paid upfront, so the edge is the same at every amount: <b>{fmtPct(f.vigFlat)}</b>.
+        </li>
+      ) : null}
+      {f.vigCliff && f.vigCliff.length > 1 ? (
+        <li data-line="vig-cliff">
+          Edge at nearby amounts:{' '}
+          {f.vigCliff.map((r, i) => (
+            <span key={r.amount}>
+              {i > 0 ? ' · ' : null}
+              {r.current ? (
+                <b aria-current="true">
+                  {fmtMoney(r.amount)} {fmtPct(r.edge)} (this bet)
+                </b>
+              ) : (
+                <>
+                  {fmtMoney(r.amount)} {fmtPct(r.edge)}
+                </>
+              )}
+            </span>
+          ))}
+          . Buy and lay vig is rounded to whole dollars, so the edge jumps around.
+        </li>
+      ) : null}
     </ul>
   );
 }

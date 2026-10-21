@@ -1,7 +1,7 @@
 import { BET_TYPES, payRatio } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import { maxOddsAmount, suggestAmount, validateAction } from '../engine/validate';
-import type { Action, BetTypeId, GameState, Validation } from '../engine/types';
+import type { Action, BetTypeId, Cents, GameState, Validation } from '../engine/types';
 import {
   betEV,
   edgeOfBet,
@@ -336,4 +336,19 @@ export function suggestAlternative(
     if (made) return made;
   }
   return null;
+}
+
+/**
+ * Edge per dollar of a bet type at each amount (the "vig cliff"): buy/lay vig is rounded to whole dollars,
+ * so the edge saws up and down as the amount changes. Pure; used by the buy/lay sheet strip.
+ */
+export function vigCliff(
+  type: BetTypeId,
+  amounts: readonly Cents[],
+  ctx: BetCtx,
+): Array<{ amount: Cents; edge: Fraction }> {
+  return amounts.map((amount) => ({
+    amount,
+    edge: edgeOfBet({ type, amount, point: null }, ctx).perResolved,
+  }));
 }

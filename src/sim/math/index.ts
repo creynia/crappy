@@ -9,7 +9,7 @@ export {
   expectedLossByTypePerRoll,
   lossPerRoll,
 } from './ev';
-export { previewAction, suggestAlternative } from './preview';
+export { previewAction, suggestAlternative, vigCliff } from './preview';
 export { explainBet } from './explain';
 export { edgeTier } from './tiers';
 export { money as formatCents, pct as formatEdge } from './format';

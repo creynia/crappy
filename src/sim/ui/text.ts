@@ -1,7 +1,7 @@
 import type { ActionPreview, EdgeTier } from '../math/types';
 import { BET_TYPES } from '../engine/bets';
 import type { Action, Bet, BetTypeId, Cents, GameEvent, GameState } from '../engine/types';
-import { betEdge } from '../math';
+import { betEdge, vigCliff } from '../math';
 import { oddsMultiplePerDecision } from '../strategy';
 import type { RegionDef } from './layouts/types';
 
@@ -113,6 +113,10 @@ export interface EvFacts {
   pays: string;
   /** Line bet with odds: combined edge per dollar (fraction) and its name, e.g. "Pass + Odds" */
   combined?: { label: string; edge: number } | null;
+  /** Buy/lay only: edge per dollar at amounts around this one (the "vig cliff"); the current amount is marked. */
+  vigCliff?: Array<{ amount: Cents; edge: number; current: boolean }> | null;
+  /** Buy/lay with upfront vig: the flat edge applies at every amount, so one line instead of a strip. */
+  vigFlat?: number | null;
 }
 
 const FLAT_ODDS: Partial<Record<BetTypeId, { flat: BetTypeId; label: string }>> = {
@@ -259,7 +263,32 @@ export function buildEvFacts(
       a.type === 'place-bet' || a.type === 'set-amount'
         ? combinedEdge(type, amount, state, a)
         : null,
+    ...vigFacts(type, amount, state.rules),
   };
+}
+
+/** The buy/lay vig strip: edges at nearby amounts, or one flat figure when vig is paid upfront. */
+function vigFacts(
+  type: BetTypeId,
+  amount: Cents,
+  rules: GameState['rules'],
+): Pick<EvFacts, 'vigCliff' | 'vigFlat'> {
+  const cat = BET_TYPES[type].category;
+  if (cat !== 'buy' && cat !== 'lay') return {};
+  const ctx = { phase: 'come-out' as const, point: null, rules };
+  if (rules.vig.timing === 'upfront') {
+    const e = betEdge(type, amount, ctx).perResolved;
+    return { vigCliff: null, vigFlat: Number(e.n) / Number(e.d) };
+  }
+  const amounts = [...new Set([amount - 1000, amount - 500, amount, amount + 500, amount + 1000])]
+    .filter((a) => a >= 100)
+    .sort((x, y) => x - y);
+  const rows = vigCliff(type, amounts, ctx).map((r) => ({
+    amount: r.amount,
+    edge: Number(r.edge.n) / Number(r.edge.d),
+    current: r.amount === amount,
+  }));
+  return { vigCliff: rows, vigFlat: null };
 }
 
 // ---------- roll descriptions ----------

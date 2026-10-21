@@ -51,6 +51,33 @@ test.describe('sandbox', () => {
     await expect(page.locator('.sim-center-ind')).toContainText('Center bets');
   });
 
+  test('bonus rail: Small collects pips, Fire is a sucker bet, neither can be taken down', async ({
+    page,
+  }) => {
+    await page.goto(url('seed=1&dice=1-1,1-2,3-4'));
+    await page.getByRole('button', { name: 'Center' }).click();
+    await page.locator('[data-region="fire"]').click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toContainText('house edge 20.76%');
+    await expect(sheet).toContainText('Sucker bet');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.locator('[data-region="small"]').click();
+    await expect(sheet).toContainText('house edge 7.76%');
+    await expect(sheet).toContainText('Costly');
+    await expect(sheet.getByLabel('Bet amount')).toHaveText('$5');
+    await sheet.getByRole('button', { name: 'Confirm' }).click();
+    await expect(sheet).toHaveCount(0);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 2
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 3
+    await expect(page.locator('[data-region="small"] .sim-pips .is-hit')).toHaveCount(2);
+    await page.locator('[data-stack]').first().click();
+    await expect(sheet).toContainText('stays up until the hand decides it');
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: /^Roll/ }).click(); // 7: Small loses
+    await expect(page.locator('[data-stack]')).toHaveCount(0);
+  });
+
   test('auto-roll 100 rolls in fast mode renders the chart', async ({ page }) => {
     await page.goto('/#/play?speed=fast');
     await page.getByRole('button', { name: 'Auto-roll' }).click();
@@ -58,6 +85,39 @@ test.describe('sandbox', () => {
     await expect(panel).toBeVisible();
     await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
     await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('auto-roll and strategy compare do not cause horizontal page scroll', async ({ page }) => {
+    const noHScroll = async (label: string) => {
+      const m = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
+        '({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })',
+      );
+      expect(m.scrollWidth, label).toBeLessThanOrEqual(m.clientWidth);
+    };
+    for (const { width, height } of [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 844 },
+      { width: 844, height: 390 },
+    ]) {
+      // single-strategy auto-roll in the sandbox
+      await page.setViewportSize({ width, height });
+      await page.goto('/#/play?speed=fast');
+      const tab = page.getByRole('button', { name: 'Auto-roll', exact: true });
+      if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.click();
+      const panel = page.locator('.sim-auto');
+      await panel.getByRole('button', { name: /^Auto-roll 100$/ }).click();
+      await expect(panel.getByRole('img').first()).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`auto-roll @${width}`);
+
+      // strategy compare run on a lesson scene (the 4-column summary table)
+      await page.goto('/#/learn/strategy-fun-per-dollar');
+      const scene = page.locator('section.scene').nth(0);
+      await scene.scrollIntoViewIfNeeded();
+      await scene.getByRole('button', { name: /^Auto-roll 100/ }).click();
+      await expect(scene.getByTestId('auto-roll-summary')).toBeVisible({ timeout: 15_000 });
+      await noHScroll(`compare @${width}`);
+    }
   });
 
   test('sandbox state persists across reload', async ({ page }) => {

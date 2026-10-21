@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BetSheet, type BetSheetProps, type SheetPreview } from './BetSheet';
 import { CenterPanel } from './CenterPanel';
 import { ChipRack } from './ChipRack';
-import { chipBreakdown } from './ChipStack';
+import { ChipStack, chipBreakdown } from './ChipStack';
 import { DiceGrid } from './DiceGrid';
 import { HistoryStrip, rollOutcome } from './HistoryStrip';
 import { Puck } from './Puck';
@@ -55,6 +55,22 @@ function preview(tier: EdgeTier, over: Partial<SheetPreview> = {}): SheetPreview
       rows: [{ label: '7 first', ways: 6, outOf: 11, probability: fr(6, 11), net: fr(-1000) }],
       evFormula: 'formula here',
     },
+    ...over,
+  };
+}
+
+function sheetProps(over: Partial<BetSheetProps> = {}): BetSheetProps {
+  return {
+    title: 'Place 6',
+    preview: preview('good'),
+    typeOptions: [{ id: 'place-6', label: 'Place 6', enabled: true }],
+    selectedType: 'place-6',
+    amount: 1200,
+    step: 500,
+    onTypeChange: vi.fn(),
+    onAmountChange: vi.fn(),
+    onConfirm: vi.fn(),
+    onCancel: vi.fn(),
     ...over,
   };
 }
@@ -167,6 +183,15 @@ describe('Table', () => {
     expect(screen.getByLabelText(/Place 6 \$12, off/)).toBeTruthy();
   });
 
+  it('CenterPanel renders the bonus rail with progress pips', () => {
+    const { container } = render(
+      <CenterPanel bets={[{ ...bet('b1', 'small', 100), progress: [2, 3] }]} />,
+    );
+    expect(container.querySelector('[data-region="fire"]')).not.toBeNull();
+    const small = container.querySelector('[data-region="small"]')!;
+    expect(small.querySelectorAll('.sim-pips .is-hit')).toHaveLength(2);
+    expect(container.querySelector('[data-region="tall"] .sim-pips .is-hit')).toBeNull();
+  });
   it('CenterPanel renders the proposition cells', () => {
     render(<CenterPanel bets={[bet('b1', 'hard-6', 500)]} />);
     expect(document.querySelector('[data-region="any-7"]')).toBeTruthy();
@@ -462,6 +487,37 @@ describe('BetSheet', () => {
     expect(onRemove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Tap again to remove' }));
     expect(onRemove).toHaveBeenCalledOnce();
+  });
+
+  it('working copy follows the toggle: OFF explains the cost of ON, ON shows the saving', () => {
+    const offCopy = 'Off on the come-out by table convention. Turning it ON costs about $0.06.';
+    const onCopy = 'Working on the come-out. Turning it OFF saves about $0.06.';
+    const { rerender } = render(
+      <BetSheet
+        {...sheetProps()}
+        mode="manage"
+        working={{ value: false, canToggle: true, copy: offCopy }}
+      />,
+    );
+    expect(screen.getByText(offCopy)).toBeTruthy();
+    rerender(
+      <BetSheet
+        {...sheetProps()}
+        mode="manage"
+        working={{ value: true, canToggle: true, copy: onCopy }}
+      />,
+    );
+    expect(screen.queryByText(offCopy)).toBeNull();
+    expect(screen.getByText(onCopy)).toBeTruthy();
+  });
+
+  it('ChipStack marks an off bet with the text OFF, not colour alone', () => {
+    render(
+      <svg>
+        <ChipStack x={0} y={0} amount={1200} off />
+      </svg>,
+    );
+    expect(screen.getByText('OFF')).toBeTruthy();
   });
 
   it('manage mode offers Remove and a working toggle', () => {

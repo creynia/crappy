@@ -27,7 +27,8 @@ test('challenge: 300 scored rolls, result screen and best score', async ({ page 
       await expect(sheet).toHaveCount(0);
     }
     await roll.click();
-    await expect(rolls).toContainText(`Roll ${i} of 300`);
+    // the 300th roll ends the scene and swaps the table for the result screen
+    if (i < 300) await expect(rolls).toContainText(`Roll ${i} of 300`);
   }
   const result = page.getByTestId('challenge-result');
   await expect(result).toBeVisible();

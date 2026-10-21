@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Simulator,
   challengeScene,
@@ -67,6 +67,10 @@ export function Challenge({ query }: { query: URLSearchParams }) {
     setResult(null);
     setPhase({ kind: 'play', seed });
   };
+  // `#/challenge` -> `#/challenge?seed=N` keeps this component mounted: follow the URL seed.
+  useEffect(() => {
+    if (urlSeed !== null && !(phase.kind === 'play' && phase.seed === urlSeed)) start(urlSeed);
+  }, [urlSeed]);
 
   const onEvent = (e: SimulatorEvent) => {
     tally.current = observeChallenge(tally.current, e);

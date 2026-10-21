@@ -18,6 +18,7 @@ export type BetTypeId =
   | 'hard-4' | 'hard-6' | 'hard-8' | 'hard-10'
   | 'any-7' | 'any-craps' | 'yo-11' | 'aces-2' | 'boxcars-12' | 'ace-deuce-3'
   | 'horn' | 'c-e' | 'world'
+  | 'hop'                                   // EXTENSION (I035): one-roll bet on one dice pair, see Bet.hop
   | 'fire' | 'all' | 'tall' | 'small';   // bonus side bets (decisions.md, I037)
 
 export type BetCategory =
@@ -38,6 +39,11 @@ export interface Bet {
   placedOnRoll: number;       // state.rollCount when placed
   /** Upfront vig already paid (only when rules.vig.timing === 'upfront'); refunded on take-down */
   vigPaid: Cents;
+  /**
+   * EXTENSION (I035), hop bets only: the dice pair, normalized low-high (2-4, never 4-2).
+   * Absent on every other bet, so states saved before hop bets existed load unchanged.
+   */
+  hop?: Dice;
   /**
    * EXTENSION (I037): memory of a multi-hand bonus bet, sorted ascending. Fire: the distinct points made
    * this hand; All/Tall/Small: the numbers already rolled. Absent (older saved states) means empty.
@@ -125,7 +131,14 @@ export interface GameState {
 
 // ---------- actions ----------
 export type Action =
-  | { type: 'place-bet'; betType: BetTypeId; amount: Cents; parentId?: string }
+  | {
+      type: 'place-bet';
+      betType: BetTypeId;
+      amount: Cents;
+      parentId?: string;
+      /** EXTENSION (I035): required for 'hop' (either order), rejected on every other bet. */
+      hop?: Dice;
+    }
   | { type: 'set-amount'; betId: string; amount: Cents }   // new total amount
   | { type: 'remove-bet'; betId: string }
   | { type: 'set-working'; betId: string; working: WorkingMode }
@@ -141,6 +154,7 @@ export type ValidationCode =
   | 'cannot-increase'           // don't-side flat after point, come/DC on number
   | 'not-removable'
   | 'unit-multiple'             // horn multiple of 4 units, world 5, c-e 2
+  | 'bad-dice'                  // EXTENSION (I035): hop without a valid pair, or a pair on a non-hop bet
   | 'not-allowed-by-scene';     // added by scene layer, never by engine
 
 export type Validation =

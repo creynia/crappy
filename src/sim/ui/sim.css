@@ -772,6 +772,52 @@
   }
 }
 
+.sim-tree,
+.sim-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.sim-tree ul {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--sim-border);
+}
+.sim-tree-leaf,
+.sim-tree summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--sim-border);
+  overflow-wrap: anywhere;
+}
+.sim-tree summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+  min-height: 44px;
+  align-items: center;
+  list-style: none;
+}
+.sim-tree summary::-webkit-details-marker {
+  display: none;
+}
+.sim-tree summary::before {
+  content: '▸';
+}
+.sim-tree details[open] > summary::before {
+  content: '▾';
+}
+.sim-tree-total {
+  margin: 4px 2px 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.sim-tree-net {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 /* "Why?" 36-dice grid: letters + patterns carry meaning, colour only reinforces */
 .sim-dicegrid {
   margin: 0.75rem 0 0.5rem;

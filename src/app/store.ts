@@ -9,6 +9,7 @@ import {
   REVIEW_LIMIT,
   save,
   type DrillProgress,
+  type ChallengeRecord,
   type LessonProgress,
   type Persisted,
   type PracticeItemRef,
@@ -213,6 +214,27 @@ export class Store {
   setPracticeLevel(drillId: string, level: number) {
     if (this.drill(drillId)?.level === level) return;
     this.patchDrill(drillId, (p) => ({ ...p, level }));
+  }
+
+  // ---- challenge mode (I030) ----
+
+  get challenge(): ChallengeRecord {
+    return this.data.challenge ?? { played: 0 };
+  }
+
+  /** A finished challenge; a scored one replaces the best when its score is lower. */
+  recordChallenge(r: { score: number | null; band: string; seed: number }, now = Date.now()) {
+    const cur = this.challenge;
+    const better = r.score !== null && (cur.best === undefined || r.score < cur.best.score);
+    const next: ChallengeRecord = {
+      played: cur.played + 1,
+      ...(better && r.score !== null
+        ? { best: { score: r.score, band: r.band, at: now, seed: r.seed } }
+        : cur.best
+          ? { best: cur.best }
+          : {}),
+    };
+    this.commit({ ...this.data, challenge: next });
   }
 
   updateSettings(patch: Partial<Settings>) {

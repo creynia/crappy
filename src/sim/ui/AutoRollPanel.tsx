@@ -26,6 +26,7 @@ import type {
 import { BankrollChart } from './BankrollChart';
 import { BANKROLL_CHIPS, MAX_BANKROLL, parseBankroll } from './bankroll';
 import type { ChartMode, ChartSeries } from './BankrollChart';
+import { StrategyTable } from './StrategyTable';
 import { EdgeChart, edgeSeries } from './EdgeChart';
 import { ResultsHistogram } from './ResultsHistogram';
 import { matchingPreset } from './customRules';
@@ -74,6 +75,8 @@ export interface AutoRollPanelProps {
     chart?: 'bankroll' | 'edge';
     /** exact specs to run side by side on the same seed (each with its own unit and odds) */
     compare?: StrategySpec[];
+    /** open on the all-presets comparison table instead of the run form */
+    table?: boolean;
     /** initial "stop when ahead by" / "stop when behind by" amounts (cents); the player can change them */
     stopWin?: Cents;
     stopLoss?: Cents;
@@ -230,6 +233,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
   const [chartKind, setChartKind] = useState<'bankroll' | 'edge'>(config?.chart ?? 'bankroll');
   const [chartTab, setChartTab] = useState<'results' | 'survival'>('results');
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'run' | 'table'>(config?.table ? 'table' : 'run');
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
   // The funnel's spread is a ~50k-roll estimate: work it out only when the % view is open, after a
@@ -381,6 +385,65 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
     </button>
   );
 
+  const unitControl = (
+    <div class="sim-ar-group" role="group" aria-label="Unit">
+      <span>Unit</span>
+      {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
+    </div>
+  );
+  const rulesControl = (
+    <>
+      {typeof props.rules !== 'object' && !fixedSpecs && (
+        <label class="sim-ar-group">
+          Rules
+          <select
+            value={editingRules || customRules ? 'custom' : preset}
+            disabled={running}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              if (v === 'custom') return setEditingRules(true);
+              setEditingRules(false);
+              setCustomRules(null);
+              setPreset(v as RulePresetId);
+            }}
+          >
+            {PRESET_IDS.map((id) => (
+              <option key={id} value={id}>
+                {PRESET_LABEL[id]}
+              </option>
+            ))}
+            <option value="custom">Custom…</option>
+          </select>
+        </label>
+      )}
+      {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+        <button
+          type="button"
+          class="sim-ar-btn"
+          disabled={running}
+          onClick={() => setEditingRules(true)}
+        >
+          Edit custom rules
+        </button>
+      ) : null}
+      {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
+        <RulesEditor
+          initial={rules}
+          disabled={running}
+          onCancel={() => setEditingRules(false)}
+          onApply={(r) => {
+            setEditingRules(false);
+            // a form equal to a preset is that preset
+            const m = matchingPreset(r);
+            if (m) {
+              setPreset(m);
+              setCustomRules(null);
+            } else setCustomRules(r);
+          }}
+        />
+      ) : null}
+    </>
+  );
   if (config?.sweep)
     return (
       <SweepPanel
@@ -395,7 +458,33 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
 
   return (
     <section class="sim-autoroll" aria-label="Auto-roll" data-testid="auto-roll-panel">
-      <div class="sim-ar-form">
+      {!fixedSpecs && (
+        <div class="sim-ar-group" role="group" aria-label="Auto-roll view">
+          {button(view === 'run', 'Run', () => setView('run'), 'view-run')}
+          {button(view === 'table', 'Compare all', () => setView('table'), 'view-table')}
+        </div>
+      )}
+      {view === 'table' && !fixedSpecs && (
+        <>
+          {unitControl}
+          {rulesControl}
+        </>
+      )}
+      {view === 'table' && !fixedSpecs && (
+        <StrategyTable
+          unit={effUnit}
+          rules={rules}
+          rollsPerHour={rollsPerHour}
+          {...(config?.strategies ? { strategies: config.strategies } : {})}
+          onRun={(spec) => {
+            setStrategyIds([spec.id]);
+            setUnit(spec.unit);
+            setOddsMultiple(undefined);
+            setView('run');
+          }}
+        />
+      )}
+      <div class="sim-ar-form" hidden={view === 'table' && !fixedSpecs}>
         <fieldset class="sim-ar-fieldset">
           <legend>
             {fixedSpecs
@@ -492,10 +581,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
         ) : null}
         {!fixedSpecs && (
           <>
-            <div class="sim-ar-group" role="group" aria-label="Unit">
-              <span>Unit</span>
-              {unitOptions.map((u) => button(effUnit === u, money(u), () => setUnit(u), u))}
-            </div>
+            {unitControl}
             <div class="sim-ar-group" role="group" aria-label="Odds">
               <span>Odds</span>
               {button(oddsMultiple === undefined, 'Max', () => setOddsMultiple(undefined))}
@@ -636,55 +722,7 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
           <span>Sessions</span>
           {sessionOptions.map((n) => button(sessions === n, String(n), () => setSessions(n), n))}
         </div>
-        {typeof props.rules !== 'object' && !fixedSpecs && (
-          <label class="sim-ar-group">
-            Rules
-            <select
-              value={editingRules || customRules ? 'custom' : preset}
-              disabled={running}
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                if (v === 'custom') return setEditingRules(true);
-                setEditingRules(false);
-                setCustomRules(null);
-                setPreset(v as RulePresetId);
-              }}
-            >
-              {PRESET_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {PRESET_LABEL[id]}
-                </option>
-              ))}
-              <option value="custom">Custom…</option>
-            </select>
-          </label>
-        )}
-        {customRules && !editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
-          <button
-            type="button"
-            class="sim-ar-btn"
-            disabled={running}
-            onClick={() => setEditingRules(true)}
-          >
-            Edit custom rules
-          </button>
-        ) : null}
-        {editingRules && typeof props.rules !== 'object' && !fixedSpecs ? (
-          <RulesEditor
-            initial={rules}
-            disabled={running}
-            onCancel={() => setEditingRules(false)}
-            onApply={(r) => {
-              setEditingRules(false);
-              // a form equal to a preset is that preset
-              const m = matchingPreset(r);
-              if (m) {
-                setPreset(m);
-                setCustomRules(null);
-              } else setCustomRules(r);
-            }}
-          />
-        ) : null}
+        {rulesControl}
         <div class="sim-ar-group">
           <label>
             Seed{' '}
@@ -735,7 +773,12 @@ export function AutoRollPanel(props: AutoRollPanelProps) {
       </div>
 
       {outcome && (
-        <div data-testid="auto-roll-output" class="sim-ar-output" aria-live="polite">
+        <div
+          data-testid="auto-roll-output"
+          class="sim-ar-output"
+          aria-live="polite"
+          hidden={view === 'table' && !fixedSpecs}
+        >
           {renderOutput(outcome)}
         </div>
       )}

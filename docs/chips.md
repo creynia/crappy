@@ -13,10 +13,6 @@ Optional dice-rattle, dice-land and chip-clack sounds in the simulator.
 - Generate sounds with the Web Audio API (no audio files) so the single-file
   offline build stays small.
 
-### "Call the bet" practice mode
-A drill where the app names a dice result and the learner calls out which bets
-win, lose or stay (dealer-style). Builds table fluency.
-
 ### Session plan panel
 A small planner: pick bankroll, unit, strategy and session length, and see
 expected loss, risk of ruin and a suggested stop-loss before you play.
@@ -36,3 +32,4 @@ stacked card layout.
 
 - Combined edge with two Come bets (PR #18): `combinedEdge` uses the managed bet (`betId` / `parentId`) for every lookup, so set-amount and odds on the second Come bet no longer fall back to the first.
 - Hop bets (I035): one-roll bets on a specific dice pair (hard hop 30:1, easy hop 15:1), with a 21-pair picker in the center panel.
+- "Call the bet" practice mode (I028): a drill at `#/practice/call-the-bet` with a legal layout and a roll; the learner calls every stack Wins / Loses / Pushes / Travels / Off / Stays, answered from the engine's own resolution, in three levels (line bets; come and odds; place, hardways and props).

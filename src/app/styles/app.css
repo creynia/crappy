@@ -588,3 +588,56 @@ textarea {
     bottom: 24px;
   }
 }
+
+/* ---------- challenge mode (I030) ---------- */
+.play-challenge-link {
+  margin: 0 0 0.75rem;
+}
+.challenge-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.challenge-head h1 {
+  margin: 0;
+  flex: 1 1 auto;
+}
+.challenge-head p {
+  margin: 0;
+}
+.challenge-score-big {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.challenge-bands {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.challenge-kv {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.75rem;
+}
+.challenge-kv dd {
+  margin: 0;
+  text-align: right;
+}
+.challenge-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+button.tile {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

@@ -50,6 +50,7 @@ export function regionIdForBet(type: string, point: number | null): RegionId | n
     case 'hard-6':
     case 'hard-8':
     case 'hard-10':
+    case 'hop':
       return type;
   }
   const m = /^(place|buy|lay)-(\d+)$/.exec(type);
@@ -75,4 +76,15 @@ export function spotPosition(region: RegionDef, type: string): Point2 {
   if (type.startsWith('buy-')) return s.buy ?? fallback;
   if (type.startsWith('lay-')) return s.lay ?? fallback;
   return s.main ?? fallback;
+}
+
+/**
+ * Hop bets (I035) get one stack per pair, side by side from the region's main spot leftwards
+ * (`slot` = 0 for the first pair placed), so each stack can show its pair.
+ */
+export function hopSpot(region: RegionDef, slot: number, chipRadius: number): Point2 {
+  const main = region.chipSpots.main ?? { x: region.rect.x + region.rect.w / 2, y: region.rect.y };
+  const step = chipRadius * 2.3;
+  const perRow = Math.max(1, Math.floor((main.x - region.rect.x) / step));
+  return { x: main.x - (slot % perRow) * step, y: main.y + Math.floor(slot / perRow) * 8 };
 }

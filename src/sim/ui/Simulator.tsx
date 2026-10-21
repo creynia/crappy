@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BET_TYPES, isToggleable } from '../engine/bets';
+import { BET_TYPES, hopLabel, isToggleable } from '../engine/bets';
 import { applyAction, equity, isWorking } from '../engine/game';
 import { resolveRules } from '../engine/rules';
 import { validateAction } from '../engine/validate';
@@ -52,6 +52,7 @@ import {
   minAmountFor,
   oddsRoom,
   parentFor,
+  hopSheetFields,
   placeAction,
 } from './simHelpers';
 import { betLabel, buildEvFacts, describeRoll, fmtMoney, rollTone } from './text';
@@ -166,6 +167,8 @@ interface SheetState {
   amount: Cents;
   /** manage mode: the existing bet */
   betId?: string;
+  /** hop bets (I035): the chosen pair */
+  hop?: DicePair;
 }
 
 const isCenterBet = (b: Bet) => {
@@ -437,7 +440,7 @@ export function Simulator(props: SimulatorInternalProps) {
     const { game: g, rt: r } = coreRef.current;
     const action: Action = s.betId
       ? { type: 'remove-bet', betId: s.betId }
-      : placeAction(s.type, s.amount, s.regionId, g);
+      : placeAction(s.type, s.amount, s.regionId, g, s.hop);
     const p = previewAction(g, action, { rollsPerHour: settingsRef.current.rollsPerHour });
     emit({ type: 'previewed', preview: p });
     const sc = sceneRef.current;
@@ -468,11 +471,12 @@ export function Simulator(props: SimulatorInternalProps) {
     if (!allowedTypes.includes(type)) type = allowedTypes[0]!;
     const amount = defaultAmount(type, id, g, chip);
     const needsParent = BET_TYPES[type].category === 'odds' && !parentFor(type, id, g);
-    if (settingsRef.current.skipPreview && !needsParent) {
+    // a hop always opens the sheet: the pair is picked there
+    if (settingsRef.current.skipPreview && !needsParent && type !== 'hop') {
       doAction(placeAction(type, amount, id, g));
       return;
     }
-    openSheet({ regionId: id, type, amount });
+    openSheet({ regionId: id, type, amount, ...hopSheetFields(type, undefined) });
   };
 
   const onStackTap = (betId: string) => {
@@ -493,7 +497,7 @@ export function Simulator(props: SimulatorInternalProps) {
       ? sheet.amount === bet.amount
         ? { type: 'remove-bet', betId: bet.id }
         : { type: 'set-amount', betId: bet.id, amount: sheet.amount }
-      : placeAction(sheet.type, sheet.amount, sheet.regionId, game);
+      : placeAction(sheet.type, sheet.amount, sheet.regionId, game, sheet.hop);
     let preview: ActionPreview = previewAction(game, action, {
       rollsPerHour: settings.rollsPerHour,
     });
@@ -980,7 +984,7 @@ export function Simulator(props: SimulatorInternalProps) {
 
       {sheet && sheetModel ? (
         <BetSheet
-          title={betLabel(sheetModel.type)}
+          title={sheetModel.bet?.hop ? hopLabel(sheetModel.bet.hop) : betLabel(sheetModel.type)}
           mode={sheetModel.bet ? 'manage' : 'new'}
           placement={landscape ? 'panel' : 'sheet'}
           preview={sheetModel.preview}
@@ -1024,6 +1028,7 @@ export function Simulator(props: SimulatorInternalProps) {
               regionId: sheet.regionId,
               type: t,
               amount: defaultAmount(t, sheet.regionId, g, chip),
+              ...hopSheetFields(t, sheet.hop),
             };
             setSheet(next);
             firePreviewed(next);
@@ -1032,7 +1037,12 @@ export function Simulator(props: SimulatorInternalProps) {
           onUseAlternative={(a) => {
             if (a.type !== 'place-bet') return;
             const rid = regionIdForBet(a.betType, null) ?? sheet.regionId;
-            const next: SheetState = { regionId: rid, type: a.betType, amount: a.amount };
+            const next: SheetState = {
+              regionId: rid,
+              type: a.betType,
+              amount: a.amount,
+              ...hopSheetFields(a.betType, a.hop),
+            };
             setSheet(next);
             firePreviewed(next);
           }}
@@ -1049,6 +1059,14 @@ export function Simulator(props: SimulatorInternalProps) {
                 onRemove: () => {
                   const r = doAction({ type: 'remove-bet', betId: sheetModel.bet!.id });
                   if (r.ok) closeSheet();
+                },
+              }
+            : {})}
+          {...(sheet.hop && !sheetModel.bet
+            ? {
+                hop: {
+                  value: sheet.hop,
+                  onChange: (d: DicePair) => setSheet({ ...sheet, hop: d }),
                 },
               }
             : {})}

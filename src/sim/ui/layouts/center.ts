@@ -30,12 +30,14 @@ const regions: RegionDef[] = [
   r('horn', { x: 20, y: 660, w: 280, h: 105 }, 'Horn', '2, 3, 11, 12', 'horn'),
   r('c-e', { x: 310, y: 660, w: 280, h: 105 }, 'C and E', 'Craps and eleven', 'c-e'),
   r('world', { x: 600, y: 660, w: 280, h: 105 }, 'World', 'Horn plus any 7', 'world'),
+  // I035: hop bets open a 21-pair picker in the sheet.
+  r('hop', { x: 20, y: 780, w: 860, h: 110 }, 'Hop Bets', 'Easy 15 to 1, hard 30 to 1', 'hop'),
 ];
 
 const zero = { x: 0, y: 0 };
 export const centerLayout: TableLayout = {
   id: 'center',
-  viewBox: { w: 900, h: 785 },
+  viewBox: { w: 900, h: 905 },
   regions,
   puck: { 4: zero, 5: zero, 6: zero, 8: zero, 9: zero, 10: zero, off: zero },
   puckRadius: 0,

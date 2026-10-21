@@ -4,7 +4,8 @@ import type { Bet, BetTypeId, Cents, PointNumber } from '../engine/types';
 import { ChipStack } from './ChipStack';
 import { Dice } from './Dice';
 import type { Dice as DicePair } from '../engine/types';
-import { regionIdForBet, spotPosition } from './layouts';
+import { hopText } from '../engine/bets';
+import { hopSpot, regionIdForBet, spotPosition } from './layouts';
 import type { RegionDef, RegionId, TableLayout } from './layouts/types';
 import { Puck } from './Puck';
 import { RegionArt } from './regionArt';
@@ -43,6 +44,15 @@ interface Placed {
   amount: Cents;
   betIds: string[];
   off: boolean;
+  /** hop bets: the pair, drawn above the stack */
+  caption?: string;
+}
+
+/** Where a bet's chips go; each hop pair gets its own slot in the hop region (in placement order). */
+function betSpot(layout: TableLayout, region: RegionDef, b: Bet, bets: readonly Bet[]) {
+  if (b.type !== 'hop' || !b.hop) return { pos: spotPosition(region, b.type), key: b.type };
+  const slot = bets.filter((x) => x.type === 'hop').indexOf(b);
+  return { pos: hopSpot(region, slot, layout.chipRadius), key: `hop:${hopText(b.hop)}` };
 }
 
 function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySet<string>) {
@@ -53,8 +63,8 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
     const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
     if (!region) continue;
     byRegion.set(region.id, [...(byRegion.get(region.id) ?? []), b]);
-    const pos = spotPosition(region, b.type);
-    const key = `${pos.x},${pos.y},${b.type}`;
+    const { pos, key: kind } = betSpot(layout, region, b, bets);
+    const key = `${pos.x},${pos.y},${kind}`;
     const prev = stacks.get(key);
     const off = offIds.has(b.id);
     if (prev) {
@@ -71,6 +81,7 @@ function placeBets(layout: TableLayout, bets: readonly Bet[], offIds: ReadonlySe
         amount: b.amount,
         betIds: [b.id],
         off,
+        ...(b.hop ? { caption: hopText(b.hop) } : {}),
       });
     }
   }
@@ -129,7 +140,13 @@ export function Table({
   const ghostPos = (b: Bet) => {
     const rid = regionIdForBet(b.type, b.point);
     const region = rid ? layout.regions.find((r) => r.id === rid) : undefined;
-    return region ? spotPosition(region, b.type) : null;
+    if (!region) return null;
+    // a resolved hop is no longer in `bets`: rebuild the pre-roll hop order (bet ids are sequential)
+    if (b.type !== 'hop') return spotPosition(region, b.type);
+    const prior = [...bets, ...(lostBets ?? []), ...(wonBets ?? []).map((x) => x.bet)]
+      .filter((x) => x.type === 'hop')
+      .sort((x, y) => Number(x.id.slice(1)) - Number(y.id.slice(1)));
+    return betSpot(layout, region, b, prior).pos;
   };
 
   return (
@@ -201,7 +218,7 @@ export function Table({
                 class={`sim-stack-hit${s.betIds.some((id) => wonIds.has(id)) ? ' is-won' : ''}`}
                 role="button"
                 tabindex={0}
-                aria-label={`Edit ${betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
+                aria-label={`Edit ${s.caption ? `${betLabel(s.type)} ${s.caption}` : betLabel(s.type)} bet, ${fmtMoney(s.amount)}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStackTap?.(s.betIds[0]!, s.betIds);
@@ -216,7 +233,14 @@ export function Table({
                 data-stack={s.betIds[0]}
                 data-count={nums}
               >
-                <ChipStack x={s.x} y={s.y} amount={s.amount} r={layout.chipRadius} off={s.off} />
+                <ChipStack
+                  x={s.x}
+                  y={s.y}
+                  amount={s.amount}
+                  r={layout.chipRadius}
+                  off={s.off}
+                  {...(s.caption ? { caption: s.caption } : {})}
+                />
               </g>
             );
           })}

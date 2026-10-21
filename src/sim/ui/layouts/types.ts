@@ -24,6 +24,7 @@ export type RegionId =
   | 'horn'
   | 'c-e'
   | 'world'
+  | 'hop'
   | `hard-${4 | 6 | 8 | 10}`;
 export type ChipSpotKey = 'main' | 'odds' | 'come-point' | 'dc-point' | 'lay' | 'buy';
 export type Point2 = { x: number; y: number };

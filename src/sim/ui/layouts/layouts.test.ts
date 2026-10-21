@@ -4,6 +4,7 @@ import {
   landscapeLayout,
   portraitLayout,
   regionIdForBet,
+  hopSpot,
   spotPosition,
 } from './index';
 import type { Rect, TableLayout } from './types';
@@ -78,5 +79,25 @@ describe('main layouts', () => {
     const box = portraitLayout.regions.find((r) => r.id === 'box-6')!;
     expect(spotPosition(box, 'buy-6')).toEqual(box.chipSpots.buy);
     expect(spotPosition(box, 'lay-6')).toEqual(box.chipSpots.lay);
+  });
+});
+
+describe('center layout: hop region (I035)', () => {
+  const hop = centerLayout.regions.find((r) => r.id === 'hop')!;
+  it('exists, takes hop bets and is a >= 44 CSS px tap target at 390px wide', () => {
+    expect(hop.betTypes).toEqual(['hop']);
+    expect(regionIdForBet('hop', null)).toBe('hop');
+    expect(Math.min(hop.rect.w, hop.rect.h) * VIEWPORT.center).toBeGreaterThanOrEqual(44);
+  });
+  it('gives each pair its own chip slot inside the region', () => {
+    const r = centerLayout.chipRadius;
+    const spots = Array.from({ length: 6 }, (_, i) => hopSpot(hop, i, r));
+    expect(new Set(spots.map((p) => `${p.x},${p.y}`)).size).toBe(6);
+    for (const p of spots) {
+      expect(p.x - r).toBeGreaterThanOrEqual(hop.rect.x);
+      expect(p.x + r).toBeLessThanOrEqual(hop.rect.x + hop.rect.w);
+      expect(p.y).toBeGreaterThanOrEqual(hop.rect.y);
+      expect(p.y).toBeLessThanOrEqual(hop.rect.y + hop.rect.h);
+    }
   });
 });

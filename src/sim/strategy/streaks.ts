@@ -45,8 +45,12 @@ export interface StreakStat {
   se: number | null;
   /** (frequency - exact) / se */
   z: number | null;
-  /** 95% interval for the true chance, from what was seen (normal approximation) */
+  /** 95% Wilson interval for the true chance, from what was seen (sound for small samples too) */
   ci: [number, number] | null;
+  /** where the observed frequency lands 95% of the time when the exact chance is true (exact +/- 1.96 se) */
+  normalRange: [number, number] | null;
+  /** at least MIN_SAMPLES: fewer than that tells us nothing */
+  enough: boolean;
 }
 
 export interface StreakResult {
@@ -71,6 +75,19 @@ export function exactProbability(target: StreakTarget): Fraction {
 }
 
 const TARGETS: StreakTarget[] = ['seven', 'six', 'point'];
+
+/** Below this many occurrences a frequency is too noisy to say anything about. */
+export const MIN_SAMPLES = 30;
+
+/** 95% Wilson score interval for k successes in n trials. */
+export function wilson(k: number, n: number): [number, number] {
+  const z = 1.96;
+  const f = k / n;
+  const d = 1 + (z * z) / n;
+  const center = (f + (z * z) / (2 * n)) / d;
+  const half = (z * Math.sqrt((f * (1 - f)) / n + (z * z) / (4 * n * n))) / d;
+  return [Math.max(0, center - half), Math.min(1, center + half)];
+}
 
 /** The dice totals of `rolls` seeded rolls. */
 export function rollTotals(seed: number, rolls: number): Uint8Array {
@@ -152,7 +169,6 @@ export function scanStreaks(cfg: StreakConfig): StreakResult {
     const h = hits[k]!;
     const f = s > 0 ? h / s : null;
     const se = s > 0 ? Math.sqrt((p * (1 - p)) / s) : null;
-    const half = f !== null && s > 0 ? 1.96 * Math.sqrt((f * (1 - f)) / s) : null;
     stats[target] = {
       target,
       samples: s,
@@ -162,7 +178,9 @@ export function scanStreaks(cfg: StreakConfig): StreakResult {
       exactNumber: p,
       se,
       z: f !== null && se ? (f - p) / se : null,
-      ci: f !== null && half !== null ? [Math.max(0, f - half), Math.min(1, f + half)] : null,
+      ci: s > 0 ? wilson(h, s) : null,
+      normalRange: se !== null ? [Math.max(0, p - 1.96 * se), Math.min(1, p + 1.96 * se)] : null,
+      enough: s >= MIN_SAMPLES,
     };
   });
   return { rolls: n, condition: c, stats };

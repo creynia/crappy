@@ -26,11 +26,13 @@ export function conditionText(c: StreakCondition): string {
   return c.n === 1 ? 'after a point is made' : `after ${c.n} points made in a row`;
 }
 
-/** One plain sentence per row: what was seen, how sure we are, and the exact chance. */
+/** One plain sentence per row: what was seen, the range dice with no memory would normally give, the exact chance. */
 export function statText(s: StreakStat): string {
-  if (s.samples === 0 || s.frequency === null || s.ci === null)
+  if (s.samples === 0 || s.frequency === null)
     return 'This never happened in these rolls. Try a shorter streak.';
-  return `${count(s.hits)} of ${count(s.samples)} times (${pct(s.frequency)}). The true chance is likely between ${pct(s.ci[0])} and ${pct(s.ci[1])}; the exact chance is ${pct(s.exactNumber)} (${fracText(s.exact)}).`;
+  if (!s.enough || s.normalRange === null)
+    return `Only ${count(s.samples)} ${s.samples === 1 ? 'time' : 'times'} (${count(s.hits)} followed): too few samples to tell anything. The exact chance is ${pct(s.exactNumber)} (${fracText(s.exact)}). Try a shorter streak.`;
+  return `Observed ${pct(s.frequency)} (${count(s.hits)} of ${count(s.samples)}). Normal wobble for dice with no memory: ${pct(s.normalRange[0])} to ${pct(s.normalRange[1])}. The exact chance is ${pct(s.exactNumber)} (${fracText(s.exact)}).`;
 }
 
 export interface StreakLabProps {
@@ -111,8 +113,9 @@ export function StreakLab({ initialSeed = 1, onCompleted }: StreakLabProps) {
             value={n}
             onInput={(e) => {
               const v = Number(e.currentTarget.value);
-              if (Number.isFinite(v)) setN(Math.max(1, Math.min(maxN, Math.round(v))));
+              if (Number.isFinite(v)) setN(Math.round(v));
             }}
+            onBlur={() => setN((v) => Math.max(1, Math.min(maxN, Math.round(v) || 1)))}
           />
         </label>
       </div>
@@ -141,7 +144,10 @@ export function StreakLab({ initialSeed = 1, onCompleted }: StreakLabProps) {
         ) : null}
       </div>
       {result ? (
-        <div data-testid="streak-result" aria-live="polite">
+        <div data-testid="streak-result">
+          <p class="sim-sr" role="status">
+            Done: {conditionText(result.condition)}, {count(result.rolls)} rolls scanned.
+          </p>
           <p>
             <strong>{conditionText(result.condition)}:</strong>
           </p>

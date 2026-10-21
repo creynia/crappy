@@ -46,6 +46,7 @@ export function SimAutoRoll({
     }
     if (ar.rollOptions) cfg.rollOptions = ar.rollOptions;
     if (ar.sessions) cfg.sessions = ar.sessions;
+    if (ar.table) cfg.table = true;
     if (ar.chart) cfg.chart = ar.chart;
     if (ar.sweep) cfg.sweep = ar.sweep;
     if (ar.stopWin !== undefined) cfg.stopWin = ar.stopWin;

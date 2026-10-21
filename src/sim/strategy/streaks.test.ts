@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { exactProbability, rollTotals, scanStreaks, type StreakCondition } from './streaks';
+import {
+  MIN_SAMPLES,
+  exactProbability,
+  rollTotals,
+  scanStreaks,
+  wilson,
+  type StreakCondition,
+} from './streaks';
 
 const CONDITIONS: [string, StreakCondition][] = [
   ['after 1 seven', { kind: 'sevens', n: 1 }],
@@ -34,7 +41,7 @@ describe('scanStreaks', () => {
         expect(Math.abs(stat.z!)).toBeLessThan(4);
         expect(stat.hits).toBeLessThanOrEqual(stat.samples);
         // the interval is built from what was seen and contains the observed frequency
-        expect(stat.ci![0]).toBeLessThanOrEqual(stat.frequency!);
+        expect(stat.ci![0]).toBeLessThanOrEqual(stat.frequency! + 1e-9);
         expect(stat.ci![1]).toBeGreaterThanOrEqual(stat.frequency!);
       }
     });
@@ -57,5 +64,17 @@ describe('scanStreaks', () => {
     const r = scanStreaks({ seed: 1, rolls: 50, condition: { kind: 'sevens', n: 6 } });
     expect(r.stats.seven.frequency).toBeNull();
     expect(r.stats.seven.z).toBeNull();
+  });
+
+  it('Wilson interval stays sensible for tiny samples (0 of 3 is not 0% to 0%)', () => {
+    const [lo, hi] = wilson(0, 3);
+    expect(lo).toBe(0);
+    expect(hi).toBeGreaterThan(0.5);
+    const [l2, h2] = wilson(500, 1000);
+    expect(l2).toBeLessThan(0.5);
+    expect(h2).toBeGreaterThan(0.5);
+    const r = scanStreaks({ seed: 1, rolls: 100_000, condition: { kind: 'sevens', n: 5 } });
+    expect(r.stats.seven.enough).toBe(r.stats.seven.samples >= MIN_SAMPLES);
+    expect(r.stats.seven.ci![1]).toBeGreaterThan(0.05);
   });
 });

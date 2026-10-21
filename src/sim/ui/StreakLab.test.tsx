@@ -13,8 +13,10 @@ describe('StreakLab', () => {
     await waitFor(() => expect(screen.getAllByTestId('streak-row')).toHaveLength(3));
     const text = screen.getByTestId('streak-result').textContent;
     expect(text).toContain('after 3 sevens in a row');
-    expect(text).toMatch(/of [\d,]+ times/); // sample size
-    expect(text).toMatch(/likely between [\d.]+% and [\d.]+%/); // the interval
+    expect(text).toMatch(/\([\d,]+ of [\d,]+\)/); // sample size
+    expect(text).toMatch(
+      /Observed [\d.]+% \([\d,]+ of [\d,]+\)\. Normal wobble .*: [\d.]+% to [\d.]+%/,
+    );
     expect(text).toContain('exact chance is 16.7% (1/6)');
     expect(text).toContain('exact chance is 13.9% (5/36)');
     expect(done).toHaveBeenCalledWith(100_000);
@@ -38,5 +40,25 @@ describe('StreakLab', () => {
       ),
     ).toContain('never happened');
     expect(exactProbability('seven').d).toBe(6n);
+  });
+
+  it('a rare streak says too few samples instead of a misleading interval', () => {
+    const r = scanStreaks({ seed: 1, rolls: 100_000, condition: { kind: 'sevens', n: 6 } });
+    const text = statText(r.stats.seven);
+    if (r.stats.seven.samples === 0) expect(text).toContain('never happened');
+    else expect(text).toContain('too few samples');
+    const tiny = scanStreaks({ seed: 1, rolls: 100_000, condition: { kind: 'sevens', n: 5 } });
+    expect(tiny.stats.seven.samples).toBeLessThan(30);
+    expect(statText(tiny.stats.seven)).toContain('too few samples to tell');
+    expect(statText(tiny.stats.seven)).not.toContain('0.0% to 0.0%');
+  });
+
+  it('clamps How many on blur, not while typing', () => {
+    render(<StreakLab />);
+    const input = screen.getByLabelText('How many') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: '60' } });
+    expect(input.value).toBe('60');
+    fireEvent.blur(input);
+    expect(input.value).toBe('6');
   });
 });

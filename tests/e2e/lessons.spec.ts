@@ -108,6 +108,28 @@ test('lesson 16: the streak lab runs 100k rolls and completes its step', async (
   await guard.check('lesson-streak-lab');
 });
 
+test('lesson 7: the demo scene plays by itself and Replay restarts it', async ({ page, guard }) => {
+  await page.goto('/#/learn/come-bets');
+  const scene = await openScene(page, 2);
+  const replay = scene.getByRole('button', { name: 'Replay the demo' });
+  const pills = scene.locator('.sim-history .sim-pill');
+  // it starts by itself when the scene loads (speed depends on the viewer's motion setting);
+  // Replay only shows once the whole demo is over
+  await expect(scene.locator('.sim-step-text')).toContainText('Watch two Come bets');
+  await expect(replay).toBeVisible({ timeout: 25_000 });
+  // the compact landscape rail has no history strip
+  const strip = await scene.locator('.sim-history').isVisible();
+  if (strip) await expect(pills).toHaveCount(2); // the two scripted rolls were 9s
+  const money = () => scene.locator('.sim-status-money').innerText();
+  const finished = await money();
+  await replay.click();
+  // Replay restores the state the step started from, so the roll history restarts at two rolls
+  await expect(replay).toBeVisible({ timeout: 25_000 });
+  if (strip) await expect(pills).toHaveCount(2);
+  expect(await money()).toBe(finished);
+  await guard.check('lesson-demo-done');
+});
+
 test('lesson 7: the call-the-bet question locks Roll until answered', async ({ page }) => {
   await page.goto('/#/learn/come-bets');
   const scene = await openScene(page, 1);

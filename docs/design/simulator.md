@@ -852,8 +852,11 @@ export type Condition =
   | { rolls: number }                                  // rolls since step start
   | { phase: Phase }
   | { point: PointNumber | null }
-  | { betOnTable: { type: BetTypeId; minAmount?: Cents } }
+  | { betOnTable: { type: BetTypeId; minAmount?: Cents; point?: PointNumber } }
+  | { betResolved: { type: BetTypeId; result?: 'won' | 'lost' | 'pushed' } }  // sugar over bet-won/lost/pushed
   | { bankrollAtLeast: Cents } | { bankrollAtMost: Cents }
+  | { equityAtLeast: Cents } | { equityAtMost: Cents }   // equity = bankroll + chips on the table
+  | { not: Condition }                                  // nests with all / any
   | { previewed: BetTypeId }                           // user opened the sheet for this bet
   | { autoRollCompleted: { minRolls?: number } }
   | { acknowledged: true }                             // user tapped "Next"
@@ -871,7 +874,7 @@ export type SceneInput =
   | { kind: 'previewed'; betType: BetTypeId } | { kind: 'acknowledged' } | { kind: 'answered'; correct: boolean } | { kind: 'auto-roll-completed'; rolls: number };
 export function validateScene(json: unknown): { ok: true; scene: SceneConfig } | { ok: false; errors: string[] };
 ```
-In-sim questions: a `SceneStep` may carry `ask: { q, options, answer, explain, mode?: 'before-roll' | 'any' }` (`StepAsk`). The panel shows the options as a radio group; each pick feeds `{ kind: 'answered', correct }`, emits `{ type: 'step-answered', stepId, index, choice, correct }` (the app stores it with `markQuiz("<scene id>:<step id>")`) and is spoken through the simulator's single announcer. A wrong answer shows `explain` and allows a retry. With `mode: 'before-roll'` (the default) Roll stays locked ("Answer the question first.") until the step is answered, or answered correctly when its `completeWhen` asks for `{ answered: 'correct' }`. A step with an `ask` must use `advance: 'button'` or an `all` condition with something besides `answered` (typically a roll), so the feedback is seen before the step moves on; `answered` without an `ask` is rejected by `validateScene`.
+In-sim questions: a `SceneStep` may carry `ask: { q, options, answer, explain, mode?: 'before-roll' | 'any' }` (`StepAsk`). The panel shows the options as buttons in a group labelled by the question; each pick feeds `{ kind: 'answered', correct }`, emits `{ type: 'step-answered', stepId, index, choice, correct }` (the app stores it with `markQuiz("<scene id>:<step id>")`) and is spoken through the simulator's single announcer. A wrong answer shows `explain` and allows a retry. With `mode: 'before-roll'` (the default) Roll stays locked ("Answer the question first.") until the step is answered, or answered correctly when its `completeWhen` asks for `{ answered: 'correct' }`. A step with an `ask` must use `advance: 'button'` or an `all` condition with something besides `answered` (typically a roll), so the feedback is seen before the step moves on; `answered` without an `ask` is rejected by `validateScene`.
 
 Rules: when a step starts, apply `setup`, replace `forcedDice` if given, and reset counters. Restrictions are resolved step → scene → defaults. `gateAction` returns `not-allowed-by-scene` with the step hint as the message. With `onForcedExhausted: 'block'` and an empty queue, Roll is disabled ("The lesson is over: try the sandbox!").
 

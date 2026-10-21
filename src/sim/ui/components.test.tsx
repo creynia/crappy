@@ -11,7 +11,7 @@ import { RollButton } from './RollButton';
 import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts } from './Toasts';
-import { portraitLayout } from './layouts';
+import { portraitLayout, spotPosition } from './layouts';
 import { buildEvFacts } from './text';
 import { createGame } from '../engine';
 import { previewAction } from '../math';
@@ -181,6 +181,90 @@ describe('Table', () => {
       />,
     );
     expect(screen.getByLabelText(/Place 6 \$12, off/)).toBeTruthy();
+  });
+
+  it('animates chip movement: travel ghosts start at the come box and head for the number', () => {
+    const come = bet('b3', 'come', 1000, 8);
+    const { container, rerender } = render(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        travellingBets={[come]}
+        chipMs={200}
+      />,
+    );
+    // the stack is hidden while its ghost waits at the come box, but the region still names the bet
+    expect(container.querySelector('[data-stack="b3"]')).toBeNull();
+    expect(screen.getByLabelText(/Come \$10, working/)).toBeTruthy();
+    const ghost = container.querySelector<SVGGElement>('.sim-ghost-travel')!;
+    expect(ghost.getAttribute('data-travel')).toBe('b3');
+    expect(ghost.classList.contains('is-moving')).toBe(false);
+    const from = spotPosition(
+      portraitLayout.regions.find((r) => r.id === 'come')!,
+      'come',
+    );
+    const to = spotPosition(
+      portraitLayout.regions.find((r) => r.id === 'box-8')!,
+      'come',
+    );
+    expect(ghost.querySelector('.sim-stack')?.getAttribute('transform')).toBe(
+      `translate(${from.x} ${from.y})`,
+    );
+    const style = ghost.getAttribute('style') ?? '';
+    const dx = Number(/--dx: (-?[\d.]+)px/.exec(style)?.[1]);
+    const dy = Number(/--dy: (-?[\d.]+)px/.exec(style)?.[1]);
+    expect(from.x + dx).toBeCloseTo(to.x, 6);
+    expect(from.y + dy).toBeCloseTo(to.y, 6);
+    expect(container.querySelector('.sim-chips')?.getAttribute('style')).toContain(
+      '--sim-chip-ms: 200ms',
+    );
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        travellingBets={[come]}
+        chipMs={200}
+        chipPhase="travel"
+      />,
+    );
+    expect(container.querySelector('.sim-ghost-travel')?.classList.contains('is-moving')).toBe(
+      true,
+    );
+    // sweeps and payouts: static until their own step, then moving
+    const field = bet('b4', 'field', 500);
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[come]}
+        point={8}
+        lostBets={[field]}
+        wonBets={[{ bet: come, payout: 1000 }]}
+        chipMs={150}
+      />,
+    );
+    expect(container.querySelector('[data-stack="b3"]')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-travel')).toBeNull();
+    expect(container.querySelector('.sim-ghost-lose')?.classList.contains('is-moving')).toBe(false);
+    expect(container.querySelector('.sim-ghost-win')).toBeNull();
+    expect(container.querySelector('[data-stack="b3"]')?.className).toContain('is-won');
+    rerender(
+      <Table layout={portraitLayout} bets={[come]} point={8} lostBets={[field]} chipPhase="lose" />,
+    );
+    expect(container.querySelector('.sim-ghost-lose')?.classList.contains('is-moving')).toBe(true);
+    // a winner that came down (field) keeps a settled ghost until the payout slides in
+    rerender(
+      <Table
+        layout={portraitLayout}
+        bets={[]}
+        point={8}
+        wonBets={[{ bet: field, payout: 1000 }]}
+        chipPhase="win"
+      />,
+    );
+    expect(container.querySelector('[data-won="b4"] .sim-ghost-settled')).not.toBeNull();
+    expect(container.querySelector('.sim-ghost-win.is-moving')).not.toBeNull();
   });
 
   it('CenterPanel renders the bonus rail with progress pips', () => {
@@ -575,7 +659,9 @@ describe('StepPanel ask', () => {
     expect(opts).toHaveLength(2);
     // not a live region: the simulator's one announcer speaks it
     expect(container.querySelector('.sim-ask-feedback')!.getAttribute('aria-live')).toBeNull();
-    expect(container.querySelectorAll('[role="radio"]')).toHaveLength(2);
+    expect(container.querySelector('[role="group"]')!.getAttribute('aria-labelledby')).toBe(
+      'ask-q-s',
+    );
     fireEvent.click(opts[0]!);
     expect(picks).toEqual([0]);
     rerender(
@@ -610,5 +696,36 @@ describe('StepPanel ask', () => {
     );
     expect(container.querySelector('.sim-ask-feedback')!.textContent).toContain('Correct.');
     expect(opts[0]!.disabled).toBe(true);
+  });
+});
+
+describe('StepPanel ask focus', () => {
+  it('hands focus to the Roll button after a correct answer (the options disable)', async () => {
+    const { StepPanel } = await import('./StepPanel');
+    const ask = { q: 'Pick b', options: ['a', 'b'], answer: 1, explain: 'b is right' };
+    const step = { id: 's', text: 't', ask, completeWhen: { answered: 'correct' as const } };
+    const ui = (correct: boolean) => (
+      <div class="sim-root">
+        <StepPanel
+          step={step}
+          index={0}
+          total={1}
+          hintVisible={false}
+          showNext={false}
+          done={false}
+          onNext={() => undefined}
+          asked={{ count: 1, correct }}
+        />
+        <button type="button" class="sim-roll" disabled={!correct}>
+          Roll
+        </button>
+      </div>
+    );
+    const { container, rerender } = render(ui(false));
+    container.querySelector<HTMLButtonElement>('.sim-ask-opt')!.focus();
+    rerender(ui(true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).toBe(container.querySelector('.sim-roll'));
+    expect(container.querySelector('.sim-ask-feedback')!.hasAttribute('tabindex')).toBe(false);
   });
 });

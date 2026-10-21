@@ -28,7 +28,7 @@ test('lesson 4: guided pass line scene, quiz, progress persists', async ({ page,
   // roll is locked until the bet is placed
   await expect(scene.getByRole('button', { name: /^Roll/ })).toBeDisabled();
 
-  await scene.getByRole('radio', { name: '$10 chip' }).click();
+  await scene.getByRole('button', { name: '$10 chip' }).click();
   await scene.locator('[data-region="pass"]').click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await expect(stepText).toContainText('8 is the point');
@@ -102,10 +102,10 @@ test('lesson 7: the call-the-bet question locks Roll until answered', async ({ p
   await expect(scene.locator('.sim-lock')).toContainText('Answer the question first');
   await expect(roll).toHaveAttribute('aria-describedby', /.+/);
   await expect(scene.locator('.sim-ask')).toBeVisible();
-  await scene.getByRole('radio', { name: 'Both lose' }).click();
+  await scene.getByRole('button', { name: 'Both lose' }).click();
   await expect(scene.locator('.sim-ask-feedback')).toContainText('Not quite');
   await expect(roll).toBeDisabled();
-  await scene.getByRole('radio', { name: 'The Come bet loses and the odds come back' }).click();
+  await scene.getByRole('button', { name: 'The Come bet loses and the odds come back' }).click();
   await expect(scene.locator('.sim-ask-feedback')).toContainText('Correct');
   await expect(scene.locator('.sim-ask-feedback')).toContainText('Now roll to check your call');
   await expect(roll).toBeEnabled();
@@ -119,7 +119,7 @@ test('lesson 13: $1 Fire + Small ride 1,000 hands on auto-roll', async ({ page }
   test.setTimeout(120_000);
   await page.goto('/#/learn/sucker-bets');
   const scene = await openScene(page, 2); // opens on the Center panel (ui.view: center)
-  await scene.getByRole('radio', { name: '$1 chip' }).click();
+  await scene.getByRole('button', { name: '$1 chip' }).click();
   const sheet = page.getByRole('dialog');
   await scene.locator('[data-region="fire"]').click();
   await expect(sheet.getByLabel('Bet amount')).toHaveText('$1');

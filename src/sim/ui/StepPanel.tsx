@@ -45,7 +45,7 @@ export function askFeedback(ask: NonNullable<SceneStep['ask']>, choice: number):
 }
 
 /**
- * The question and its options (radio semantics). Feedback is shown here but is not a live region: the
+ * The question and its options (plain buttons in a labelled group). Feedback is shown here but is not a live region: the
  * simulator has one announcer, which Simulator.tsx feeds the same text through `announce`.
  */
 function AskBlock(p: {
@@ -55,31 +55,32 @@ function AskBlock(p: {
   onAnswer?: (choice: number) => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
-  const feedback = useRef<HTMLParagraphElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   useEffect(() => setPicked(null), [p.stepId]);
   // a restart clears the runtime counters; forget the old pick with them
   useEffect(() => {
     if (p.asked.count === 0) setPicked(null);
   }, [p.asked.count]);
   const solved = p.asked.correct;
-  // once solved the options are disabled, so focus would drop to the page: park it on the feedback
+  // Once solved the options are disabled, so focus would fall to the page. Hand it to what comes next:
+  // Roll when it is unlocked, else the Next button. The announcer speaks the feedback.
   useEffect(() => {
-    if (solved) feedback.current?.focus();
+    if (!solved) return;
+    const sim = root.current?.closest('.sim-root');
+    sim?.querySelector<HTMLElement>('.sim-roll:not(:disabled), .sim-next')?.focus();
   }, [solved]);
   const shown = p.asked.count === 0 ? null : picked;
   const correct = shown !== null && shown === p.ask.answer;
   return (
-    <div class="sim-ask">
+    <div class="sim-ask" ref={root}>
       <p class="sim-ask-q" id={`ask-q-${p.stepId}`}>
         {renderLite(p.ask.q)}
       </p>
-      <div class="sim-ask-options" role="radiogroup" aria-labelledby={`ask-q-${p.stepId}`}>
+      <div class="sim-ask-options" role="group" aria-labelledby={`ask-q-${p.stepId}`}>
         {p.ask.options.map((o, i) => (
           <button
             key={i}
             type="button"
-            role="radio"
-            aria-checked={shown === i}
             class="sim-ask-opt"
             data-state={shown === i ? (correct ? 'correct' : 'wrong') : undefined}
             disabled={solved}
@@ -92,8 +93,8 @@ function AskBlock(p: {
           </button>
         ))}
       </div>
-      {/* TODO(I056): the announcer in Simulator.tsx speaks this text; this region stays silent */}
-      <p class="sim-ask-feedback" ref={feedback} tabIndex={-1}>
+      {/* Visual feedback only: the simulator's single announcer speaks the same text (Simulator.tsx). */}
+      <p class="sim-ask-feedback">
         {shown === null ? null : (
           <>
             <strong>{correct ? 'Correct.' : 'Not quite.'}</strong> {renderLite(p.ask.explain)}

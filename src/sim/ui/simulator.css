@@ -623,9 +623,9 @@
   white-space: nowrap;
 }
 
-/* the cost row always takes 44px, with or without a bet, so nothing below it moves */
-.sim-cost-row {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
+/* the cost toggle is placed over the top-right corner of the status line: no extra height, so Roll does not move */
+.sim-status-wrap > .sim-cost-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
 }

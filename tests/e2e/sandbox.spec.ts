@@ -216,7 +216,12 @@ test.describe('sandbox', () => {
     expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth);
   });
 
-  test('cost toggle is on the status line at first view; Roll does not move', async ({ page }) => {
+  test('cost toggle sits in the status line; Roll does not move or get covered', async ({
+    page,
+  }) => {
+    type Box = { x: number; y: number; width: number; height: number };
+    const overlaps = (a: Box, b: Box) =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
     for (const { width, height } of [
       { width: 390, height: 844 },
       { width: 360, height: 740 },
@@ -228,29 +233,38 @@ test.describe('sandbox', () => {
       await page.locator('[data-region="pass"]').click();
       await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
       expect(await page.evaluate<number>('window.scrollY')).toBe(0);
-      const cost = await page.locator('.sim-cost-toggle').boundingBox();
-      const roll = await page.locator('.sim-roll').boundingBox();
-      const bar = await page.locator('.tabbar').boundingBox();
-      expect(cost, `${width}x${height} cost`).not.toBeNull();
-      expect(cost!.height, `${width}x${height} cost 44px`).toBeGreaterThanOrEqual(44);
-      expect(cost!.y + cost!.height, `${width}x${height} cost in viewport`).toBeLessThanOrEqual(
-        height,
+      const cost = (await page.locator('.sim-cost-toggle').boundingBox()) as Box | null;
+      const status = (await page.locator('.sim-status').first().boundingBox()) as Box | null;
+      const roll = (await page.locator('.sim-roll').boundingBox()) as Box | null;
+      expect(cost, `${width}x${height} cost toggle`).not.toBeNull();
+      expect(status, `${width}x${height} status line`).not.toBeNull();
+      // (a) the toggle starts inside the status line, at its top-right
+      expect(cost!.y, `${width}x${height} toggle top in status line`).toBeGreaterThanOrEqual(
+        status!.y,
       );
-      if (bar)
-        expect(cost!.y + cost!.height, `${width}x${height} cost clears tabbar`).toBeLessThanOrEqual(
-          bar.y,
-        );
+      expect(
+        cost!.x + cost!.width,
+        `${width}x${height} toggle right in status line`,
+      ).toBeLessThanOrEqual(status!.x + status!.width + 1);
+      expect(cost!.height, `${width}x${height} toggle hit area`).toBeGreaterThanOrEqual(44);
+      // (b) the toggle does not cover the status text
+      for (const sel of ['.sim-status-money > *', '.sim-point', '.sim-last']) {
+        for (const box of await page.locator(sel).evaluateAll((els) =>
+          els.map((e) => {
+            const r = e.getBoundingClientRect();
+            return { x: r.x, y: r.y, width: r.width, height: r.height };
+          }),
+        )) {
+          expect(overlaps(cost!, box), `${width}x${height} toggle vs ${sel}`).toBe(false);
+        }
+      }
+      // (c) Roll is identical before and after the first bet
       expect(roll, `${width}x${height} roll box unchanged by a bet`).toEqual(rollBefore);
-      // Roll does not overlap the chip rack or the cost toggle, and a plain click reaches it
-      const chips = await page.locator('.sim-rack').boundingBox();
-      const overlaps = (
-        a: { x: number; y: number; width: number; height: number },
-        b: { x: number; y: number; width: number; height: number },
-      ) =>
-        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      // (d) Roll does not intersect the rack or the toggle, and a plain click reaches it
+      const chips = (await page.locator('.sim-rack').boundingBox()) as Box | null;
       if (chips) expect(overlaps(roll!, chips), `${width}x${height} roll vs chip rack`).toBe(false);
       expect(overlaps(roll!, cost!), `${width}x${height} roll vs cost toggle`).toBe(false);
-      await page.locator('.sim-roll').click({ trial: false, timeout: 5_000 });
+      await page.locator('.sim-roll').click({ timeout: 5_000 });
     }
   });
 

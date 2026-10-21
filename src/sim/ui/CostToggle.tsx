@@ -38,28 +38,25 @@ export function CostToggle({
   rollsPerHour?: number;
 }) {
   const [unit, setUnit] = useState<CostUnit>(readCostUnit);
-  // the row always takes its 44px, so Roll does not move when the first bet appears
-  if (game.bets.length === 0) return <div class="sim-cost-row" aria-hidden="true" />;
+  if (game.bets.length === 0) return null;
   const perRoll = toNumber(tableExpectedLossPerRoll(game));
   const edge = edgeOnAction(game);
   const full = rollCostText(unit, perRoll, rollsPerHour, edge);
   const short = costShort(unit, perRoll, rollsPerHour, edge);
-  if (!full || !short) return <div class="sim-cost-row" aria-hidden="true" />;
+  if (!full || !short) return null;
   const next = nextCostUnit(unit);
   return (
-    <div class="sim-cost-row">
-      <button
-        type="button"
-        class="sim-cost-toggle"
-        aria-label={`${full}. Tap to show ${COST_UNIT_LABEL[next]}.`}
-        onClick={() => {
-          setUnit(next);
-          writeCostUnit(next);
-        }}
-      >
-        {short.value}
-        {short.unit}
-      </button>
-    </div>
+    <button
+      type="button"
+      class="sim-cost-toggle"
+      aria-label={`${full}. Tap to show ${COST_UNIT_LABEL[next]}.`}
+      onClick={() => {
+        setUnit(next);
+        writeCostUnit(next);
+      }}
+    >
+      {short.value}
+      {short.unit}
+    </button>
   );
 }

@@ -437,10 +437,10 @@ export function Simulator(props: SimulatorInternalProps) {
       <div class="sim-main">
         <div class="sim-felt">
           {!landscape ? (
-            <>
+            <div class="sim-status-wrap">
               {status(false)}
               <CostToggle game={liveGame} rollsPerHour={settings.rollsPerHour} />
-            </>
+            </div>
           ) : null}
           <div class="sim-felt-body">
             {view === 'center' ? (

@@ -12,13 +12,7 @@ afterEach(() => {
   }
 });
 
-const panels: Panels = {
-  auto: false,
-  session: false,
-  menu: false,
-  bets: false,
-  center: false,
-} as Panels;
+const panels: Panels = { auto: false, session: false, log: false, menu: false };
 
 function controls(
   game = createGame({ bankroll: 100000, bets: [{ type: 'pass-line', amount: 1000 }] }),

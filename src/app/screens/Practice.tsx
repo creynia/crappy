@@ -172,6 +172,13 @@ function DrillRunner({ drill, query }: { drill: AnyDrill; query: URLSearchParams
                 {!round.feedback.result.ok && <>Answer: {round.feedback.result.expected}. </>}
                 {round.feedback.result.explain}
               </p>
+              {round.feedback.result.explainList?.length ? (
+                <ol class="pr-explain-list">
+                  {round.feedback.result.explainList.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ol>
+              ) : null}
               <button type="button" class="btn" ref={nextRef} onClick={onNext}>
                 {round.queue.length === 0 ? 'See results' : 'Next'}
               </button>

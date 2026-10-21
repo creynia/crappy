@@ -622,3 +622,10 @@
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* the cost row always takes 44px, with or without a bet, so nothing below it moves */
+.sim-cost-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}

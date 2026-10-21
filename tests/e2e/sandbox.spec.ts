@@ -241,6 +241,16 @@ test.describe('sandbox', () => {
           bar.y,
         );
       expect(roll, `${width}x${height} roll box unchanged by a bet`).toEqual(rollBefore);
+      // Roll does not overlap the chip rack or the cost toggle, and a plain click reaches it
+      const chips = await page.locator('.sim-rack').boundingBox();
+      const overlaps = (
+        a: { x: number; y: number; width: number; height: number },
+        b: { x: number; y: number; width: number; height: number },
+      ) =>
+        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      if (chips) expect(overlaps(roll!, chips), `${width}x${height} roll vs chip rack`).toBe(false);
+      expect(overlaps(roll!, cost!), `${width}x${height} roll vs cost toggle`).toBe(false);
+      await page.locator('.sim-roll').click({ trial: false, timeout: 5_000 });
     }
   });
 

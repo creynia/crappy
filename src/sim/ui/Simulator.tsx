@@ -275,6 +275,11 @@ export function Simulator(props: SimulatorInternalProps) {
                 Center bets: {fmtMoney(centerTotal)}
               </button>
             ) : null}
+            <Toasts
+              toasts={toasts}
+              onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+              autoDismissMs={toastDurationMs(settings.speed)}
+            />
           </div>
         </div>
         {landscape ? (
@@ -287,12 +292,6 @@ export function Simulator(props: SimulatorInternalProps) {
           controls
         )}
       </div>
-
-      <Toasts
-        toasts={toasts}
-        onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
-        autoDismissMs={toastDurationMs(settings.speed)}
-      />
 
       {panels.menu ? (
         <SimMenu

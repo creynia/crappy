@@ -342,11 +342,32 @@
 }
 
 /* ---------- toasts ---------- */
+/* An overlay on the felt, never part of the page flow: showing or dismissing a toast must not move
+   anything. Portrait: along the bottom edge of the felt, just above the controls. Landscape phones:
+   top-right of the felt, so it is on screen even though the page is short. Anchored to the felt (not
+   the viewport) so it never lands on the app header or the tab bar. */
 .sim-toasts {
+  position: absolute;
+  z-index: 20;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  margin: 0 auto;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   pointer-events: none;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .sim-toasts {
+    left: auto;
+    right: 8px;
+    top: 8px;
+    bottom: auto;
+    width: min(320px, 60%);
+    margin: 0;
+  }
 }
 .sim-toast {
   pointer-events: auto;
@@ -361,6 +382,8 @@
   border-left: 6px solid var(--sim-muted);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   font-size: 0.9rem;
+  touch-action: pan-y; /* horizontal swipes dismiss; vertical ones still scroll the page */
+  will-change: transform, opacity;
 }
 .sim-toast-win {
   border-left-color: var(--sim-win);

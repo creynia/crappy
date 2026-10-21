@@ -20,7 +20,7 @@ import { StatusBar } from './StatusBar';
 import { Table } from './Table';
 import { Toasts, type ToastItem } from './Toasts';
 import { OddsHint, oddsHintText } from './OddsHint';
-import { oddsRoom } from './oddsHint';
+import { oddsRoom, type OddsRoom } from './oddsHint';
 import { toastDurationMs } from './animation';
 import { landscapeLayout, portraitLayout } from './layouts';
 import type { RegionId } from './layouts/types';
@@ -102,15 +102,14 @@ export function Simulator(props: SimulatorInternalProps) {
     setToasts((t) => [...t.slice(-1), { id, text, tone }]);
   }, []);
   const announce = useCallback((text: string) => setLive((l) => ({ text, n: l.n + 1 })), []);
-  // the last roll's announcement, so the odds nudge can follow it in the same message
+  // A roll's announcement is made by an effect after the render (see below), so that the odds nudge
+  // can join it in the same live update.
+  const [rollSeq, setRollSeq] = useState(0);
   const rollTextRef = useRef('');
-  const announceRoll = useCallback(
-    (text: string) => {
-      rollTextRef.current = text;
-      announce(text);
-    },
-    [announce],
-  );
+  const announceRoll = useCallback((text: string) => {
+    rollTextRef.current = text;
+    setRollSeq((n) => n + 1);
+  }, []);
 
   const anim = useAnimationPlayer(
     () => settingsRef.current.speed,
@@ -143,24 +142,26 @@ export function Simulator(props: SimulatorInternalProps) {
       return false;
     }
   });
-  const [oddsHintKey, setOddsHintKey] = useState<string | null>(null);
-  // Once per mount: the first time a point gives odds room. Never while the auto-roll panel is open.
+  // The nudge is shown once per mount, then stays until dismissed (or the point goes off).
+  const [oddsHint, setOddsHint] = useState<OddsRoom | null>(null);
   const oddsShownOnce = useRef(false);
-  // Only after the roll has finished animating, so the nudge is not announced mid-roll.
+  // Computed from the state after the roll has finished animating.
   const oddsNow =
     ui.hints === true && !hideOddsHint && !panels.auto && !anim.busy ? oddsRoom(liveGame) : null;
-  const oddsNowKey = oddsNow ? `${oddsNow.betId}:${oddsNow.point}` : null;
   useEffect(() => {
-    if (!oddsNow || oddsShownOnce.current) return;
-    oddsShownOnce.current = true;
-    setOddsHintKey(oddsNowKey);
-    // one announcement: the roll that just finished, then the nudge
+    if (rollSeq === 0) return;
     const roll = rollTextRef.current;
     rollTextRef.current = '';
-    const nudge = oddsHintText(oddsNow);
-    announce(roll ? `${roll} ${nudge}` : nudge);
-  }, [oddsNowKey]);
-  const oddsHintRoom = oddsNow && oddsHintKey === oddsNowKey ? oddsNow : null;
+    if (oddsNow && !oddsShownOnce.current) {
+      oddsShownOnce.current = true;
+      setOddsHint(oddsNow);
+      announce(`${roll} ${oddsHintText(oddsNow)}`);
+    } else announce(roll);
+  }, [rollSeq]);
+  useEffect(() => {
+    if (oddsHint && !anim.busy && liveGame.phase !== 'point') setOddsHint(null);
+  }, [liveGame.phase, anim.busy]);
+  const oddsHintRoom = panels.auto ? null : oddsHint;
   const step = currentStep(scene, rt);
 
   // ---------- events + effects ----------
@@ -198,7 +199,7 @@ export function Simulator(props: SimulatorInternalProps) {
   const oddsHintEl = oddsHintRoom ? (
     <OddsHint
       room={oddsHintRoom}
-      onDismiss={() => setOddsHintKey(null)}
+      onDismiss={() => setOddsHint(null)}
       onHideForever={() => {
         try {
           localStorage.setItem('crappy-sim-hide-odds-hint', '1');
@@ -206,7 +207,7 @@ export function Simulator(props: SimulatorInternalProps) {
           /* private mode: the hint just stays hidden for this session */
         }
         setHideOddsHint(true);
-        setOddsHintKey(null);
+        setOddsHint(null);
       }}
     />
   ) : null;

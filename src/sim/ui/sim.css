@@ -959,17 +959,35 @@
 }
 
 .sim-odds-hint {
+  /* docked above the bottom tabs on phones, bottom-left on wider screens; always in the viewport */
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 9;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  margin: 6px 12px;
   padding: 6px 10px;
   border: 1px solid var(--sim-border);
   border-radius: 8px;
   background: var(--sim-surface);
   color: var(--sim-text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   font-size: 0.85rem;
+  /* taps pass through the text to the tabs and the table; only the buttons take them */
+  pointer-events: none;
+}
+.sim-odds-hint-actions button {
+  pointer-events: auto;
+}
+@media (min-width: 768px) {
+  .sim-odds-hint {
+    right: auto;
+    width: min(46vw, 420px);
+    bottom: 12px;
+  }
 }
 .sim-odds-hint p {
   margin: 0;

@@ -575,25 +575,32 @@ test.describe('sandbox flows', () => {
   });
 });
 
-test('the odds nudge shows after a roll and Roll stays in view, portrait and landscape', async ({
+test('the odds nudge is inside the viewport and above the tabs, portrait and landscape', async ({
   browser,
 }) => {
   for (const vp of [
     { width: 390, height: 844 },
+    { width: 360, height: 640 },
     { width: 844, height: 390 },
   ]) {
-    // a fresh context per orientation: the sandbox persists its table between visits
+    // a fresh context per size: the sandbox persists its table between visits
     const context = await browser.newContext({ viewport: vp });
     const page = await context.newPage();
     await page.goto('/#/play?speed=instant&dice=3-3');
     await page.locator('[data-region="pass"]').first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
-    const roll = page.getByRole('button', { name: /^Roll/ });
-    await roll.click();
-    await expect(page.getByTestId('odds-hint')).toBeVisible();
-    const box = await roll.boundingBox();
-    expect(box).not.toBeNull();
+    await page.getByRole('button', { name: /^Roll/ }).click();
+    const hint = page.getByTestId('odds-hint');
+    await expect(hint).toBeVisible();
+    const box = await hint.boundingBox();
+    expect(box, `hint box at ${vp.width}x${vp.height}`).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
+    const tabs = page.locator('.tabbar');
+    if (await tabs.isVisible()) {
+      const tb = await tabs.boundingBox();
+      expect(box!.y + box!.height).toBeLessThanOrEqual(tb!.y);
+    }
     await context.close();
   }
 });

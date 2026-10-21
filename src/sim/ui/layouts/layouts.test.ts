@@ -7,8 +7,10 @@ import {
   landscapeLayout,
   portraitLayout,
   regionIdForBet,
+  hopSpot,
   spotPosition,
 } from './index';
+import { HOP_BAND, stackExtent } from './hopSlots';
 import type { ChipSpotKey, Point2, Rect, TableLayout } from './types';
 
 const VIEWPORT: Record<TableLayout['id'], number> = {
@@ -206,4 +208,34 @@ describe('chip spots: every bet type renders at its documented spot (simulator.m
       }
     },
   );
+});
+
+describe('center layout: hop region (I035)', () => {
+  const hop = centerLayout.regions.find((r) => r.id === 'hop')!;
+  it('exists, takes hop bets and is a >= 44 CSS px tap target at 390px wide', () => {
+    expect(hop.betTypes).toEqual(['hop']);
+    expect(regionIdForBet('hop', null)).toBe('hop');
+    expect(Math.min(hop.rect.w, hop.rect.h) * VIEWPORT.center).toBeGreaterThanOrEqual(44);
+  });
+  it('fits all 21 pairs: slots >= 2r apart, stacks inside the region and below the title', () => {
+    const r = centerLayout.chipRadius;
+    const ext = stackExtent(r);
+    const spots = Array.from({ length: 21 }, (_, i) => hopSpot(hop, i, r));
+    for (let i = 0; i < spots.length; i++)
+      for (let j = i + 1; j < spots.length; j++) {
+        const a = spots[i]!;
+        const b = spots[j]!;
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * r);
+        // same column, next row: the lower stack's caption clears the upper stack's badge
+        if (a.x === b.x) expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(ext.above + ext.below);
+      }
+    for (const p of spots) {
+      expect(p.x - r).toBeGreaterThanOrEqual(hop.rect.x);
+      expect(p.x + r).toBeLessThanOrEqual(hop.rect.x + hop.rect.w);
+      // a 5-chip stack, caption and badge included, stays below the title band and in the region
+      expect(p.y - ext.above).toBeGreaterThanOrEqual(hop.rect.y + HOP_BAND);
+      expect(p.y + ext.below).toBeLessThanOrEqual(hop.rect.y + hop.rect.h);
+    }
+    expect(hop.rect.y + hop.rect.h).toBeLessThanOrEqual(centerLayout.viewBox.h);
+  });
 });

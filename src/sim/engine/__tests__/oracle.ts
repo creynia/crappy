@@ -30,6 +30,7 @@ export interface OracleIn {
   upfrontPaid?: boolean; // upfront vig already paid and not yet consumed by a win
   working: boolean; // already decided by the caller (only matters for toggleable bets)
   rules: OracleRules;
+  hop?: [number, number]; // hop bets: the chosen pair, in either order
   /** bonus bets: numbers already collected */
   progress?: number[];
 }
@@ -244,6 +245,15 @@ export function oracle(i: OracleIn): OracleOut {
       if (t === 3 || t === 11) return { kind: 'win', profit: 15 * u - 4 * u, vig: 0 };
       if (t === 7) return { kind: 'push' };
       return L;
+    }
+    case 'hop': {
+      // One exact pair on the next roll. A pair (3-3) is one of 36 rolls and pays 30 to 1;
+      // two different dice (2-4) can land either way round, two of 36 rolls, paying 15 to 1.
+      if (!i.hop) throw new Error('oracle: hop needs a pair');
+      const [h1, h2] = i.hop;
+      const hit = (i.d1 === h1 && i.d2 === h2) || (i.d1 === h2 && i.d2 === h1);
+      if (!hit) return L;
+      return h1 === h2 ? winAt(30, 1) : winAt(15, 1);
     }
   }
   throw new Error(`oracle: unknown bet ${i.type}`);

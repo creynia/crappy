@@ -1,4 +1,4 @@
-import { BET_TYPES, payRatio } from '../engine/bets';
+import { BET_TYPES, normalizeHop, payRatio } from '../engine/bets';
 import { isWorking } from '../engine/working';
 import { maxOddsAmount, suggestAmount, validateAction } from '../engine/validate';
 import type { Action, BetTypeId, GameState, Validation } from '../engine/types';
@@ -46,6 +46,7 @@ function newBet(state: GameState, a: PlaceAction): BetLike {
     type: a.betType,
     amount: a.amount,
     point: isOdds ? oddsPoint(state, a.betType, a.parentId) : null,
+    ...(a.betType === 'hop' && a.hop ? { hop: normalizeHop(a.hop) } : {}),
   };
 }
 
@@ -115,6 +116,7 @@ export function previewAction(
           type: old.type,
           amount: action.amount,
           point: old.point,
+          ...(old.hop ? { hop: old.hop } : {}),
           progress: old.progress,
         };
         const ev = sub(betEV(next, ctx), betEV(old, ctx));
@@ -237,6 +239,7 @@ const ALTERNATIVES: Partial<Record<BetTypeId, BetTypeId[]>> = {
   'boxcars-12': ['pass-line', 'come'],
   horn: ['pass-line', 'come'],
   world: ['pass-line', 'come'],
+  hop: ['pass-line', 'come'],
   'lay-5': ['dont-come', 'dont-pass'],
   'lay-6': ['dont-come', 'dont-pass'],
   'lay-8': ['dont-come', 'dont-pass'],

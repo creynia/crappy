@@ -92,6 +92,8 @@ export interface ChipStackProps {
   marker?: 'buy' | 'lay';
   /** show a "$12" badge under the stack (default true) */
   badge?: boolean;
+  /** short tag above the stack, e.g. a hop bet's pair "2-4" (I035) */
+  caption?: string;
   class?: string;
 }
 
@@ -107,6 +109,7 @@ export function ChipStack({
   on,
   marker,
   badge = true,
+  caption,
   class: cls,
 }: ChipStackProps) {
   const chips = chipBreakdown(amount).slice(0, STACK_LIMIT);
@@ -146,6 +149,32 @@ export function ChipStack({
           />
           <text text-anchor="middle" y={r * 0.2} font-size={r * 0.58} font-weight="800" fill="#fff">
             {text}
+          </text>
+        </g>
+      ) : null}
+      {caption ? (
+        <g
+          transform={`translate(0 ${-r - Math.min(chips.length - 1, 4) * 6 - r * 0.32})`}
+          class="sim-stack-caption"
+        >
+          <rect
+            x={-r * 0.95}
+            y={-r * 0.36}
+            width={r * 1.9}
+            height={r * 0.72}
+            rx={r * 0.2}
+            fill="#fbfaf6"
+            stroke="rgba(0,0,0,0.6)"
+            stroke-width="2"
+          />
+          <text
+            text-anchor="middle"
+            y={r * 0.19}
+            font-size={r * 0.52}
+            font-weight="800"
+            fill="#111"
+          >
+            {caption}
           </text>
         </g>
       ) : null}

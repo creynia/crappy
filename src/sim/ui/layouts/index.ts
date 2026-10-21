@@ -1,4 +1,5 @@
 import { centerLayout } from './center';
+import { hopSlot } from './hopSlots';
 import { landscapeLayout } from './landscape';
 import { portraitLayout } from './portrait';
 import type { Point2, RegionDef, RegionId, TableLayout } from './types';
@@ -50,6 +51,7 @@ export function regionIdForBet(type: string, point: number | null): RegionId | n
     case 'hard-6':
     case 'hard-8':
     case 'hard-10':
+    case 'hop':
     case 'fire':
     case 'all':
     case 'tall':
@@ -76,4 +78,9 @@ export function spotPosition(region: RegionDef, type: string): Point2 {
   if (type.startsWith('buy-')) return s.buy ?? fallback;
   if (type.startsWith('lay-')) return s.lay ?? fallback;
   return s.main ?? fallback;
+}
+
+/** Hop bets (I035) get one stack per pair, in rows under the title (`slot` = 0 for the first pair placed). */
+export function hopSpot(region: RegionDef, slot: number, chipRadius: number): Point2 {
+  return hopSlot(region.rect, slot, chipRadius);
 }

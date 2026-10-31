@@ -21,6 +21,7 @@
     "build/**/*.ts",
     "tests/e2e/**/*.ts",
     "src/content/**/*.ts",
+    "src/app/bets.ts",
     "src/sim/engine/**/*.ts",
     "src/sim/math/**/*.ts",
     "src/sim/strategy/**/*.ts",

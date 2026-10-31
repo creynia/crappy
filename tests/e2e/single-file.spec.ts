@@ -9,7 +9,7 @@ test('single-file build opens from file:// with no failed requests', async ({ pa
     if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`);
   });
   await page.goto(pathToFileURL(path.resolve('dist-single/crappy.html')).href);
-  await expect(page).toHaveTitle('crappy');
+  await expect(page).toHaveTitle(/^Learn Craps Free: .* \| crappy$/);
   await expect(page.locator('h1, main').first()).toBeVisible();
   expect(failed).toEqual([]);
 });

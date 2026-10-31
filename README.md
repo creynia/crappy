@@ -6,7 +6,7 @@ Learn craps from zero to perfect strategy. crappy pairs short, friendly lessons 
 
 ## Use it
 
-- **Open it:** <https://creynia.github.io/crappy/> (direct file download: <https://creynia.github.io/crappy/crappy.html>)
+- **Open it:** <https://creynia.com/crappy/> (direct file download: <https://creynia.com/crappy/crappy.html>)
 - **Install it as an app (Android/Chrome):** open the link above, tap the Chrome menu (three dots), then **Add to Home screen** (or **Install app**). It then launches full screen and works offline.
 - **Download one offline file:** go to this repo's **Releases**, open **Latest build** and download `crappy.html`. Open it in Chrome from your Downloads list. It has no external requests at all. Progress in this copy is separate from the website copy, so use Settings, then Export/Import to move it.
 
@@ -40,6 +40,19 @@ npm run check      # lint, typecheck, format check, unit tests
 npm run build:all  # dist/ (PWA) and dist-single/crappy.html
 npm run test:e2e   # Playwright (needs a browser, see CONTRIBUTING.md)
 ```
+
+### Static pages for search engines and LLMs
+
+The app uses hash routes (`#/learn/pass-line`), which crawlers ignore. So the normal build (`dist/`, not the single file) also writes plain, JavaScript-free pages from the same content, each with a button into the app:
+
+| URL (under https://creynia.com/crappy/)     | Source                                                                                                                                              |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `learn/` and `learn/<lessonId>/`            | `content/chapters.json`, `content/lessons/*.md` (practice scenes become a "try this in the app" note; quizzes show their answer in a collapsed box) |
+| `bets/` and `bets/<betId>/`                 | `content/bets.json` plus the payout and house edge from the math module (same as the app's Bets screen)                                             |
+| `glossary/` (one `#<slug>` anchor per term) | `content/glossary.json`                                                                                                                             |
+| `sitemap.xml`, `llms.txt`, `llms-full.txt`  | all of the above                                                                                                                                    |
+
+The generator is [`build/static-site.ts`](build/static-site.ts) (wired in by `build/vite-plugin-static.ts`, which also adds the canonical link and a `<noscript>` block to the app shell). The service worker never precaches these files and never answers them with the app shell. `tests/build/static-site.test.ts` checks every page (one h1, title, description, canonical, JSON-LD) and that the sitemap matches the pages. After each deploy from `main`, the Pages workflow submits the sitemap URLs to IndexNow (`scripts/indexnow.mjs`).
 
 Design documents are in [`docs/design/`](docs/design/). Planned future work is listed in [`docs/chips.md`](docs/chips.md). See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 

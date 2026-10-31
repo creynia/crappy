@@ -9,7 +9,7 @@ test('PWA works offline after the service worker is installed', async ({ page, c
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page).toHaveTitle('crappy');
+  await expect(page).toHaveTitle(/^Learn Craps Free: .* \| crappy$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await context.setOffline(false);
 });

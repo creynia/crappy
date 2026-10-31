@@ -137,13 +137,13 @@ export function parseQuizzes(yamlText: string, lessonId: string, startIndex: num
   });
 }
 
-type Seg =
+export type Seg =
   | { t: 'md'; text: string }
   | { t: 'fence'; lang: 'scene' | 'quiz'; text: string }
   | { t: 'box'; kind: 'math' | 'tip'; title: string; text: string };
 
 /** Split a lesson body into markdown / scene / quiz / math / tip segments. */
-function segment(body: string): Seg[] {
+export function segment(body: string): Seg[] {
   const lines = body.split(/\r?\n/);
   const segs: Seg[] = [];
   let md: string[] = [];

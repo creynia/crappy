@@ -2,6 +2,9 @@
 
 Content lives in `content/` and is compiled at build time into the `virtual:content` module
 (`build/vite-plugin-content.ts`, using `src/content/compile.ts`). `npm test` validates all of it.
+The same content is also published as static, crawlable pages (`/learn/<id>/`, `/bets/<id>/`,
+`/glossary/`) by `build/static-site.ts`, so a lesson's `title` and `summary` double as its search
+result title and description: keep summaries specific (about 60 to 110 characters).
 
 ## Files
 

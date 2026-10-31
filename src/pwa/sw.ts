@@ -29,6 +29,13 @@ const PREFIX = 'crappy-';
 const CACHE = PREFIX + __VERSION__;
 const urls = __PRECACHE__.map((p) => new URL(p, sw.location.href).href);
 const indexUrl = new URL('./index.html', sw.location.href).href;
+const scopePath = new URL('./', sw.location.href).pathname;
+
+/** Only the app shell itself may fall back to the cached shell; the static pages under
+ * learn/, bets/, glossary/ (not precached) always come from the network. */
+function isShellPath(pathname: string): boolean {
+  return pathname === scopePath || pathname === scopePath + 'index.html';
+}
 
 sw.addEventListener('install', (event) => {
   // Note: no automatic skipWaiting; the app shows "Update available" and posts SKIP_WAITING.
@@ -70,8 +77,8 @@ sw.addEventListener('fetch', (event) => {
       try {
         return await fetch(req);
       } catch (err) {
-        // Offline navigation fallback: serve the app shell.
-        if (req.mode === 'navigate') {
+        // Offline navigation fallback: serve the app shell (for the shell's own URL only).
+        if (req.mode === 'navigate' && isShellPath(url.pathname)) {
           const shell = await cache.match(indexUrl);
           if (shell) return shell;
         }

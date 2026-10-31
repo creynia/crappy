@@ -41,6 +41,19 @@ npm run build:all  # dist/ (PWA) and dist-single/crappy.html
 npm run test:e2e   # Playwright (needs a browser, see CONTRIBUTING.md)
 ```
 
+### Static pages for search engines and LLMs
+
+The app uses hash routes (`#/learn/pass-line`), which crawlers ignore. So the normal build (`dist/`, not the single file) also writes plain, JavaScript-free pages from the same content, each with a button into the app:
+
+| URL (under https://creynia.com/crappy/)     | Source                                                                                                                                              |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `learn/` and `learn/<lessonId>/`            | `content/chapters.json`, `content/lessons/*.md` (practice scenes become a "try this in the app" note; quizzes show their answer in a collapsed box) |
+| `bets/` and `bets/<betId>/`                 | `content/bets.json` plus the payout and house edge from the math module (same as the app's Bets screen)                                             |
+| `glossary/` (one `#<slug>` anchor per term) | `content/glossary.json`                                                                                                                             |
+| `sitemap.xml`, `llms.txt`, `llms-full.txt`  | all of the above                                                                                                                                    |
+
+The generator is [`build/static-site.ts`](build/static-site.ts) (wired in by `build/vite-plugin-static.ts`, which also adds the canonical link and a `<noscript>` block to the app shell). The service worker never precaches these files and never answers them with the app shell. `tests/build/static-site.test.ts` checks every page (one h1, title, description, canonical, JSON-LD) and that the sitemap matches the pages. After each deploy from `main`, the Pages workflow submits the sitemap URLs to IndexNow (`scripts/indexnow.mjs`).
+
 Design documents are in [`docs/design/`](docs/design/). Planned future work is listed in [`docs/chips.md`](docs/chips.md). See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 
 ## License

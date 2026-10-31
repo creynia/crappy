@@ -1,7 +1,7 @@
 {
-  "name": "crappy — learn craps",
+  "name": "Learn Craps: lessons, odds & practice table (crappy)",
   "short_name": "crappy",
-  "description": "Learn craps: lessons, odds, and a practice table.",
+  "description": "Learn craps free: short lessons from dice odds to perfect strategy, and a practice table that shows every bet's house edge. Play money only.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

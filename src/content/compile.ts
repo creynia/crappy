@@ -1,7 +1,7 @@
 import { Marked, marked, type Token, type Tokens } from 'marked';
 import { parse as parseYaml } from 'yaml';
 import { validateScene } from '../sim/scene';
-import type { Block, Lesson, Quiz } from './types';
+import type { Block, Lesson, LessonSource, Quiz, SourceItem } from './types';
 
 export interface CompileOptions {
   /** known glossary slugs, for `[[term]]` links; omit to skip link checking */
@@ -10,6 +10,10 @@ export interface CompileOptions {
   glossaryTerms?: ReadonlyMap<string, string>;
   /** subtract from every heading depth (min result 2), so lesson headings sit under the page h1 */
   headingShift?: number;
+  /** sources.json entries by id, for lesson `sources:` ids; omit to accept only object entries */
+  sourceIds?: ReadonlyMap<string, SourceItem>;
+  /** when set, `[^n]` markers are turned into citation superscripts; n must be 1..cites */
+  cites?: number;
 }
 
 const shifted = new Map<number, Marked>();
@@ -61,7 +65,16 @@ export function splitFrontMatter(source: string): { data: Record<string, unknown
 
 /** Render markdown to HTML, resolving `[[term]]` / `[[term|label]]` glossary links. */
 export function renderMarkdown(md: string, opts: CompileOptions = {}): string {
-  const withLinks = md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, term: string, label?: string) => {
+  const cited =
+    opts.cites === undefined
+      ? md
+      : md.replace(/\[\^(\d+)\]/g, (_m, d: string) => {
+          const n = Number(d);
+          if (n < 1 || n > (opts.cites ?? 0))
+            throw new Error(`citation [^${d}] is out of range (the lesson has ${opts.cites} sources)`);
+          return `<sup class="cite"><button type="button" class="cite-btn" data-cite="${n}" aria-label="Source ${n}">${n}</button></sup>`;
+        });
+  const withLinks = cited.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, term: string, label?: string) => {
     const key = term.trim().toLowerCase();
     const slug = opts.glossaryTerms?.get(key) ?? (opts.glossarySlugs?.has(key) ? key : undefined);
     if (!slug) {
@@ -76,6 +89,29 @@ export function renderMarkdown(md: string, opts: CompileOptions = {}): string {
 function str(v: unknown, what: string): string {
   if (typeof v !== 'string' || v.trim() === '') throw new Error(`${what} must be a non-empty string`);
   return v;
+}
+
+/** Resolve a frontmatter `sources:` list: string ids from sources.json, or `{ title, url?, note? }`. */
+export function parseLessonSources(raw: unknown, opts: CompileOptions): LessonSource[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new Error('front matter sources must be a list');
+  return raw.map((e, i): LessonSource => {
+    if (typeof e === 'string') {
+      const hit = opts.sourceIds?.get(e);
+      if (!hit) throw new Error(`sources[${i + 1}]: unknown source id "${e}"`);
+      return { ...hit };
+    }
+    if (typeof e !== 'object' || e === null || Array.isArray(e))
+      throw new Error(`sources[${i + 1}] must be an id string or a { title, url?, note? } mapping`);
+    const o = e as Record<string, unknown>;
+    const out: LessonSource = { title: str(o.title, `sources[${i + 1}].title`) };
+    for (const k of ['author', 'url', 'note'] as const) {
+      if (o[k] === undefined) continue;
+      out[k] = str(o[k], `sources[${i + 1}].${k}`);
+    }
+    if (out.url && !/^https:\/\/\S+$/.test(out.url)) throw new Error(`sources[${i + 1}].url must be an https URL`);
+    return out;
+  });
 }
 
 export function parseQuizzes(yamlText: string, lessonId: string, startIndex: number): Quiz[] {
@@ -180,7 +216,8 @@ export function compileLesson(source: string, file: string, opts: CompileOptions
     const { data, body } = splitFrontMatter(source);
     const id = str(data.id, 'front matter id');
     const min = minHeadingDepth(body);
-    opts = { ...opts, headingShift: min <= 6 ? Math.max(0, min - 2) : 0 };
+    const sources = parseLessonSources(data.sources, opts);
+    opts = { ...opts, headingShift: min <= 6 ? Math.max(0, min - 2) : 0, cites: sources.length };
     const blocks: Block[] = [];
     let quizCount = 0;
     for (const seg of segment(body)) {
@@ -210,6 +247,7 @@ export function compileLesson(source: string, file: string, opts: CompileOptions
       summary: str(data.summary, 'front matter summary'),
       minutes,
       blocks,
+      ...(sources.length ? { sources } : {}),
     };
   } catch (e) {
     throw new Error(`${file}: ${e instanceof Error ? e.message : String(e)}`, { cause: e });

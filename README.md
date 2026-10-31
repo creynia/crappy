@@ -6,7 +6,7 @@ Learn craps from zero to perfect strategy. crappy pairs short, friendly lessons 
 
 ## Use it
 
-- **Open it:** <https://creynia.github.io/crappy/> (direct file download: <https://creynia.github.io/crappy/crappy.html>)
+- **Open it:** <https://creynia.com/crappy/> (direct file download: <https://creynia.com/crappy/crappy.html>)
 - **Install it as an app (Android/Chrome):** open the link above, tap the Chrome menu (three dots), then **Add to Home screen** (or **Install app**). It then launches full screen and works offline.
 - **Download one offline file:** go to this repo's **Releases**, open **Latest build** and download `crappy.html`. Open it in Chrome from your Downloads list. It has no external requests at all. Progress in this copy is separate from the website copy, so use Settings, then Export/Import to move it.
 

@@ -4,6 +4,8 @@ title: The Don't side
 chapter: more-bets
 summary: Bet against the shooter. Don't Pass, Don't Come and lay odds, and how the two sides compare.
 minutes: 6
+sources:
+  - woo-craps-appendix-1
 ---
 
 The flat bets have a mirror image. **Don't Pass** (and **Don't Come**, its any-time version) bets that the shooter will **lose**:
@@ -15,9 +17,9 @@ The flat bets have a mirror image. **Don't Pass** (and **Don't Come**, its any-t
 
 On the come-out the Don't is the underdog (3 ways to win vs 8 ways to lose). But **once a point is set, the Don't is the favourite**. A Don't Pass on a 4 wins 2 times out of 3. Because of that, Don't bets **can** be taken down after a point is set, but you **shouldn't**: you'd be giving up the good part of the bet.
 
-**House edge: 1.36%**, a little lower than the Pass Line's 1.41%.
+**House edge: 1.36%**, a little lower than the Pass Line's 1.41%.[^1]
 
-**Laying odds.** Behind a Don't bet you can **lay odds**: risk more to win less, at true odds, **0% edge**. At a 3-4-5x table you may lay up to **6×** your flat bet on any point (that wins 3×, 4× or 5×). Don't Pass + 6× lay odds has a combined edge of **0.27%** per dollar, the lowest of any standard bet combination at this table. Lay odds are **always working**, even on the come-out for Don't Come bets.
+**Laying odds.** Behind a Don't bet you can **lay odds**: risk more to win less, at true odds, **0% edge**. At a 3-4-5x table you may lay up to **6×** your flat bet on any point (that wins 3×, 4× or 5×). Don't Pass + 6× lay odds has a combined edge of **0.27%** per dollar, the lowest of any standard bet combination at this table.[^1] Lay odds are **always working**, even on the come-out for Don't Come bets.
 
 The two sides are mirror images only for the flat bets. Pass + odds and Don't Pass + lay odds are **not** mirrors of each other: lay odds put more of your money in action for the same flat bet, so the edge per dollar looks much better than the cost per hour. In real money the gap is small: about **$0.15 an hour** on a $10 flat bet ($4.19 for Pass + odds vs $4.04 for Don't Pass + 6× lay).
 

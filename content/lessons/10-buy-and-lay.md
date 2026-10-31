@@ -4,6 +4,8 @@ title: "Buy and Lay bets: paying commission"
 chapter: more-bets
 summary: Buy bets pay true odds minus a commission, and Lay bets are the Don't-side version. Learn when Buy beats Place.
 minutes: 7
+sources:
+  - woo-craps-appendix-1
 ---
 
 **Buy bets** are like place bets, except the casino pays **true odds** (2:1 on 4/10, 3:2 on 5/9, 6:5 on 6/8) and charges a **5% commission**, called the **vig**. In this app, as at many Las Vegas casinos, the vig is **5% of your bet, rounded down to whole dollars (minimum $1), and taken only when you win**.
@@ -18,9 +20,9 @@ That rounding is why you should **buy for $20 or more**. At $20 to $39 the vig i
 
 So the rule of thumb is: **place the 6 and 8, buy the 4 and 10** (and buy the 5 and 9 if you really want them). A Buy 4 wins +$40 less the $1 vig, so you collect $39; a Buy 5 or 9 for $20 wins $30 less $1 = $29; a Buy 6 or 8 for $20 wins $24 less $1 = $23. For 5/9 and 6/8, full-pay units are $2 and $5, so $20 works everywhere.
 
-Some casinos take the vig **up front**, when you make the bet. The edge is then measured against your bet **plus** the vig, and every buy bet costs **4.76%**: still better than placing the 4/10, but no longer cheap.
+Some casinos take the vig **up front**, when you make the bet. The edge is then measured against your bet **plus** the vig, and every buy bet costs **4.76%**: still better than placing the 4/10, but no longer cheap.[^1]
 
-**Lay bets** are the reverse: you bet that **7 comes before** the number. 7 is more likely, so you have to risk more than you win. You pay true odds the other way (lay $2 to win $1 against 4/10, $3 to win $2 against 5/9, $6 to win $5 against 6/8), and the vig is **5% of what you win**, rounded down to whole dollars with a $1 minimum. To make that $1 vig worth it, lay in the efficient amounts: **$40** against the 4 or 10, **$30** against the 5 or 9, and **$24** against the 6 or 8. Each of those wins $20, less a $1 vig, so you collect $19.
+**Lay bets** are the reverse: you bet that **7 comes before** the number. 7 is more likely, so you have to risk more than you win. You pay true odds the other way (lay $2 to win $1 against 4/10, $3 to win $2 against 5/9, $6 to win $5 against 6/8), and the vig is **5% of what you win**, rounded down to whole dollars with a $1 minimum.[^1] To make that $1 vig worth it, lay in the efficient amounts: **$40** against the 4 or 10, **$30** against the 5 or 9, and **$24** against the 6 or 8. Each of those wins $20, less a $1 vig, so you collect $19.
 
 | Lay | House edge (vig on win) | Vig paid up front |
 |---|---|---|

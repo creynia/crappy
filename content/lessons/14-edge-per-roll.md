@@ -4,11 +4,14 @@ title: Edge per bet vs edge per roll, and the cost of an hour
 chapter: math-that-matters
 summary: Why a one-roll bet that "only" costs 5.56% is far more expensive per hour than a Pass Line bet.
 minutes: 6
+sources:
+  - woo-craps-appendix-1
+  - grochowski-speed
 ---
 
 So far, every house edge has been **per bet resolved**: what you lose on average each time a bet finally wins or loses. But bets take different amounts of time. A Field bet is over in one roll. A Pass bet lasts about **3.4 rolls** on average. A Place 4 waits until a 4 or a 7 shows, about 4 rolls.
 
-If you leave a bet up all session, what you actually pay depends on how many decisions it has. That's the **per-roll edge**: the average loss per roll, per dollar on the table.
+If you leave a bet up all session, what you actually pay depends on how many decisions it has. That's the **per-roll edge**: the average loss per roll, per dollar on the table. Wizard of Odds and John Grochowski both publish this per-roll comparison.[^1][^2]
 
 | Bet | Edge per bet | Edge per roll |
 |---|---|---|

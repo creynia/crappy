@@ -4,6 +4,8 @@ title: "Odds: the best bet in the house"
 chapter: core-game
 summary: The one bet with no house edge, and how it shrinks the cost of your Pass bet.
 minutes: 9
+sources:
+  - woo-craps-appendix-1
 ---
 
 Once a point is set and you have a Pass bet, you may add a second bet **behind** it, called **taking the odds**. It wins if the point is made and loses on a 7, exactly like your Pass bet. The difference is how it's paid: at **true odds**, the exact ratio of losing to winning chances.
@@ -18,7 +20,7 @@ Because the payout matches the true chance exactly, **the Odds bet has a house e
 
 The maximums at a "3-4-5x" table are set so a winning odds bet always pays 6× your flat bet. Some casinos allow 10× or even 100×.
 
-Why it matters: your Pass bet still costs 1.41% of the flat bet, but now more of your money is riding at 0%. Averaged over everything you bet, the edge drops:
+Why it matters: your Pass bet still costs 1.41% of the flat bet, but now more of your money is riding at 0%. Averaged over everything you bet, the edge drops (figures as published by the Wizard of Odds):[^1]
 
 | Odds taken | Edge per dollar bet (Pass + Odds) |
 |---|---|

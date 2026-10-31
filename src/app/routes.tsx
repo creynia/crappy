@@ -12,6 +12,7 @@ import { NotFound } from './screens/NotFound';
 import { Play } from './screens/Play';
 import { DrillView, PracticeHub } from './screens/Practice';
 import { Settings } from './screens/Settings';
+import { Sources } from './screens/Sources';
 
 type Render = (p: Record<string, string>, r: ParsedHash) => VNode;
 
@@ -29,6 +30,7 @@ export const ROUTES: { pattern: string; render: Render }[] = [
   { pattern: '/bets', render: () => <BetsList /> },
   { pattern: '/bets/:betId', render: (p) => <BetDetail id={p.betId!} /> },
   { pattern: '/glossary', render: (_p, r) => <Glossary query={r.query} /> },
+  { pattern: '/sources', render: () => <Sources /> },
   { pattern: '/settings', render: () => <Settings /> },
   { pattern: '/more', render: () => <More /> },
 ];

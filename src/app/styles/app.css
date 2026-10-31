@@ -723,3 +723,39 @@ button.tile {
   text-align: left;
   cursor: pointer;
 }
+
+.cite {
+  line-height: 0;
+}
+.cite-btn {
+  background: none;
+  border: 0;
+  padding: 0 0.15em;
+  font: inherit;
+  font-size: 0.8em;
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.lesson-sources {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.lesson-sources h2 {
+  font-size: 1rem;
+  margin-top: 0;
+}
+.lesson-sources li:focus {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+.source-list {
+  padding-left: 1.2rem;
+}
+.source-list li {
+  margin: 0.5rem 0;
+}
+.credit {
+  font-size: 0.85rem;
+}

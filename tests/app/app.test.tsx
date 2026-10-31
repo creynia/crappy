@@ -35,6 +35,7 @@ describe('App routes render', () => {
     ['#/glossary', 'Glossary'],
     ['#/settings', 'Settings'],
     ['#/more', 'More'],
+    ['#/sources', 'Sources'],
     ['#/nope/nothing', 'Not found'],
     ['#/learn/does-not-exist', 'Not found'],
     ['#/bets/not-a-bet', 'Not found'],

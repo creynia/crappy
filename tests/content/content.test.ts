@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildContent, readSources } from '../../src/content/load';
+import { buildContent, readSources, validateSources } from '../../src/content/load';
 import { compileLesson } from '../../src/content/compile';
 import { BET_TYPE_IDS, isBetTypeId } from '../../src/sim/engine';
 import { TIERS } from '../../src/content/types';
@@ -127,5 +127,23 @@ describe('content: bundle', () => {
     expect(b.lessons.length).toBeGreaterThan(0);
     for (const l of b.lessons) expect(b.chapters.map((c) => c.id)).toContain(l.chapterId);
     expect(Object.keys(b.bets)).toHaveLength(BET_TYPE_IDS.length);
+  });
+});
+
+describe('content: sources.json', () => {
+  it('is valid: unique ids, https urls', () => {
+    expect(src.sources.length).toBeGreaterThan(0);
+    expect(validateSources(src.sources).size).toBeGreaterThan(5);
+  });
+
+  it('rejects duplicate ids and non-https urls', () => {
+    const g = (items: object[]) => [{ group: 'G', items }];
+    expect(() => validateSources(g([{ id: 'a', title: 'A' }, { id: 'a', title: 'B' }]))).toThrow(/duplicate/);
+    expect(() => validateSources(g([{ id: 'a', title: 'A', url: 'http://x.test' }]))).toThrow(/https/);
+  });
+
+  it('every id cited by a lesson exists (compiled with the real sources)', () => {
+    const ids = validateSources(src.sources);
+    for (const f of src.lessonFiles) compileLesson(f.source, f.file, { ...opts, sourceIds: ids });
   });
 });

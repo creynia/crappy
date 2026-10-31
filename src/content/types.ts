@@ -32,6 +32,23 @@ export type Block =
   | { kind: 'scene'; scene: SceneConfig }
   | { kind: 'quiz'; quiz: Quiz };
 
+/** One entry of content/sources.json. `id` is stable so lessons can refer to it. */
+export interface SourceItem {
+  id: string;
+  title: string;
+  author?: string;
+  url?: string;
+  note?: string;
+}
+
+export interface SourceGroup {
+  group: string;
+  items: SourceItem[];
+}
+
+/** A lesson's cited source: a resolved sources.json entry or a one-off from frontmatter. */
+export type LessonSource = Omit<SourceItem, 'id'> & { id?: string };
+
 export interface Lesson {
   id: LessonId;
   title: string;
@@ -39,6 +56,8 @@ export interface Lesson {
   minutes: number;
   chapterId: ChapterId;
   blocks: Block[];
+  /** cited sources, in `[^n]` order (n is 1-based); absent when the lesson cites none */
+  sources?: LessonSource[];
 }
 
 export interface Chapter {
@@ -73,4 +92,5 @@ export interface ContentBundle {
   lessons: Lesson[];
   glossary: GlossaryEntry[];
   bets: Record<BetTypeId, BetCopy>;
+  sources: SourceGroup[];
 }

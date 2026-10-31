@@ -1,0 +1,122 @@
+[
+  {
+    "group": "Figures & analysis",
+    "items": [
+      {
+        "id": "woo-craps",
+        "title": "Craps (house edge table)",
+        "author": "Michael Shackleford, Wizard of Odds",
+        "url": "https://wizardofodds.com/games/craps/",
+        "note": "Cross-check for the standard house edges of every craps bet."
+      },
+      {
+        "id": "woo-craps-appendix-1",
+        "title": "Craps appendix 1: house edge of each bet, per bet and per roll",
+        "author": "Michael Shackleford, Wizard of Odds",
+        "url": "https://wizardofodds.com/games/craps/appendix/1/",
+        "note": "Edges with and without odds, and the per-roll column behind lesson 14."
+      },
+      {
+        "id": "woo-craps-side-bets",
+        "title": "Craps side bets (Fire Bet, All / Tall / Small)",
+        "author": "Michael Shackleford, Wizard of Odds",
+        "url": "https://wizardofodds.com/games/craps/side-bets/",
+        "note": "The paytables and edges for the bonus bets."
+      },
+      {
+        "id": "woo-crapless",
+        "title": "Crapless craps",
+        "author": "Michael Shackleford, Wizard of Odds",
+        "url": "https://wizardofodds.com/games/crapless-craps/",
+        "note": "The crapless Pass Line and Place 2/3/11/12 edges."
+      },
+      {
+        "id": "lva-bet-em-all",
+        "title": "Bet 'Em All (craps)",
+        "author": "Las Vegas Advisor",
+        "url": "https://www.lasvegasadvisor.com/question/bet-em-all-craps/",
+        "note": "All / Tall / Small edges at 175-1 and 150-1, crediting Shackleford's analysis."
+      },
+      {
+        "id": "grochowski-speed",
+        "title": "What Effect Does Speed Have on Your Craps Game?",
+        "author": "John Grochowski, casino.org",
+        "url": "https://www.casino.org/blog/what-effect-does-speed-have-on-your-craps-game/",
+        "note": "The house-edge-per-roll comparison used in lesson 14."
+      }
+    ]
+  },
+  {
+    "group": "Rules & strategy",
+    "items": [
+      {
+        "id": "caesars-craps-rackcard",
+        "title": "Craps rack card (how to play)",
+        "author": "Caesars Entertainment",
+        "url": "https://www.caesars.com/content/dam/uba/Gaming/Gaming%20Guides/2017/rackcard_craps.pdf",
+        "note": "Lesson order and etiquette follow the usual casino free-lesson sequence."
+      }
+    ]
+  },
+  {
+    "group": "Named methods",
+    "items": [
+      {
+        "id": "wiki-craps-glossary",
+        "title": "Glossary of craps terms",
+        "author": "Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Glossary_of_craps_terms",
+        "note": "Names and standard definitions of systems such as the Iron Cross and Three-point Molly."
+      }
+    ]
+  },
+  {
+    "group": "Algorithms",
+    "items": [
+      {
+        "id": "blackman-vigna-xoshiro",
+        "title": "xoshiro / xoroshiro generators and the PRNG shootout",
+        "author": "David Blackman and Sebastiano Vigna",
+        "url": "https://prng.di.unimi.it/",
+        "note": "The xoshiro128** generator behind every seeded roll (public domain)."
+      },
+      {
+        "id": "splitmix32-bryc",
+        "title": "PRNGs in JavaScript (splitmix32 and xoshiro128ss)",
+        "author": "bryc",
+        "url": "https://gist.github.com/bryc/38a86416e8fa940e009adb15821f36d7",
+        "note": "The widely shared splitmix32 snippet used to expand a seed into generator state."
+      },
+      {
+        "id": "hash-prospector",
+        "title": "hash-prospector",
+        "author": "Chris Wellons",
+        "note": "Origin of the integer-hash constants used by splitmix32."
+      }
+    ]
+  },
+  {
+    "group": "Software",
+    "items": [
+      {
+        "id": "preact",
+        "title": "Preact",
+        "author": "Jason Miller and contributors",
+        "url": "https://preactjs.com/",
+        "note": "MIT license, copyright Jason Miller and contributors. The only runtime dependency."
+      }
+    ]
+  },
+  {
+    "group": "Help",
+    "items": [
+      {
+        "id": "ncpg-help",
+        "title": "Help and treatment (1-800-GAMBLER)",
+        "author": "National Council on Problem Gambling",
+        "url": "https://www.ncpgambling.org/help-treatment/",
+        "note": "If gambling is causing you or someone close to you trouble, free confidential help is available."
+      }
+    ]
+  }
+]

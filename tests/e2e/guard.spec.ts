@@ -85,6 +85,7 @@ test.describe('overflow and console guard at phone widths', () => {
       '/glossary',
       '/settings',
       '/more',
+      '/sources',
     ];
     for (const vp of VIEWPORTS) {
       await page.setViewportSize(vp);

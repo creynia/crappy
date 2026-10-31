@@ -6,6 +6,7 @@ import { Quiz } from '../components/Quiz';
 import { useContent, useStore } from '../context';
 import { FINAL_EXAM_ID, finalExamScore } from '../store';
 import { NotFound } from './NotFound';
+import { SourceEntry } from './Sources';
 
 export function LessonView({ id }: { id: string }) {
   const content = useContent();
@@ -22,7 +23,16 @@ export function LessonView({ id }: { id: string }) {
   const done = store.status(lesson.id) === 'done';
   const progress = store.lesson(lesson.id);
   return (
-    <article class="page lesson">
+    <article
+      class="page lesson"
+      onClick={(e) => {
+        const cite = (e.target as HTMLElement).closest<HTMLElement>('[data-cite]');
+        if (!cite) return;
+        const li = document.getElementById(`${lesson.id}-source-${cite.dataset.cite}`);
+        li?.scrollIntoView({ block: 'center' });
+        li?.focus({ preventScroll: true });
+      }}
+    >
       <Link to="/learn" class="back">
         {'←'} All lessons
       </Link>
@@ -65,6 +75,18 @@ export function LessonView({ id }: { id: string }) {
             );
         }
       })}
+      {lesson.sources && (
+        <section class="lesson-sources" aria-label="Sources">
+          <h2>Sources</h2>
+          <ol>
+            {lesson.sources.map((s, i) => (
+              <li key={i} id={`${lesson.id}-source-${i + 1}`} tabIndex={-1}>
+                <SourceEntry s={s} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {lesson.id === FINAL_EXAM_ID && (
         <section class="card exam-score" aria-label="Exam score">
           <p>

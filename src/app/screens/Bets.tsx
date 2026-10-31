@@ -81,6 +81,10 @@ export function BetsList() {
           </tbody>
         </table>
       </div>
+      <p class="muted credit">
+        Figures computed by crappy; they agree with the Wizard of Odds analysis.{' '}
+        <Link to="/sources">See Sources</Link>.
+      </p>
     </div>
   );
 }

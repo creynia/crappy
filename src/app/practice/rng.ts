@@ -1,4 +1,4 @@
-// Seeded randomness for drills, built on the simulator's xoshiro128** (src/sim/engine/rng.ts).
+// Seeded randomness for drills, built on the simulator's xoshiro128** (src/sim/engine/rng.ts; xoshiro128** by David Blackman and Sebastiano Vigna, https://prng.di.unimi.it/).
 import { nextU32, rollDie, seedRng } from '../../sim/engine';
 import type { Dice, Die, RngState } from '../../sim/engine';
 

@@ -4,9 +4,11 @@ title: Field and Big 6/8
 chapter: more-bets
 summary: Why seven numbers beat four only on paper, and why Big 6/8 is just a worse Place 6/8.
 minutes: 5
+sources:
+  - woo-craps-appendix-1
 ---
 
-**The Field** is a one-roll bet. Win if the next roll is 2, 3, 4, 9, 10, 11 or 12; lose on 5, 6, 7 or 8. Most winners pay even money, but 2 and 12 pay extra.
+**The Field** is a one-roll bet. Win if the next roll is 2, 3, 4, 9, 10, 11 or 12; lose on 5, 6, 7 or 8. Most winners pay even money, but 2 and 12 pay extra.[^1]
 
 It looks generous: seven winning numbers against only four losing ones! But count **ways**, not numbers. The four losers (5, 6, 7, 8) are the four most common totals: **20 ways out of 36**. The winners have only 16.
 
@@ -17,7 +19,7 @@ It looks generous: seven winning numbers against only four losing ones! But coun
 
 Because it settles on every roll, the Field's cost piles up fast. That idea gets its own lesson (14).
 
-**Big 6 / Big 8** sits in the corner. It wins if the 6 (or 8) rolls before a 7, the **exact same thing as Place 6/8**, but it pays only **even money** instead of 7:6. That pushes the edge from 1.52% to **9.09%**, which the simulator labels a **Sucker bet**. There's never a reason to bet Big 6/8; place the number instead. (Atlantic City removed it altogether.)
+**Big 6 / Big 8** sits in the corner. It wins if the 6 (or 8) rolls before a 7, the **exact same thing as Place 6/8**, but it pays only **even money** instead of 7:6. That pushes the edge from 1.52% to **9.09%**, which the simulator labels a **Sucker bet**. There's never a reason to bet Big 6/8; place the number instead. (Atlantic City removed it altogether.)[^1]
 
 :::math Field and Big 6/8
 Field (2:1 on 2 and 12): EV = [1 × (2+3+4+3+2) + 2 × 1 + 2 × 1 − 20]/36 = (14 + 4 − 20)/36 = −2/36 = **−5.556%**.

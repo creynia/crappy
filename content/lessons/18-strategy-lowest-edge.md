@@ -4,6 +4,9 @@ title: "Perfect strategy I: the lowest possible edge"
 chapter: perfect-strategy
 summary: The pure-math lens. Which play costs the least per dollar bet, and what "perfect" can and can't promise.
 minutes: 9
+sources:
+  - woo-craps-appendix-1
+  - woo-craps
 ---
 
 "Perfect strategy" comes in three flavours, and this chapter keeps them apart on purpose:
@@ -16,7 +19,7 @@ They give different answers, and that's fine. Start with the math.
 
 Here's the uncomfortable truth: **there is no way to win at craps in the long run**. Every bet except odds has a house edge, and odds can only be added to bets that have one. "Perfect strategy" therefore means **paying the smallest possible edge for every dollar you put in action**.
 
-By that pure measure, the ranking at a 3-4-5x table is:
+By that pure measure, the ranking at a 3-4-5x table is (these edges agree with the published Wizard of Odds tables):[^1][^2]
 
 | Rank | Play | Edge per dollar bet |
 |---|---|---|

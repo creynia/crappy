@@ -4,6 +4,8 @@ title: Place bets
 chapter: more-bets
 summary: Bet a number directly, without waiting for a Come bet to travel, and learn which numbers are cheap.
 minutes: 6
+sources:
+  - woo-craps-appendix-1
 ---
 
 A **Place bet** lets you pick a number and bet it will roll **before a 7**. No come-out, no travelling. You hand the dealer chips and say "place the 6". The bet stays up after each win until a 7 takes it, or until you take it down.
@@ -16,7 +18,7 @@ The catch is that place bets pay **slightly less than true odds**. That shortfal
 | 5 or 9 | 3:2 | **7:5** | $5 | 4.00% |
 | 4 or 10 | 2:1 | **9:5** | $5 | 6.67% |
 
-**Place 6 and 8 are good bets**, nearly as cheap as the Pass Line (1.52% vs 1.41%). The 5/9 is meh, and 4/10 is expensive. The next lesson shows a cheaper way to bet the 4 and 10.
+**Place 6 and 8 are good bets**, nearly as cheap as the Pass Line (1.52% vs 1.41%).[^1] The 5/9 is meh, and 4/10 is expensive. The next lesson shows a cheaper way to bet the 4 and 10.
 
 Rules to know:
 

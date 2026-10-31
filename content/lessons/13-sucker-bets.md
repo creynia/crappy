@@ -4,6 +4,11 @@ title: Hardways, props and the middle of the table
 chapter: more-bets
 summary: The loud bets in the center of the table, what they pay, and why they cost so much.
 minutes: 7
+sources:
+  - woo-craps-appendix-1
+  - woo-craps-side-bets
+  - woo-crapless
+  - lva-bet-em-all
 ---
 
 The center of the table is bright, loud and paid at long odds. It's also where craps makes most of its money.
@@ -29,7 +34,7 @@ Hardways are off on the come-out by default and can be taken down. They use the 
 | C&E | Any Craps or 11 (2 units) | craps 3:1, 11 7:1 on the whole bet | 11.11% |
 | World ("Whirl") | Horn + Any 7 (5 units) | 7 is a push; 2/3/11/12 as Horn | 13.33% |
 
-You will also hear about **hop bets**: a bet that the very next roll is one exact pair, such as 2-4. An easy hop (two different dice, either way round) pays 15:1 and costs 11.11%; a hard hop (a pair such as 3-3) pays 30:1 and costs 13.89%. In the simulator, tap **Hop** in the center bets and pick a pair; the math is the same as the other props.
+You will also hear about **hop bets**: a bet that the very next roll is one exact pair, such as 2-4. An easy hop (two different dice, either way round) pays 15:1 and costs 11.11%; a hard hop (a pair such as 3-3) pays 30:1 and costs 13.89%.[^1] In the simulator, tap **Hop** in the center bets and pick a pair; the math is the same as the other props.
 
 Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% or more). You can still place them in the sandbox, but it asks you to tap a second time first.
 
@@ -37,8 +42,8 @@ Every one of these is a **Sucker bet** in the simulator's colour code (red, 9% o
 
 **Bonus side bets** live on a rail at the bottom of the Center panel. They ride the whole hand: you can only put them up before a new shooter's first roll, and they stay until the hand decides them.
 
-- **Fire Bet**: pays if the shooter makes 4, 5 or 6 *different* points (the same point twice counts once). With the common 24:1 / 249:1 / 999:1 paytable the edge is **20.76%**. About 1 hand in 100 reaches 4 points.
-- **All / Tall / Small**: pays if every number from 2 to 6 (Small), from 8 to 12 (Tall), or both (All) rolls before a 7, come-out rolls included. With 34:1 / 34:1 / 175:1 the edge is **7.76%** for Small or Tall and **7.46%** for All; it jumps to 18.3% / 20.6% where they pay 30:1 / 150:1. Small and Tall hit 2.64% of the time, All 0.53%.
+- **Fire Bet**: pays if the shooter makes 4, 5 or 6 *different* points (the same point twice counts once). With the common 24:1 / 249:1 / 999:1 paytable the edge is **20.76%**. About 1 hand in 100 reaches 4 points.[^2]
+- **All / Tall / Small**: pays if every number from 2 to 6 (Small), from 8 to 12 (Tall), or both (All) rolls before a 7, come-out rolls included. With 34:1 / 34:1 / 175:1 the edge is **7.76%** for Small or Tall and **7.46%** for All; it jumps to 18.3% / 20.6% where they pay 30:1 / 150:1. Small and Tall hit 2.64% of the time, All 0.53%.[^2][^4]
 
 They're fun lottery tickets, but think of them as a fee for the thrill, not as a strategy. In the simulator the Fire Bet shows the red **Sucker bet** tier; All, Tall and Small land in the orange **Costly** tier (between 5% and 9%), which is cheaper than any one-roll prop but still far from the line bets.
 
@@ -51,7 +56,7 @@ They're fun lottery tickets, but think of them as a fee for the thrill, not as a
 | Place 3 / Place 11 | 11:4 | 6.25% |
 | Odds on 2/12, 3/11 | 6:1, 3:1 | 0% |
 
-You give up the sure win on 11 (2 ways in 36): it becomes a point that usually loses to the 7. In return the 2, 3 and 12 no longer lose at once, but as points they usually lose to the 7 too. The Pass Line looks safer but costs almost **4x** as much.
+You give up the sure win on 11 (2 ways in 36): it becomes a point that usually loses to the 7. In return the 2, 3 and 12 no longer lose at once, but as points they usually lose to the 7 too. The Pass Line looks safer but costs almost **4x** as much.[^3]
 
 :::math Crapless Pass Line
 Come-out 7 wins: 6/36. A point n made before 7: P(n) × w/(w + 6), where w is the number of ways to roll n.

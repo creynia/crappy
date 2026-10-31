@@ -1,3 +1,11 @@
+/*
+ * Seeded randomness. Credits:
+ * - xoshiro128** by David Blackman and Sebastiano Vigna (https://prng.di.unimi.it/, public domain).
+ * - splitmix32 seeding, with the 0x9e3779b9 / 0x21f0aaad / 0x735a2d97 constants as widely shared in
+ *   JavaScript (e.g. bryc's PRNG gist); the multiplier constants come from Chris Wellons'
+ *   hash-prospector work.
+ * This is an independent, immutable-state TypeScript implementation.
+ */
 import type { Dice, Die, RngState } from './types';
 
 /** One step of splitmix32; returns [output, nextCounter]. */

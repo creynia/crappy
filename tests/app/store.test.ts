@@ -15,6 +15,7 @@ const bundle = (ids: string[]): ContentBundle => ({
   })),
   glossary: [],
   bets: {} as ContentBundle['bets'],
+  sources: [],
 });
 
 describe('Store challenge record', () => {

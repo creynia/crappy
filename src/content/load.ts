@@ -1,7 +1,15 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compileLesson, renderMarkdown } from './compile';
-import type { BetCopy, Chapter, ContentBundle, GlossaryEntry, Lesson } from './types';
+import type {
+  BetCopy,
+  Chapter,
+  ContentBundle,
+  GlossaryEntry,
+  Lesson,
+  SourceGroup,
+  SourceItem,
+} from './types';
 import type { BetTypeId } from '../sim/engine/types';
 
 interface RawGlossary {
@@ -37,11 +45,32 @@ export function normalizeBets(raw: unknown): Record<string, BetCopy> {
   return out;
 }
 
+/** Checks content/sources.json: unique non-empty ids, titles, https urls. Returns the id lookup. */
+export function validateSources(groups: unknown): Map<string, SourceItem> {
+  const byId = new Map<string, SourceItem>();
+  if (!Array.isArray(groups)) throw new Error('content/sources.json must be an array of groups');
+  for (const g of groups as Partial<SourceGroup>[]) {
+    if (!g || typeof g.group !== 'string' || !g.group || !Array.isArray(g.items))
+      throw new Error('content/sources.json: each group needs a `group` name and an `items` list');
+    for (const it of g.items) {
+      const where = `content/sources.json: ${g.group} / ${String(it?.id)}`;
+      if (!it || typeof it.id !== 'string' || !it.id) throw new Error(`${where}: item needs an id`);
+      if (typeof it.title !== 'string' || !it.title) throw new Error(`${where}: item needs a title`);
+      if (it.url !== undefined && !/^https:\/\/\S+$/.test(it.url))
+        throw new Error(`${where}: url must be an https URL`);
+      if (byId.has(it.id)) throw new Error(`${where}: duplicate source id`);
+      byId.set(it.id, it);
+    }
+  }
+  return byId;
+}
+
 /** Raw (uncompiled) source files, exposed so content tests can check them directly. */
 export interface ContentSources {
   chapters: Chapter[];
   glossary: GlossaryEntry[];
   bets: Record<string, BetCopy>;
+  sources: SourceGroup[];
   samplesActive: boolean;
   lessonFiles: { file: string; slug: string; source: string }[];
 }
@@ -70,6 +99,7 @@ export function readSources(root: string, includeSamples = false): ContentSource
     chapters: json<Chapter[]>('chapters.json', '_sample-chapters.json', []),
     glossary: json<RawGlossary[]>('glossary.json', '_sample-glossary.json', []).map(normalizeGlossary),
     bets: normalizeBets(json<unknown>('bets.json', '_sample-bets.json', {})),
+    sources: json<SourceGroup[]>('sources.json', '_none', []),
     samplesActive,
     lessonFiles: files.map((f) => ({
       file: f,
@@ -83,7 +113,8 @@ export function buildContent(root: string): ContentBundle {
   const src = readSources(root);
   const glossarySlugs = new Set(src.glossary.map((g) => g.slug));
   const glossaryTerms = new Map(src.glossary.map((g) => [g.term.toLowerCase(), g.slug] as const));
-  const opts = { glossarySlugs, glossaryTerms };
+  const sourceIds = validateSources(src.sources);
+  const opts = { glossarySlugs, glossaryTerms, sourceIds };
   const compiled = new Map(
     src.lessonFiles.map((f) => {
       const l = compileLesson(f.source, `content/lessons/${f.file}`, opts);
@@ -110,6 +141,6 @@ export function buildContent(root: string): ContentBundle {
       { ...v, howItWorks: renderMarkdown(v.howItWorks, opts) },
     ]),
   ) as Record<BetTypeId, BetCopy>;
-  return { chapters: src.chapters, lessons, glossary, bets };
+  return { chapters: src.chapters, lessons, glossary, bets, sources: src.sources };
 }
 

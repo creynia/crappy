@@ -74,3 +74,35 @@ describe('quiz ids', () => {
     ).toThrow(/":"/);
   });
 });
+
+describe('lesson sources and citations', () => {
+  const sourceIds = new Map([['woo', { id: 'woo', title: 'Wizard of Odds', url: 'https://wizardofodds.com/' }]]);
+  const lesson = (fm: string, body: string) =>
+    `---\nid: x\ntitle: X\nsummary: s\nminutes: 1\n${fm}---\n\n${body}\n`;
+
+  it('resolves ids and one-off entries, and renders [^n] markers', () => {
+    const l = compileLesson(
+      lesson('sources:\n  - woo\n  - { title: One-off, note: n }\n', 'Edge is 1%.[^1] And more.[^2]'),
+      'x.md',
+      { sourceIds },
+    );
+    expect(l.sources?.map((s) => s.title)).toEqual(['Wizard of Odds', 'One-off']);
+    const html = (l.blocks[0] as { html: string }).html;
+    expect(html).toContain('data-cite="1"');
+    expect(html).toContain('data-cite="2"');
+    expect(html).not.toContain('[^');
+  });
+
+  it('rejects unknown ids, out-of-range markers and bad urls', () => {
+    expect(() => compileLesson(lesson('sources: [nope]\n', 'a'), 'x.md', { sourceIds })).toThrow(/unknown source id/);
+    expect(() => compileLesson(lesson('sources: [woo]\n', 'a[^2]'), 'x.md', { sourceIds })).toThrow(/out of range/);
+    expect(() => compileLesson(lesson('', 'a[^1]'), 'x.md', { sourceIds })).toThrow(/out of range/);
+    expect(() =>
+      compileLesson(lesson('sources:\n  - { title: T, url: "http://x.test" }\n', 'a'), 'x.md', { sourceIds }),
+    ).toThrow(/https/);
+  });
+
+  it('lessons without sources carry none', () => {
+    expect(compileLesson(lesson('', 'plain'), 'x.md').sources).toBeUndefined();
+  });
+});

@@ -1,5 +1,7 @@
-import { BET_TYPE_IDS, DEFAULT_RULES, betEdge, getBetType } from '../sim';
-import type { BetTypeId, PointNumber } from '../sim';
+// Engine/math barrels (not '../sim') so the static-page build can import this without the UI.
+import { BET_TYPE_IDS, DEFAULT_RULES, getBetType } from '../sim/engine';
+import type { BetTypeId, PointNumber } from '../sim/engine';
+import { betEdge } from '../sim/math';
 import type { BetCopy, Tier } from '../content/types';
 
 export const ALL_BETS: readonly BetTypeId[] = BET_TYPE_IDS;

@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
+import { isStaticSiteFile } from './static-site';
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -13,7 +14,8 @@ function walk(dir: string): string[] {
 
 /**
  * Emits `sw.js` (from src/pwa/sw.ts) with a precache list of every built file, and
- * injects the manifest + apple-touch-icon links. Only added to non-single builds.
+ * injects the manifest + apple-touch-icon links. Only added to non-single builds. The static
+ * SEO pages (build/static-site.ts) are left out of the precache.
  */
 export function swPlugin(): Plugin {
   let outDir = 'dist';
@@ -46,6 +48,8 @@ export function swPlugin(): Plugin {
         const files = walk(outDir)
           .map((f) => relative(outDir, f).split('\\').join('/'))
           .filter((f) => f !== 'sw.js' && f !== 'crappy.html' && !f.endsWith('.map'))
+          // Static SEO pages, sitemap and llms files are always fetched from the network.
+          .filter((f) => !isStaticSiteFile(f))
           .sort();
         const precache = ['./', ...files.map((f) => './' + f)];
         const src = readFileSync(resolve(root, 'src/pwa/sw.ts'), 'utf8');

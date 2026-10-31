@@ -9,7 +9,7 @@ const root = process.cwd();
 const src = readSources(root, true);
 const glossarySlugs = new Set(src.glossary.map((g) => g.slug));
 const glossaryTerms = new Map(src.glossary.map((g) => [g.term.toLowerCase(), g.slug] as const));
-const opts = { glossarySlugs, glossaryTerms };
+const opts = { glossarySlugs, glossaryTerms, sourceIds: validateSources(src.sources) };
 const compiled = src.lessonFiles.map((f) => ({
   f,
   lesson: compileLesson(f.source, `content/lessons/${f.file}`, opts),

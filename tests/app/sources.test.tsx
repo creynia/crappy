@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { describe, expect, it } from 'vitest';
 import content from 'virtual:content';
 import { AppProviders } from '../../src/app/context';
+import { LessonView } from '../../src/app/screens/Lesson';
 import { More } from '../../src/app/screens/More';
 import { Sources } from '../../src/app/screens/Sources';
 import { MemoryStorage } from '../../src/app/storage';
@@ -57,5 +58,16 @@ describe('Sources screen', () => {
     const set = hrefs.findIndex((h) => h?.endsWith('/settings'));
     expect(s).toBeGreaterThan(-1);
     expect(s).toBeLessThan(set);
+  });
+
+  it('cited lessons list their sources after the body; uncited lessons do not', async () => {
+    const cited = content.lessons.find((l) => l.id === 'sucker-bets')!;
+    expect(cited.sources?.length).toBe(4);
+    const el = await mount(<LessonView id={cited.id} />);
+    expect(el.querySelectorAll('.lesson-sources ol li').length).toBe(4);
+    expect(el.querySelectorAll('sup.cite').length).toBeGreaterThan(3);
+    const plain = content.lessons.find((l) => !l.sources)!;
+    const el2 = await mount(<LessonView id={plain.id} />);
+    expect(el2.querySelector('.lesson-sources')).toBeNull();
   });
 });

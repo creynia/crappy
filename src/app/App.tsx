@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { pagePath, trackPage } from './analytics';
 import { UpdateToast, type UpdateSubscribe } from './components/UpdateToast';
 import { Shell } from './components/Shell';
 import { useStore } from './context';
@@ -38,6 +39,7 @@ export function App(props: { onUpdateAvailable?: UpdateSubscribe }) {
       }),
     [store],
   );
+  useEffect(() => trackPage(pagePath(location.pathname, route.path)), [route.path]);
   // Move focus to the page after a route change (not on first load).
   const firstRoute = useRef(true);
   useEffect(() => {

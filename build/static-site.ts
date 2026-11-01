@@ -18,6 +18,8 @@ export const GAME = 'Craps';
 export const BASE = `${ORIGIN}/${APP}/`;
 const THEME = '#0b3d2e';
 const OG_IMAGE = `${ORIGIN}/assets/og/${APP}.jpg`;
+/** GoatCounter page-view pixel (docs/analytics.md); same endpoint as src/app/analytics.ts. */
+export const COUNT_URL = 'https://creynia.goatcounter.com/count';
 const PERSON = {
   '@type': 'Person',
   '@id': `${ORIGIN}/#creynia`,
@@ -206,6 +208,12 @@ interface Layout {
   body: string;
 }
 
+/** A JS-free, cookieless page-view count for a static page (path like 'learn/pass-line/'). */
+export function countPixel(path: string): string {
+  const p = encodeURIComponent(`/${APP}/${path}`);
+  return `<img src="${COUNT_URL}?p=${p}" alt="" width="1" height="1" style="position:absolute;left:-9999px">`;
+}
+
 function page(o: Layout): string {
   const root = up(o.path);
   const url = abs(o.path);
@@ -260,6 +268,7 @@ ${o.body}
 <p>If gambling is hurting you or someone you know, call or text <strong>1-800-GAMBLER</strong> (US), or contact your national problem-gambling helpline.</p>
 <ul><li><a href="${ORIGIN}/">Know the Odds: creynia's casino lab</a></li>${others}</ul>
 </div></footer>
+${countPixel(o.path)}
 </body>
 </html>
 `;

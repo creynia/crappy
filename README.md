@@ -23,11 +23,17 @@ The repo is already public. Use github.com in Chrome (tap the menu and choose **
 - A practice table with real craps rules and payouts
 - Expected value, house edge and odds shown for every bet
 - Quizzes and a glossary
-- Installable and fully offline; no accounts, no tracking, no ads
+- Installable and fully offline; no accounts, no ads, only anonymous cookieless page counts
 
 ## Is this gambling advice?
 
 No. crappy is for education. In craps the house always has an edge, and no betting system changes that; the lessons show you which bets cost the least, not how to win. Play money only here. If gambling is causing you or someone you know harm, call **1-800-GAMBLER** (US) or find local resources at your national problem-gambling helpline.
+
+## Privacy
+
+Your progress stays in your browser. The site counts anonymous, cookieless page views with
+GoatCounter (no identifiers, no tracking across sites, off with Do Not Track or Global Privacy
+Control, never in the offline file); see [`docs/analytics.md`](docs/analytics.md).
 
 ## Development
 

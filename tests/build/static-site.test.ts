@@ -48,6 +48,11 @@ describe('static SEO pages', () => {
     expect(count(html, /<script/g)).toBe(1);
     expect(html).not.toMatch(/:::|```|\[\[|href="#\//);
     expect(html).not.toContain('creynia.github.io');
+    // One cookieless GoatCounter pixel for the page's own path.
+    expect(count(html, /creynia\.goatcounter\.com\/count/g)).toBe(1);
+    expect(html).toContain(
+      `count?p=${encodeURIComponent(`/crappy/${file.replace(/index\.html$/, '')}`)}"`,
+    );
     const ld = JSON.parse(attr(html, /<script type="application\/ld\+json">(.*?)<\/script>/s)) as {
       '@graph': { '@type': string | string[] }[];
     };

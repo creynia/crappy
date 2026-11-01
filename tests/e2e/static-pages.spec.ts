@@ -28,8 +28,11 @@ test('static lesson page is served as itself, even once the service worker contr
 
 test('course index, bets and glossary pages exist', async ({ page }) => {
   for (const [path, h1] of [
-    ['/learn/', 'Learn Craps: the free course'],
-    ['/bets/', 'Every Craps bet and its house edge'],
+    ['/learn/', 'How to play craps: the free course'],
+    ['/bets/', 'Craps odds chart: payout, true odds and house edge of every bet'],
+    ['/best-and-worst-bets/', 'The best and worst bets in craps, ranked by house edge'],
+    ['/odds-bet-house-edge/', 'Craps odds bet explained: the house edge at 1x to 100x odds'],
+    ['/dice-probability/', 'Craps dice probability: the odds of rolling every total'],
     ['/bets/pass-line/', 'Pass Line'],
     ['/glossary/', 'Craps glossary'],
   ] as const) {

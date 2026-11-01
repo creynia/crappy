@@ -4,7 +4,9 @@ Content lives in `content/` and is compiled at build time into the `virtual:cont
 (`build/vite-plugin-content.ts`, using `src/content/compile.ts`). `npm test` validates all of it.
 The same content is also published as static, crawlable pages (`/learn/<id>/`, `/bets/<id>/`,
 `/glossary/`) by `build/static-site.ts`, so a lesson's `title` and `summary` double as its search
-result title and description: keep summaries specific (about 60 to 110 characters).
+result title and description: keep summaries specific (about 60 to 110 characters). A few
+lessons that answer a common search ("how to play craps") get a search title from
+`LESSON_SEO_TITLES` in that file instead; the page's `h1` stays the lesson title.
 
 ## Files
 

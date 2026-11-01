@@ -26,7 +26,8 @@
     "src/sim/math/**/*.ts",
     "src/sim/strategy/**/*.ts",
     "src/sim/scene/**/*.ts",
-    "src/sim/ui/layouts/types.ts"
+    "src/sim/ui/layouts/types.ts",
+    "src/sim/ui/customRules.ts"
   ],
   "exclude": ["**/*.test.ts"]
 }

@@ -29,7 +29,14 @@ export function oddsLimits(choice: OddsChoice): Pick<TableRules, 'maxOdds' | 'ma
     }
     return { maxOdds, maxLayOdds };
   }
-  const n = Number(choice.slice(0, -1));
+  return flatOddsLimits(Number(choice.slice(0, -1)));
+}
+
+/** Flat N-times odds on every point, and the matching lay limit (see oddsLimits). */
+export function flatOddsLimits(n: number): Pick<TableRules, 'maxOdds' | 'maxLayOdds'> {
+  const points = pointsFor({ variant: 'crapless' });
+  const maxOdds = {} as PointTable;
+  const maxLayOdds = {} as PointTable;
   // lay odds to win n times the flat: the lay pays 1:6 on 2/12, 1:3 on 3/11, 1:2 on 4/10, 2:3, 5:6
   const layWin: Record<PointNumber, number> = {
     2: 6,
